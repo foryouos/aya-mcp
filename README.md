@@ -75,7 +75,7 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 
 **开启方式**：设置 → MCP → 勾选"启用 MCP 服务"。开启后自动弹出配置片段，复制到客户端即可；服务随应用启动自动拉起，端口默认 `7788`。
 
-**工具清单**（共 37 个，15 只读 / 22 写）：
+**工具清单**（共 42 个，16 只读 / 26 写）：
 
 设备与画面：
 
@@ -151,6 +151,18 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 
 端口端点支持 `8080`、`tcp:8080`、`localabstract:<name>` 三种写法，省略 `tcp:` 会自动补齐；WebView 调试默认取前台应用，也可显式传 `pid`，内部自动 `adb forward` 并访问 `/json`。
 
+录屏与投屏：
+
+| 工具 | 权限 | 说明 |
+| --- | --- | --- |
+| `aya_start_recording` | 写 | 设备端 `screenrecord` 后台开录，可设时长（≤180s）、码率、分辨率 |
+| `aya_stop_recording` | 写 | 停止录制并把视频拉回本机，返回本机路径、大小、时长 |
+| `aya_recording_status` | 只读 | 是否在录、已录时长、剩余时长、设备端文件大小 |
+| `aya_cast_window` | 写 | 打开 / 关闭 / 重启 AYA 投屏窗口 |
+| `aya_cast_settings` | 写 | 读取或修改投屏码率、最大边长，`restart: true` 立即生效 |
+
+录屏是「开录 → 操作 → 停录」三步：`aya_start_recording` 立刻返回，后续 `aya_tap` / `aya_batch` 照常执行，最后 `aya_stop_recording` 触发 SIGINT 让设备正常收尾（直接杀进程会留下损坏的 mp4）。
+
 写工具默认隐藏，需在设置中勾选"允许写入操作"；桥接脚本通过 SSE 收到 `notifications/tools/list_changed` 后通知客户端热刷新，客户端不支持热更新时重连即可。
 
 **典型组合**：验证某个操作是否报错，先 `aya_clear_logcat`，执行操作，再 `aya_logcat{level:'E'}`；排查应用异常退出一律先 `aya_app_info` 看 `running`/`pid`，再决定 `aya_start_app` 重启；需要把崩溃日志带回本机就 `aya_pull_file` 拉 `/sdcard/` 下的文件。
@@ -183,10 +195,12 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 | adb 找不到设备 | 确认 `resources/adb/adb.exe` 存在，`adb devices` 有输出 |
 | 安装依赖很慢 | 脚本默认使用 `https://npmmirror.com/mirrors/electron/` 镜像，可自行设置 `ELECTRON_MIRROR` |
 | MCP 开关打不开、提示端口被占用 | 7788 已被告占用，改端口后重试；设置项里会直接显示错误原因 |
-| 客户端只看到 12 个只读工具 | 未勾选"允许写入操作"，勾选后重连 MCP 服务（或等待 `tools/list_changed` 热更新） |
+| 客户端只看到 16 个只读工具 | 未勾选"允许写入操作"，勾选后重连 MCP 服务（或等待 `tools/list_changed` 热更新） |
 | `aya_tap` 返回 `STALE_SNAPSHOT` | 快照 60s 过期或中间执行过输入类工具，重新 `aya_ui_dump` 再点 |
 | 点开播放器控制栏后 `aya_ui_dump` 读不到 | 控件已自动隐藏，改用 `aya_tap` 的 `withUi`（默认开）或 `aya_batch` 在同一次调用内完成点击与观察 |
 | `withUi` 返回 `ui.nodes` 为空 | 视频/游戏画面是 SurfaceView，uiautomator 读不到节点，改用 `aya_screencap` 从截图判断 |
+| `aya_start_recording` 提示"设备已在录屏中" | 上一次没正常停止，`kill -2` 收尾或等 180s 自动结束；`aya_recording_status` 可看到 pid |
+| `aya_stop_recording` 返回文件为空 | 录制时长过短（不足 1s）或设备 `screenrecord` 不可用，加大 `timeLimit` 后重试 |
 
 ## 其它常用命令
 

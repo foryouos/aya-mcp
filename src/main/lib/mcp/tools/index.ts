@@ -14,6 +14,8 @@ import batchTools from './batch'
 import waitTools from './wait'
 import portTools from './port'
 import webviewTools from './webview'
+import recordTools from './record'
+import castTools from './cast'
 
 export type { McpTool } from './types'
 
@@ -32,6 +34,8 @@ const toolGroups: McpTool[][] = [
   logcatTools,
   portTools,
   webviewTools,
+  recordTools,
+  castTools,
 ]
 
 export function getAllTools(): McpTool[] {
