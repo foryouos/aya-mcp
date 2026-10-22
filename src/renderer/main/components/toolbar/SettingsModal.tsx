@@ -2,6 +2,8 @@ import LunaModal from 'luna-modal/react'
 import LunaSetting, {
   LunaSettingButton,
   LunaSettingCheckbox,
+  LunaSettingHtml,
+  LunaSettingNumber,
   LunaSettingSelect,
   LunaSettingSeparator,
   LunaSettingTitle,
@@ -11,22 +13,72 @@ import { t } from 'common/util'
 import Style from './SettingsModal.module.scss'
 import { createPortal } from 'react-dom'
 import { observer } from 'mobx-react-lite'
+import { useMemo, useState } from 'react'
 import contain from 'licia/contain'
 import debounce from 'licia/debounce'
 import SettingPath from 'share/renderer/components/SettingPath'
 import store from '../../store'
 import { IModalProps } from 'share/common/types'
+import McpConfigModal from './McpConfigModal'
 
 const notifyRequireReload = debounce(() => {
   notify(t('requireReload'), { icon: 'info' })
 }, 1000)
 
 export default observer(function SettingsModal(props: IModalProps) {
+  const [configVisible, setConfigVisible] = useState(false)
+  const applyPort = useMemo(
+    () =>
+      debounce((port: number) => {
+        store.mcp.setPort(port)
+      }, 800),
+    []
+  )
+
   function onChange(key, val) {
+    // MCP 相关配置由主进程托管，走专用 IPC 而不是通用设置存储
+    if (contain(['mcpEnabled', 'mcpAllowWrite'], key)) {
+      if (key === 'mcpEnabled') {
+        toggleEnabled(val)
+      } else {
+        toggleAllowWrite(val)
+      }
+      return
+    }
+    if (key === 'mcpPort') {
+      applyPort(val)
+      return
+    }
     if (contain(['language', 'useNativeTitlebar'], key)) {
       notifyRequireReload()
     }
     store.settings.set(key, val)
+  }
+
+  async function toggleEnabled(enabled: boolean) {
+    const status = await store.mcp.setEnabled(enabled)
+    if (enabled && !status.running) {
+      notify(t('mcpStartFailed', { error: status.error || '' }), {
+        icon: 'error',
+      })
+      return
+    }
+    if (enabled) {
+      setConfigVisible(true)
+    }
+  }
+
+  async function toggleAllowWrite(allowWrite: boolean) {
+    await store.mcp.setAllowWrite(allowWrite)
+    if (allowWrite) {
+      notify(t('mcpWriteToolsHint'), { icon: 'info' })
+    }
+  }
+
+  async function resetToken() {
+    await store.mcp.resetToken()
+    notify(t('mcpTokenReset'), { icon: 'success' })
+    setConfigVisible(true)
   }
 
   return createPortal(
@@ -92,7 +144,68 @@ export default observer(function SettingsModal(props: IModalProps) {
           description={t('restartAya')}
           onClick={() => main.relaunch()}
         />
+        <LunaSettingSeparator />
+        <LunaSettingTitle title={t('mcp')} />
+        <LunaSettingCheckbox
+          keyName="mcpEnabled"
+          value={store.mcp.enabled}
+          description={t('mcpEnabled')}
+        />
+        <LunaSettingCheckbox
+          keyName="mcpAllowWrite"
+          value={store.mcp.allowWrite}
+          description={t('mcpAllowWrite')}
+          disabled={!store.mcp.enabled}
+        />
+        <LunaSettingNumber
+          keyName="mcpPort"
+          value={store.mcp.port}
+          title={t('mcpPort')}
+          description={t('mcpPortDesc')}
+          min={1024}
+          max={65535}
+          disabled={!store.mcp.enabled}
+        />
+        <LunaSettingHtml>
+          <div className={Style.mcpStatus}>
+            <div className={Style.mcpEndpoint}>
+              <span
+                className={
+                  store.mcp.running ? Style.dotRunning : Style.dotStopped
+                }
+              />
+              <span className={Style.mcpUrl}>{store.mcp.url}</span>
+            </div>
+            <div className={Style.mcpMeta}>
+              {store.mcp.running
+                ? `${t('mcpRunning')} · ${t('mcpToolCount', {
+                    count: store.mcp.toolCount,
+                  })}`
+                : t('mcpNotStarted')}
+            </div>
+            {store.mcp.error ? (
+              <div className={Style.mcpError}>{store.mcp.error}</div>
+            ) : null}
+          </div>
+        </LunaSettingHtml>
+        <LunaSettingHtml>
+          <div className={Style.mcpActions}>
+            <button
+              className={Style.mcpAction}
+              onClick={() => setConfigVisible(true)}
+            >
+              {t('mcpViewConfig')}
+            </button>
+            <button className={Style.mcpAction} onClick={resetToken}>
+              {t('mcpResetToken')}
+            </button>
+          </div>
+        </LunaSettingHtml>
       </LunaSetting>
+      <McpConfigModal
+        visible={configVisible}
+        onClose={() => setConfigVisible(false)}
+      />
     </LunaModal>,
     document.body
   )

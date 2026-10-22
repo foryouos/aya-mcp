@@ -1,0 +1,82 @@
+@use '../../../theme' as *;
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: #{$padding-x-s}px;
+  padding: #{$padding-x-s}px;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: inherit;
+  font-family: inherit;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}
+
+.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.copy {
+  margin-left: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg-container);
+  color: var(--color-text);
+  font-size: inherit;
+  font-family: inherit;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.code {
+  margin: 0;
+  max-height: 300px;
+  overflow: auto;
+  padding: #{$padding-x-s}px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg-container-darker);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.tip {
+  margin: 0;
+  color: var(--color-text-secondary, var(--color-text));
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.75;
+}

@@ -38,6 +38,9 @@ import {
   IpcDumpWindowHierarchy,
   IpcGetDevices,
   IpcInputKey,
+  IpcInputSwipe,
+  IpcInputTap,
+  IpcInputText,
   IpcPairDevice,
   IpcScreencap,
 } from 'common/types'
@@ -52,7 +55,7 @@ const settingsStore = getSettingsStore()
 
 let client: Client
 
-const getDevices: IpcGetDevices = async function () {
+export const getDevices: IpcGetDevices = async function () {
   let devices = await client.listDevices()
   devices = filter(
     devices,
@@ -81,7 +84,7 @@ const getDevices: IpcGetDevices = async function () {
   ).catch(() => [])
 }
 
-async function getOverview(deviceId: string) {
+export async function getOverview(deviceId: string) {
   const device = await client.getDevice(deviceId)
   const properties = await device.getProperties()
   const cpus = await getCpus(deviceId, false)
@@ -180,7 +183,7 @@ function getMarketName(properties: types.PlainObj<string>) {
   return marketName
 }
 
-async function getPerformance(deviceId: string) {
+export async function getPerformance(deviceId: string) {
   const cpus = await getCpus(deviceId)
 
   return {
@@ -208,7 +211,7 @@ async function getBattery(deviceId: string) {
   }
 }
 
-const screencap: IpcScreencap = async function (deviceId) {
+export const screencap: IpcScreencap = async function (deviceId) {
   const device = await client.getDevice(deviceId)
   const data = await device.screencap()
   const buf = await Adb.util.readAll(data)
@@ -216,7 +219,9 @@ const screencap: IpcScreencap = async function (deviceId) {
   return buf.toString('base64')
 }
 
-const dumpWindowHierarchy: IpcDumpWindowHierarchy = async function (deviceId) {
+export const dumpWindowHierarchy: IpcDumpWindowHierarchy = async function (
+  deviceId
+) {
   const path = '/data/local/tmp/aya_uidump.xml'
   await shell(deviceId, `uiautomator dump ${path}`)
   const data = await file.pullFileData(deviceId, path)
@@ -311,8 +316,32 @@ const pairDevice: IpcPairDevice = async function (host, port, password) {
   }
 }
 
-const inputKey: IpcInputKey = async function (deviceId, keyCode) {
+export const inputKey: IpcInputKey = async function (deviceId, keyCode) {
   await base.shell(deviceId, `input keyevent ${keyCode}`)
+}
+
+export const inputTap: IpcInputTap = async function (deviceId, x, y) {
+  return base.shell(deviceId, `input tap ${Math.round(x)} ${Math.round(y)}`)
+}
+
+export const inputSwipe: IpcInputSwipe = async function (
+  deviceId,
+  x1,
+  y1,
+  x2,
+  y2,
+  duration = 300
+) {
+  return base.shell(
+    deviceId,
+    `input swipe ${Math.round(x1)} ${Math.round(y1)} ${Math.round(
+      x2
+    )} ${Math.round(y2)} ${Math.round(duration)}`
+  )
+}
+
+export const inputText: IpcInputText = async function (deviceId, text) {
+  return base.shell(deviceId, `input text ${text}`)
 }
 
 async function openAdbCli() {
@@ -427,6 +456,9 @@ export async function init() {
   handleEvent('connectDevice', connectDevice)
   handleEvent('disconnectDevice', disconnectDevice)
   handleEvent('inputKey', inputKey)
+  handleEvent('inputTap', inputTap)
+  handleEvent('inputSwipe', inputSwipe)
+  handleEvent('inputText', inputText)
   handleEvent('openAdbCli', openAdbCli)
   handleEvent('dumpWindowHierarchy', dumpWindowHierarchy)
   handleEvent('root', root)

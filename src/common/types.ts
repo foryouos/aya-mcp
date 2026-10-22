@@ -63,6 +63,25 @@ export interface IProcess {
   pid: string
 }
 
+export interface IMcpStatus {
+  running: boolean
+  enabled: boolean
+  port: number
+  url: string
+  allowWrite: boolean
+  toolCount: number
+  rev: number
+  error?: string
+}
+
+export interface IMcpConfigs {
+  port: number
+  token: string
+  stdio: string
+  node: string
+  http: string
+}
+
 export enum TransferType {
   Upload,
   Download,
@@ -113,6 +132,26 @@ export type IpcCloseLogcat = (logcatId: string) => Promise<void>
 export type IpcPauseLogcat = IpcCloseLogcat
 export type IpcResumeLogcat = IpcCloseLogcat
 export type IpcInputKey = (deviceId: string, keyCode: number) => Promise<void>
+export type IpcInputTap = (
+  deviceId: string,
+  x: number,
+  y: number
+) => Promise<string>
+export type IpcInputSwipe = (
+  deviceId: string,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  duration?: number
+) => Promise<string>
+export type IpcInputText = (deviceId: string, text: string) => Promise<string>
+export type IpcMcpGetStatus = () => Promise<IMcpStatus>
+export type IpcMcpSetEnabled = (enabled: boolean) => Promise<IMcpStatus>
+export type IpcMcpSetAllowWrite = (allowWrite: boolean) => Promise<IMcpStatus>
+export type IpcMcpSetPort = (port: number) => Promise<IMcpStatus>
+export type IpcMcpGetConfigs = () => Promise<IMcpConfigs>
+export type IpcMcpResetToken = IpcMcpGetConfigs
 export type IpcReverseTcp = (
   deviceId: string,
   remote: string

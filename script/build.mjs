@@ -14,6 +14,7 @@ await $`npm run build:main`
 await $`npm run build:preload`
 await $`npm run build:renderer`
 
+await fs.copy('script/mcp', 'resources/mcp')
 await fs.copy('build', 'dist/build')
 await fs.copy('resources', 'dist/resources')
 cd('dist')

@@ -69,6 +69,39 @@ powershell -NoProfile -ExecutionPolicy Bypass -File script\dev.ps1 -InspectPort 
 - 主进程：`chrome://inspect` 连 `localhost:9229`（Node inspector，可断点调试）。
 - dev 模式下渲染代码改动即时热更新；**主进程 / preload 改动需重新执行脚本**（或用 `npm run dev:main`、`npm run dev:preload` 单独 watch 后重启 Electron）。
 
+## MCP 服务（AI 客户端控制设备）
+
+AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*` 工具暴露给 CodeBuddy / WorkBuddy 等 AI 客户端，省去"写脚本 → 运行 → 解析输出"的往返。
+
+**开启方式**：设置 → MCP → 勾选"启用 MCP 服务"。开启后自动弹出配置片段，复制到客户端即可；服务随应用启动自动拉起，端口默认 `7788`。
+
+**工具清单**：
+
+| 工具 | 权限 | 说明 |
+| --- | --- | --- |
+| `aya_list_devices` | 只读 | 列出在线设备，标出 AYA 当前选中设备 |
+| `aya_device_info` | 只读 | 机型、系统版本、分辨率、CPU/内存/电量摘要 |
+| `aya_screencap` | 只读 | 截图（默认缩放到 900px 宽，返回 `scale`） |
+| `aya_ui_dump` | 只读 | UI 层级树，节点带 `bounds` / `center` / 全局索引 `i` |
+| `aya_current_app` | 只读 | 前台包名与 pid |
+| `aya_tap` | 写 | 坐标、`nodeIndex`+`snapshotId`、或 `text`/`id`/`desc` 选择器 |
+| `aya_tap_text` | 写 | `aya_tap{text}` 的语义化快捷方式 |
+| `aya_swipe` | 写 | 滑动，`duration` 默认 300ms |
+| `aya_key` | 写 | `back`/`home`/`enter`/`recent`/`volume_up` 等按键 |
+| `aya_text` | 写 | 仅可打印 ASCII，中文走 `aya_shell` + 输入法 |
+| `aya_shell` | 写 | adb shell，30s 超时，输出截断 20000 字符 |
+
+写工具默认隐藏，需在设置中勾选"允许写入操作"；桥接脚本通过 SSE 收到 `notifications/tools/list_changed` 后通知客户端热刷新，客户端不支持热更新时重连即可。
+
+**点击定位**：`aya_ui_dump` 返回的 `i` 是未过滤完整树的 DFS 前序号，过滤只减少返回节点、不改变 `i`。把 `nodeIndex` 和 `snapshotId` 一起传给 `aya_tap` 才能精确点击；快照 60s 过期，任何输入类工具执行后立即失效，返回 `STALE_SNAPSHOT` 时重新 dump。同名控件用 `index`（从 0 开始）选择，越界返回 `AMBIGUOUS_MATCH` 并附候选列表。
+
+**两种接入方式**：
+
+- `stdio`（推荐）：客户端以 `AYA.exe` 附带 `--url` / `--token` 启动 `resources/mcp/aya-mcp-stdio.cjs` 桥接脚本，脚本把 stdio 上的 JSON-RPC 转发到本机 HTTP 服务。
+- `http`：直接把 `http://127.0.0.1:7788/mcp` 与 `Authorization: Bearer <token>` 配给客户端；HTTP 无状态，切换写权限后需重新 `tools/list`。
+
+令牌首次开启服务时生成并持久化，配置片段内含令牌，泄露后可在设置中点"重置访问令牌"。服务不监听外网、校验 `Origin`、限制请求体 2MB。
+
 ## 常见问题
 
 | 现象 | 处理 |
@@ -79,6 +112,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File script\dev.ps1 -InspectPort 
 | 投屏提示 `scrcpy: Aborted` | 缺少 `resources/scrcpy.jar`，执行 `npm run scrcpy` |
 | adb 找不到设备 | 确认 `resources/adb/adb.exe` 存在，`adb devices` 有输出 |
 | 安装依赖很慢 | 脚本默认使用 `https://npmmirror.com/mirrors/electron/` 镜像，可自行设置 `ELECTRON_MIRROR` |
+| MCP 开关打不开、提示端口被占用 | 7788 已被告占用，改端口后重试；设置项里会直接显示错误原因 |
+| 客户端只看到 5 个只读工具 | 未勾选"允许写入操作"，勾选后重连 MCP 服务（或等待 `tools/list_changed` 热更新） |
+| `aya_tap` 返回 `STALE_SNAPSHOT` | 快照 60s 过期或中间执行过输入类工具，重新 `aya_ui_dump` 再点 |
 
 ## 其它常用命令
 

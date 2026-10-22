@@ -26,5 +26,9 @@ export const getSettingsStore = memoize(function () {
     useNativeTitlebar: false,
     adbPath: '',
     killAdbWhenExit: false,
+    mcpEnabled: false,
+    mcpPort: 7788,
+    mcpToken: '',
+    mcpAllowWrite: false,
   })
 })

@@ -254,6 +254,14 @@ try {
     }
   }
 
+  # ------------------------------------------------------------- mcp bridge
+  # resources/ is gitignored, so the MCP stdio bridge is kept in script/mcp and
+  # mirrored into resources/mcp (which the app resolves at runtime).
+  Step 'Sync MCP bridge script'
+  New-Item -ItemType Directory -Force -Path 'resources/mcp' | Out-Null
+  Copy-Item 'script/mcp/aya-mcp-stdio.cjs' 'resources/mcp/aya-mcp-stdio.cjs' -Force
+  Ok 'resources/mcp ready'
+
   # -------------------------------------------- single instance lock conflict
   # AYA keeps its single instance lock inside %APPDATA%\AYA (dev builds always
   # use that folder), so a running AYA makes a new process quit silently.
