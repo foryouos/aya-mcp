@@ -12,6 +12,8 @@ import fileTools from './file'
 import logcatTools from './logcat'
 import batchTools from './batch'
 import waitTools from './wait'
+import portTools from './port'
+import webviewTools from './webview'
 
 export type { McpTool } from './types'
 
@@ -28,6 +30,8 @@ const toolGroups: McpTool[][] = [
   performanceTools,
   fileTools,
   logcatTools,
+  portTools,
+  webviewTools,
 ]
 
 export function getAllTools(): McpTool[] {

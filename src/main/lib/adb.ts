@@ -139,7 +139,7 @@ async function getIpAndMac(deviceId: string) {
   }
 }
 
-async function setFontScale(deviceId: string, scale: number) {
+export async function setFontScale(deviceId: string, scale: number) {
   await shell(deviceId, `settings put system font_scale ${scale}`)
 }
 

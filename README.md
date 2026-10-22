@@ -75,7 +75,7 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 
 **开启方式**：设置 → MCP → 勾选"启用 MCP 服务"。开启后自动弹出配置片段，复制到客户端即可；服务随应用启动自动拉起，端口默认 `7788`。
 
-**工具清单**（共 32 个，13 只读 / 19 写）：
+**工具清单**（共 37 个，15 只读 / 22 写）：
 
 设备与画面：
 
@@ -86,6 +86,7 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 | `aya_screencap` | 只读 | 截图（默认缩放到 900px 宽，返回 `scale`） |
 | `aya_ui_dump` | 只读 | UI 层级树，节点带 `bounds` / `center` / 全局索引 `i` |
 | `aya_current_app` | 只读 | 前台包名与 pid |
+| `aya_set_font_scale` | 写 | 设置系统字体缩放（0.5-2.0），返回改动前后的值 |
 
 交互：
 
@@ -138,6 +139,17 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 | `aya_logcat` | 只读 | 日志快照，按级别/标签/关键字过滤，返回结构化条目 |
 | `aya_clear_logcat` | 写 | 清空日志缓冲区 |
 | `aya_shell` | 写 | adb shell，30s 超时，输出截断 20000 字符 |
+
+端口映射与 WebView：
+
+| 工具 | 权限 | 说明 |
+| --- | --- | --- |
+| `aya_list_ports` | 只读 | 列出 `adb forward` / `adb reverse` 的全部映射 |
+| `aya_add_port` | 写 | 新增映射，`direction: forward`（主机→设备）或 `reverse`（设备→主机） |
+| `aya_remove_port` | 写 | 按 `local`（forward）/ `remote`（reverse）移除，`all: true` 清空该方向 |
+| `aya_list_webviews` | 只读 | 列出应用内 WebView 的调试页面（title/url/devtoolsFrontendUrl） |
+
+端口端点支持 `8080`、`tcp:8080`、`localabstract:<name>` 三种写法，省略 `tcp:` 会自动补齐；WebView 调试默认取前台应用，也可显式传 `pid`，内部自动 `adb forward` 并访问 `/json`。
 
 写工具默认隐藏，需在设置中勾选"允许写入操作"；桥接脚本通过 SSE 收到 `notifications/tools/list_changed` 后通知客户端热刷新，客户端不支持热更新时重连即可。
 

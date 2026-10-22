@@ -7,7 +7,8 @@ import { shell, forwardTcp } from './base'
 import { handleEvent } from 'share/main/lib/util'
 import { IpcGetWebviews, IWebview } from 'common/types'
 
-const getWebviews = singleton(<IpcGetWebviews>(async (
+// 未做 singleton 的原始实现：MCP 需要每次拿到最新页面列表
+const fetchWebviews: IpcGetWebviews = async (
   deviceId: string,
   pid: number
 ) => {
@@ -40,7 +41,11 @@ const getWebviews = singleton(<IpcGetWebviews>(async (
   each(data, (item: any) => webviews.push(item))
 
   return webviews
-}))
+}
+
+const getWebviews = singleton(fetchWebviews)
+
+export { fetchWebviews }
 
 export function init() {
   handleEvent('getWebviews', getWebviews)
