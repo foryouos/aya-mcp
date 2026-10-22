@@ -75,7 +75,7 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 
 **开启方式**：设置 → MCP → 勾选"启用 MCP 服务"。开启后自动弹出配置片段，复制到客户端即可；服务随应用启动自动拉起，端口默认 `7788`。
 
-**工具清单**（共 30 个，12 只读 / 18 写）：
+**工具清单**（共 32 个，13 只读 / 19 写）：
 
 设备与画面：
 
@@ -91,8 +91,10 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 
 | 工具 | 权限 | 说明 |
 | --- | --- | --- |
-| `aya_tap` | 写 | 坐标、`nodeIndex`+`snapshotId`、或 `text`/`id`/`desc` 选择器 |
+| `aya_tap` | 写 | 坐标、`nodeIndex`+`snapshotId`、或 `text`/`id`/`desc` 选择器；默认点完立即回传新界面 |
 | `aya_tap_text` | 写 | `aya_tap{text}` 的语义化快捷方式 |
+| `aya_batch` | 写 | 一次调用串行执行最多 20 个动作，最后统一回传界面 |
+| `aya_wait_for` | 只读 | 轮询等待控件出现/消失，命中或超时都返回当前界面 |
 | `aya_swipe` | 写 | 滑动，`duration` 默认 300ms |
 | `aya_key` | 写 | `back`/`home`/`enter`/`recent`/`volume_up` 等按键 |
 | `aya_text` | 写 | 仅可打印 ASCII，中文走 `aya_shell` + 输入法 |
@@ -143,6 +145,14 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 
 **点击定位**：`aya_ui_dump` 返回的 `i` 是未过滤完整树的 DFS 前序号，过滤只减少返回节点、不改变 `i`。把 `nodeIndex` 和 `snapshotId` 一起传给 `aya_tap` 才能精确点击；快照 60s 过期，任何输入类工具执行后立即失效，返回 `STALE_SNAPSHOT` 时重新 dump。同名控件用 `index`（从 0 开始）选择，越界返回 `AMBIGUOUS_MATCH` 并附候选列表。
 
+**时序敏感操作（控件会自动隐藏）**：视频播放器控制栏、Toast、下拉菜单往往只停留 1-3 秒，而模型在两次工具调用之间的思考延迟就可能超过这个窗口——「先 `aya_tap`，再 `aya_ui_dump`」经常只读到控件已隐藏后的界面。三种做法按需要选：
+
+- `aya_tap` 默认 `withUi: true`：点完立刻（`settle` 默认 120ms）抓一帧，返回 `ui.nodes`（可直接配合 `ui.snapshotId` 继续点）与 `ui.appeared` / `ui.disappeared`（相对点击前新增/消失的控件）。一次往返完成「点击 + 观察」；只要点击结果时传 `withUi: false`。
+- `aya_batch`：把「点击 → 等待 → 再点击」合成一次调用，服务端连续执行，中间不经过模型，彻底避开思考延迟。某步失败会停在该步（`failedAt` + `error`），但依然返回当前界面便于纠正。
+- `aya_wait_for`：等控件出现或消失（`gone: true`），命中立即返回，超时也带回当前界面的可交互节点，比反复 `aya_ui_dump` 省调用。
+
+注意 `withUi` 抓的是**点击后**的界面，返回的 `snapshotId` 与 `nodeIndex` 属于新快照，不要再用点击前的 `snapshotId` 去点。
+
 **两种接入方式**：
 
 - `stdio`（推荐）：客户端以 `AYA.exe` 附带 `--url` / `--token` 启动 `resources/mcp/aya-mcp-stdio.cjs` 桥接脚本，脚本把 stdio 上的 JSON-RPC 转发到本机 HTTP 服务。
@@ -163,6 +173,8 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 | MCP 开关打不开、提示端口被占用 | 7788 已被告占用，改端口后重试；设置项里会直接显示错误原因 |
 | 客户端只看到 12 个只读工具 | 未勾选"允许写入操作"，勾选后重连 MCP 服务（或等待 `tools/list_changed` 热更新） |
 | `aya_tap` 返回 `STALE_SNAPSHOT` | 快照 60s 过期或中间执行过输入类工具，重新 `aya_ui_dump` 再点 |
+| 点开播放器控制栏后 `aya_ui_dump` 读不到 | 控件已自动隐藏，改用 `aya_tap` 的 `withUi`（默认开）或 `aya_batch` 在同一次调用内完成点击与观察 |
+| `withUi` 返回 `ui.nodes` 为空 | 视频/游戏画面是 SurfaceView，uiautomator 读不到节点，改用 `aya_screencap` 从截图判断 |
 
 ## 其它常用命令
 

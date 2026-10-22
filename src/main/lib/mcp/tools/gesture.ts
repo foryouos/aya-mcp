@@ -1,31 +1,13 @@
-import * as adb from '../../adb'
-import * as base from '../../adb/base'
 import { resolveDeviceId } from '../lib/device'
-import { withDeviceQueue } from '../lib/dump'
-import { afterInput } from '../lib/action'
-import { assertShellOk } from '../lib/shellCheck'
-import { jsonResult, McpError } from '../lib/result'
+import {
+  captureUi,
+  performKey,
+  performSwipe,
+  performText,
+  resolveSettle,
+} from '../lib/action'
+import { jsonResult } from '../lib/result'
 import { McpTool } from './types'
-
-const KEY_CODES: { [name: string]: number } = {
-  back: 4,
-  home: 3,
-  enter: 66,
-  menu: 82,
-  recent: 187,
-  app_switch: 187,
-  power: 26,
-  volume_up: 24,
-  volume_down: 25,
-  delete: 67,
-  tab: 61,
-  escape: 111,
-  search: 84,
-  dpad_up: 19,
-  dpad_down: 20,
-  dpad_left: 21,
-  dpad_right: 22,
-}
 
 const deviceIdProperty = {
   type: 'string',
@@ -37,10 +19,35 @@ const settleProperty = {
   description: '操作后等待界面稳定的毫秒数，默认 300',
 }
 
+const withUiProperty = {
+  type: 'boolean',
+  description:
+    '操作后是否立即抓取新界面（默认 false；打开可省掉一次 aya_ui_dump，但会多花约 0.5-1s）',
+}
+
+const uiMaxNodesProperty = {
+  type: 'number',
+  description: 'withUi 回传的可交互节点上限，默认 60',
+}
+
+async function capture(deviceId: string, args: any) {
+  try {
+    return {
+      ui: await captureUi(deviceId, { maxNodes: args.uiMaxNodes }),
+      uiError: null as string | null,
+    }
+  } catch (err) {
+    return {
+      ui: null,
+      uiError: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
 const swipe: McpTool = {
   name: 'aya_swipe',
   description:
-    '在屏幕上滑动，从 (x1,y1) 滑到 (x2,y2)。duration 为滑动时长（毫秒），默认 300。',
+    '在屏幕上滑动，从 (x1,y1) 滑到 (x2,y2)。duration 为滑动时长（毫秒），默认 300。连续滑动时可开 withUi 观察结果。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -51,6 +58,8 @@ const swipe: McpTool = {
       y2: { type: 'number', description: '终点 Y' },
       duration: { type: 'number', description: '滑动时长（毫秒），默认 300' },
       settle: settleProperty,
+      withUi: withUiProperty,
+      uiMaxNodes: uiMaxNodesProperty,
     },
     required: ['x1', 'y1', 'x2', 'y2'],
     additionalProperties: false,
@@ -62,17 +71,16 @@ const swipe: McpTool = {
       typeof args.duration === 'number' && args.duration > 0
         ? args.duration
         : 300
-
-    const output = await withDeviceQueue(deviceId, () =>
-      adb.inputSwipe(deviceId, args.x1, args.y1, args.x2, args.y2, duration)
-    )
-    assertShellOk(output, 'aya_swipe')
-    const settledMs = await afterInput(
+    const settledMs = await performSwipe(
       deviceId,
-      typeof args.settle === 'number' ? args.settle : 300
+      { x1: args.x1, y1: args.y1, x2: args.x2, y2: args.y2 },
+      duration,
+      resolveSettle(args, 300)
     )
 
-    return jsonResult({ ok: true, deviceId, duration, settledMs })
+    const extra = args.withUi === true ? await capture(deviceId, args) : {}
+
+    return jsonResult({ ok: true, deviceId, duration, settledMs, ...extra })
   },
 }
 
@@ -89,6 +97,8 @@ const key: McpTool = {
         description: '按键名称或 keycode，例如 "back" 或 4',
       },
       settle: settleProperty,
+      withUi: withUiProperty,
+      uiMaxNodes: uiMaxNodesProperty,
     },
     required: ['key'],
     additionalProperties: false,
@@ -96,28 +106,22 @@ const key: McpTool = {
   write: true,
   handler: async (args) => {
     const deviceId = await resolveDeviceId(args.deviceId)
-    let code = 0
-
-    if (typeof args.key === 'number') {
-      code = Math.round(args.key)
-    } else {
-      code = KEY_CODES[String(args.key).toLowerCase()] || 0
-    }
-
-    if (!code) {
-      throw new McpError(
-        'INVALID_ARGS',
-        `未知按键 ${String(args.key)}，可用：${Object.keys(KEY_CODES).join(', ')}`
-      )
-    }
-
-    await withDeviceQueue(deviceId, () => adb.inputKey(deviceId, code))
-    const settledMs = await afterInput(
+    const { code, settledMs } = await performKey(
       deviceId,
-      typeof args.settle === 'number' ? args.settle : 300
+      args.key,
+      resolveSettle(args, 300)
     )
 
-    return jsonResult({ ok: true, deviceId, key: args.key, keycode: code, settledMs })
+    const extra = args.withUi === true ? await capture(deviceId, args) : {}
+
+    return jsonResult({
+      ok: true,
+      deviceId,
+      key: args.key,
+      keycode: code,
+      settledMs,
+      ...extra,
+    })
   },
 }
 
@@ -131,6 +135,8 @@ const text: McpTool = {
       deviceId: deviceIdProperty,
       text: { type: 'string', description: '要输入的 ASCII 文本' },
       settle: settleProperty,
+      withUi: withUiProperty,
+      uiMaxNodes: uiMaxNodesProperty,
     },
     required: ['text'],
     additionalProperties: false,
@@ -139,25 +145,15 @@ const text: McpTool = {
   handler: async (args) => {
     const deviceId = await resolveDeviceId(args.deviceId)
     const value = String(args.text)
-
-    if (!/^[\x20-\x7E]+$/.test(value)) {
-      throw new McpError(
-        'INVALID_ARGS',
-        'aya_text 仅支持可打印 ASCII 字符；中文等非 ASCII 文本请用 aya_shell 配合设备输入法'
-      )
-    }
-
-    const escaped = value.replace(/'/g, `'\\''`).replace(/ /g, '%s')
-    const output = await withDeviceQueue(deviceId, () =>
-      base.shell(deviceId, `input text '${escaped}'`)
-    )
-    assertShellOk(output, 'aya_text')
-    const settledMs = await afterInput(
+    const settledMs = await performText(
       deviceId,
-      typeof args.settle === 'number' ? args.settle : 300
+      value,
+      resolveSettle(args, 300)
     )
 
-    return jsonResult({ ok: true, deviceId, text: value, settledMs })
+    const extra = args.withUi === true ? await capture(deviceId, args) : {}
+
+    return jsonResult({ ok: true, deviceId, text: value, settledMs, ...extra })
   },
 }
 

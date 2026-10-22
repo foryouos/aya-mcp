@@ -1,9 +1,5 @@
-import * as adb from '../../adb'
-import { withDeviceQueue } from '../lib/dump'
-import { resolveTarget } from '../lib/target'
-import { afterInput } from '../lib/action'
+import { captureUi, performTap, resolveSettle } from '../lib/action'
 import { brief } from '../lib/ui'
-import { assertShellOk } from '../lib/shellCheck'
 import { jsonResult } from '../lib/result'
 import { McpTool } from './types'
 
@@ -35,25 +31,25 @@ const targetProps = {
   },
   settle: {
     type: 'number',
-    description: '操作后等待界面稳定的毫秒数，默认 300',
+    description: '点击后到抓取界面的等待毫秒数，默认 120（withUi:false 时 300）',
+  },
+  withUi: {
+    type: 'boolean',
+    description:
+      '点击后立即抓取新界面返回（默认 true）。一次调用即可看到点击结果，避免再调 aya_ui_dump 期间控件已自动隐藏',
+  },
+  uiMaxNodes: {
+    type: 'number',
+    description: '回传的可交互节点上限，默认 60',
   },
 }
 
 async function tapHandler(args: any) {
-  const target = await resolveTarget(args)
-  const x = target.point[0]
-  const y = target.point[1]
+  const withUi = args.withUi !== false
+  const settle = resolveSettle(args, withUi ? 120 : 300)
+  const { target, settledMs } = await performTap(args, settle)
 
-  const output = await withDeviceQueue(target.deviceId, () =>
-    adb.inputTap(target.deviceId, x, y)
-  )
-  assertShellOk(output, 'aya_tap')
-  const settledMs = await afterInput(
-    target.deviceId,
-    typeof args.settle === 'number' ? args.settle : 300
-  )
-
-  return jsonResult({
+  const payload: any = {
     ok: true,
     deviceId: target.deviceId,
     clicked: true,
@@ -63,13 +59,26 @@ async function tapHandler(args: any) {
     node: target.node ? brief(target.node) : null,
     candidates: target.candidates,
     settledMs,
-  })
+  }
+
+  if (withUi) {
+    try {
+      payload.ui = await captureUi(target.deviceId, {
+        maxNodes: args.uiMaxNodes,
+      })
+    } catch (err) {
+      // 点击已经生效，抓界面失败不能算整体失败
+      payload.uiError = err instanceof Error ? err.message : String(err)
+    }
+  }
+
+  return jsonResult(payload)
 }
 
 const tap: McpTool = {
   name: 'aya_tap',
   description:
-    '点击屏幕。可用 {x,y} 指定坐标，用 {nodeIndex,snapshotId} 精确点击快照中的节点，或用 {text,id,desc} 按控件定位（服务端自动计算中心坐标）。返回实际点击坐标与命中节点。',
+    '点击屏幕。可用 {x,y} 指定坐标，用 {nodeIndex,snapshotId} 精确点击快照中的节点，或用 {text,id,desc} 按控件定位。默认点击后立即返回新界面（ui.appeared 是相对点击前新增的控件；ui.nodes 可直接用 nodeIndex+ui.snapshotId 继续点击），适合视频控制栏等会自动隐藏的瞬时控件；只要点击结果可用 withUi:false 关掉。',
   inputSchema: {
     type: 'object',
     properties: targetProps,
@@ -82,7 +91,7 @@ const tap: McpTool = {
 const tapText: McpTool = {
   name: 'aya_tap_text',
   description:
-    '按控件文本点击（等价 aya_tap + text）。默认精确匹配，找不到时可用 exact:false 做子串匹配；多个同名控件用 index 指定。',
+    '按控件文本点击（等价 aya_tap + text）。默认精确匹配，找不到时可用 exact:false 做子串匹配；多个同名控件用 index 指定。参数与返回同 aya_tap（含 withUi）。',
   inputSchema: {
     type: 'object',
     properties: {

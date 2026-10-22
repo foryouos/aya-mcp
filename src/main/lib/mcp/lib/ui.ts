@@ -52,6 +52,79 @@ export function brief(node: IUiNode) {
   }
 }
 
+function shortClass(cls: string) {
+  if (!cls) {
+    return ''
+  }
+  const parts = cls.split('.')
+
+  return parts[parts.length - 1]
+}
+
+// 动作后回传的节点：只保留能点击/能滚动的实用节点，字段按需出现以压缩体积
+export function labelNode(node: IUiNode) {
+  const ret: any = {
+    i: node.i,
+    class: shortClass(node.cls),
+    center: node.center,
+    bounds: node.bounds,
+  }
+
+  if (node.text) {
+    ret.text = node.text
+  }
+  if (node.desc) {
+    ret.desc = node.desc
+  }
+  if (node.id) {
+    ret.id = node.id
+  }
+  if (node.clickable) {
+    ret.clickable = true
+  }
+  if (node.scrollable) {
+    ret.scrollable = true
+  }
+  if (node.checked || node.selected) {
+    ret.selected = true
+  }
+  if (!node.enabled) {
+    ret.enabled = false
+  }
+
+  return ret
+}
+
+function isActionable(node: IUiNode) {
+  if (!node.enabled) {
+    return false
+  }
+
+  return node.clickable || node.scrollable || !!node.text || !!node.desc
+}
+
+export function pickActionable(flat: IUiNode[], limit: number) {
+  const picked: IUiNode[] = []
+  let total = 0
+
+  for (let i = 0; i < flat.length; i++) {
+    const node = flat[i]
+    if (!isActionable(node)) {
+      continue
+    }
+    total++
+    if (picked.length < limit) {
+      picked.push(node)
+    }
+  }
+
+  return {
+    nodes: picked.map(labelNode),
+    total,
+    truncated: total > picked.length,
+  }
+}
+
 function compactNode(
   node: IUiNode,
   maxDepth: number,

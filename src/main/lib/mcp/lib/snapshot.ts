@@ -31,8 +31,16 @@ export interface ISnapshot {
   createdAt: number
 }
 
+export interface IFrame {
+  at: number
+  keys: { [key: string]: true }
+  nodes: { key: string; node: IUiNode }[]
+}
+
 const SNAPSHOT_TTL = 60 * 1000
 const snapshots: { [deviceId: string]: ISnapshot } = {}
+// 输入类操作会作废旧快照，但保留上一帧的节点签名，用于比对新界面
+const lastFrames: { [deviceId: string]: IFrame } = {}
 
 function attr(el: Element, name: string) {
   const val = el.getAttribute(name)
@@ -197,9 +205,79 @@ export function requireSnapshot(deviceId: string, id: string): ISnapshot {
 
 export function invalidateSnapshot(deviceId?: string) {
   if (deviceId) {
+    saveFrame(deviceId)
     delete snapshots[deviceId]
     return
   }
 
-  Object.keys(snapshots).forEach((key) => delete snapshots[key])
+  Object.keys(snapshots).forEach((key) => {
+    saveFrame(key)
+    delete snapshots[key]
+  })
+}
+
+function nodeKey(node: IUiNode) {
+  return `${node.cls}\u0001${node.text}\u0001${node.desc}\u0001${node.id}\u0001${node.bounds.join(',')}`
+}
+
+function saveFrame(deviceId: string) {
+  const snapshot = snapshots[deviceId]
+  if (!snapshot || !snapshot.flat.length) {
+    return
+  }
+
+  const keys: { [key: string]: true } = {}
+  const nodes: { key: string; node: IUiNode }[] = []
+  for (let i = 0; i < snapshot.flat.length; i++) {
+    const node = snapshot.flat[i]
+    const key = nodeKey(node)
+    keys[key] = true
+    nodes.push({ key, node })
+  }
+
+  lastFrames[deviceId] = { at: snapshot.createdAt, keys, nodes }
+}
+
+export function dropSnapshot(deviceId: string) {
+  delete snapshots[deviceId]
+}
+
+export function takeLastFrame(deviceId: string): IFrame | null {
+  const frame = lastFrames[deviceId] || null
+  delete lastFrames[deviceId]
+
+  return frame
+}
+
+export interface IFrameDiff {
+  comparable: boolean
+  changed: boolean
+  appeared: IUiNode[]
+  disappeared: IUiNode[]
+}
+
+export function diffFrame(
+  frame: IFrame | null,
+  current: IUiNode[]
+): IFrameDiff {
+  if (!frame) {
+    return { comparable: false, changed: false, appeared: [], disappeared: [] }
+  }
+
+  const currentKeys: { [key: string]: true } = {}
+  for (let i = 0; i < current.length; i++) {
+    currentKeys[nodeKey(current[i])] = true
+  }
+
+  const appeared = current.filter((node) => !frame.keys[nodeKey(node)])
+  const disappeared = frame.nodes
+    .filter((item) => !currentKeys[item.key])
+    .map((item) => item.node)
+
+  return {
+    comparable: true,
+    changed: appeared.length > 0 || disappeared.length > 0,
+    appeared,
+    disappeared,
+  }
 }

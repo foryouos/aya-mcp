@@ -10,6 +10,8 @@ import packageTools from './package'
 import performanceTools from './performance'
 import fileTools from './file'
 import logcatTools from './logcat'
+import batchTools from './batch'
+import waitTools from './wait'
 
 export type { McpTool } from './types'
 
@@ -18,6 +20,8 @@ const toolGroups: McpTool[][] = [
   screenTools,
   inputTools,
   gestureTools,
+  batchTools,
+  waitTools,
   appTools,
   shellTools,
   packageTools,
