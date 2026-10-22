@@ -429,6 +429,18 @@ const statFile: IpcStatFile = async function (deviceId, path) {
   }
 }
 
+// 供 MCP 工具复用，与 IPC 共用同一实现，避免逻辑分叉
+export {
+  pullFile,
+  pushFile,
+  readDir,
+  statFile,
+  deleteFile,
+  deleteDir,
+  createDir,
+  moveFile,
+}
+
 export async function init(c: Client) {
   client = c
 

@@ -195,7 +195,7 @@ export async function getPerformance(deviceId: string) {
   }
 }
 
-async function getUptime(deviceId: string) {
+export async function getUptime(deviceId: string) {
   const result = await shell(deviceId, 'cat /proc/uptime')
   const [uptime] = result.split(' ')
   return Math.round(toNum(uptime) * 1000)

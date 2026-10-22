@@ -75,7 +75,9 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 
 **开启方式**：设置 → MCP → 勾选"启用 MCP 服务"。开启后自动弹出配置片段，复制到客户端即可；服务随应用启动自动拉起，端口默认 `7788`。
 
-**工具清单**：
+**工具清单**（共 30 个，12 只读 / 18 写）：
+
+设备与画面：
 
 | 工具 | 权限 | 说明 |
 | --- | --- | --- |
@@ -84,14 +86,60 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 | `aya_screencap` | 只读 | 截图（默认缩放到 900px 宽，返回 `scale`） |
 | `aya_ui_dump` | 只读 | UI 层级树，节点带 `bounds` / `center` / 全局索引 `i` |
 | `aya_current_app` | 只读 | 前台包名与 pid |
+
+交互：
+
+| 工具 | 权限 | 说明 |
+| --- | --- | --- |
 | `aya_tap` | 写 | 坐标、`nodeIndex`+`snapshotId`、或 `text`/`id`/`desc` 选择器 |
 | `aya_tap_text` | 写 | `aya_tap{text}` 的语义化快捷方式 |
 | `aya_swipe` | 写 | 滑动，`duration` 默认 300ms |
 | `aya_key` | 写 | `back`/`home`/`enter`/`recent`/`volume_up` 等按键 |
 | `aya_text` | 写 | 仅可打印 ASCII，中文走 `aya_shell` + 输入法 |
+
+应用管理：
+
+| 工具 | 权限 | 说明 |
+| --- | --- | --- |
+| `aya_list_packages` | 只读 | 包名列表（apk 路径、是否系统应用），可关键字过滤/仅第三方 |
+| `aya_app_info` | 只读 | 版本号、sdk、安装/更新时间、启用状态、运行状态与 pid |
+| `aya_start_app` | 写 | 启动 Launcher Activity |
+| `aya_stop_app` | 写 | `am force-stop` 强杀进程 |
+| `aya_clear_app_data` | 写 | `pm clear` 清空数据与缓存，不可撤销 |
+| `aya_set_app_enabled` | 写 | 启用/禁用应用（`pm enable` / `pm disable-user`） |
+| `aya_install_app` | 写 | 安装本机 apk（覆盖安装保留数据） |
+| `aya_uninstall_app` | 写 | 卸载应用（含数据） |
+
+性能与进程：
+
+| 工具 | 权限 | 说明 |
+| --- | --- | --- |
+| `aya_performance` | 只读 | CPU 各核负载/温度、内存占用、电量、开机时长、前台帧率 |
+| `aya_list_processes` | 只读 | 运行中的进程名与 pid，可关键字过滤 |
+
+文件：
+
+| 工具 | 权限 | 说明 |
+| --- | --- | --- |
+| `aya_list_dir` | 只读 | 列目录（目录优先，含大小/时间/mime） |
+| `aya_stat_path` | 只读 | 路径属性：是否存在、文件/目录、大小、权限 |
+| `aya_pull_file` | 写 | 设备 → 本机，省略目标路径时存到临时目录 `aya-mcp/` |
+| `aya_push_file` | 写 | 本机 → 设备 |
+| `aya_delete_path` | 写 | 删除文件/目录，目录必须显式 `recursive: true` |
+| `aya_make_dir` | 写 | `mkdir -p` |
+| `aya_rename_path` | 写 | 重命名/移动 |
+
+日志与命令：
+
+| 工具 | 权限 | 说明 |
+| --- | --- | --- |
+| `aya_logcat` | 只读 | 日志快照，按级别/标签/关键字过滤，返回结构化条目 |
+| `aya_clear_logcat` | 写 | 清空日志缓冲区 |
 | `aya_shell` | 写 | adb shell，30s 超时，输出截断 20000 字符 |
 
 写工具默认隐藏，需在设置中勾选"允许写入操作"；桥接脚本通过 SSE 收到 `notifications/tools/list_changed` 后通知客户端热刷新，客户端不支持热更新时重连即可。
+
+**典型组合**：验证某个操作是否报错，先 `aya_clear_logcat`，执行操作，再 `aya_logcat{level:'E'}`；排查应用异常退出一律先 `aya_app_info` 看 `running`/`pid`，再决定 `aya_start_app` 重启；需要把崩溃日志带回本机就 `aya_pull_file` 拉 `/sdcard/` 下的文件。
 
 **点击定位**：`aya_ui_dump` 返回的 `i` 是未过滤完整树的 DFS 前序号，过滤只减少返回节点、不改变 `i`。把 `nodeIndex` 和 `snapshotId` 一起传给 `aya_tap` 才能精确点击；快照 60s 过期，任何输入类工具执行后立即失效，返回 `STALE_SNAPSHOT` 时重新 dump。同名控件用 `index`（从 0 开始）选择，越界返回 `AMBIGUOUS_MATCH` 并附候选列表。
 
@@ -113,7 +161,7 @@ AYA 内置一个只监听 `127.0.0.1` 的 MCP 服务，把设备能力以 `aya_*
 | adb 找不到设备 | 确认 `resources/adb/adb.exe` 存在，`adb devices` 有输出 |
 | 安装依赖很慢 | 脚本默认使用 `https://npmmirror.com/mirrors/electron/` 镜像，可自行设置 `ELECTRON_MIRROR` |
 | MCP 开关打不开、提示端口被占用 | 7788 已被告占用，改端口后重试；设置项里会直接显示错误原因 |
-| 客户端只看到 5 个只读工具 | 未勾选"允许写入操作"，勾选后重连 MCP 服务（或等待 `tools/list_changed` 热更新） |
+| 客户端只看到 12 个只读工具 | 未勾选"允许写入操作"，勾选后重连 MCP 服务（或等待 `tools/list_changed` 热更新） |
 | `aya_tap` 返回 `STALE_SNAPSHOT` | 快照 60s 过期或中间执行过输入类工具，重新 `aya_ui_dump` 再点 |
 
 ## 其它常用命令

@@ -38,16 +38,16 @@ export const getPackages = singleton(<IpcGetPackages>(async (
   return map(trim(result).split('\n'), (line) => line.slice(8))
 }))
 
-const stopPackage: IpcStopPackage = async function (deviceId, pkg) {
+export const stopPackage: IpcStopPackage = async function (deviceId, pkg) {
   await shell(deviceId, `am force-stop ${pkg}`)
 }
 
-const clearPackage: IpcClearPackage = async function (deviceId, pkg) {
+export const clearPackage: IpcClearPackage = async function (deviceId, pkg) {
   const device = await client.getDevice(deviceId)
   await device.clear(pkg)
 }
 
-const startPackage: IpcStartPackage = async function (deviceId, pkg) {
+export const startPackage: IpcStartPackage = async function (deviceId, pkg) {
   const component = await getMainComponent(deviceId, pkg)
   const device = await client.getDevice(deviceId)
   await device.startActivity({
@@ -55,12 +55,18 @@ const startPackage: IpcStartPackage = async function (deviceId, pkg) {
   })
 }
 
-const installPackage: IpcInstallPackage = async function (deviceId, apkPath) {
+export const installPackage: IpcInstallPackage = async function (
+  deviceId,
+  apkPath
+) {
   const device = await client.getDevice(deviceId)
   await device.install(apkPath)
 }
 
-const uninstallPackage: IpcUninstallPackage = async function (deviceId, pkg) {
+export const uninstallPackage: IpcUninstallPackage = async function (
+  deviceId,
+  pkg
+) {
   const device = await client.getDevice(deviceId)
   await device.uninstall(pkg)
 }
@@ -115,11 +121,14 @@ export const getTopPackage = singleton(<IpcGetTopPackage>(
   }
 ))
 
-const disablePackage: IpcDisablePackage = async function (deviceId, pkg) {
+export const disablePackage: IpcDisablePackage = async function (
+  deviceId,
+  pkg
+) {
   await shell(deviceId, `pm disable-user ${pkg}`)
 }
 
-const enablePackage: IpcEnablePackage = async function (deviceId, pkg) {
+export const enablePackage: IpcEnablePackage = async function (deviceId, pkg) {
   await shell(deviceId, `pm enable ${pkg}`)
 }
 

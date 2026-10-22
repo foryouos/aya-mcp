@@ -6,6 +6,10 @@ import inputTools from './input'
 import gestureTools from './gesture'
 import appTools from './app'
 import shellTools from './shell'
+import packageTools from './package'
+import performanceTools from './performance'
+import fileTools from './file'
+import logcatTools from './logcat'
 
 export type { McpTool } from './types'
 
@@ -16,6 +20,10 @@ const toolGroups: McpTool[][] = [
   gestureTools,
   appTools,
   shellTools,
+  packageTools,
+  performanceTools,
+  fileTools,
+  logcatTools,
 ]
 
 export function getAllTools(): McpTool[] {

@@ -14,7 +14,7 @@ import { IpcGetFps } from 'common/types'
 import startWith from 'licia/startWith'
 import endWith from 'licia/endWith'
 
-const getFps: IpcGetFps = async function (deviceId, pkg) {
+export const getFps: IpcGetFps = async function (deviceId, pkg) {
   let fps = 0
 
   const result: string = await shell(deviceId, 'dumpsys SurfaceFlinger')
