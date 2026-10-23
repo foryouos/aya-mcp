@@ -24,6 +24,8 @@ export default observer(function McpConfigModal(props: IModalProps) {
   useEffect(() => {
     if (props.visible) {
       setCopied('')
+      // 开启局域网时默认展示 HTTP 配置，方便跨设备/服务器复制
+      setTab(store.mcp.lan ? 'http' : 'stdio')
       store.mcp.getConfigs()
     }
   }, [props.visible])
@@ -76,6 +78,7 @@ export default observer(function McpConfigModal(props: IModalProps) {
         <pre className={Style.code}>{code}</pre>
         <p className={Style.tip}>{t('mcpConfigTip')}</p>
         <p className={Style.tip}>{t('mcpConfigTokenTip')}</p>
+        <p className={Style.tipWarn}>{t('mcpConfigRemoteTip')}</p>
       </div>
     </LunaModal>,
     document.body

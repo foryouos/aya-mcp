@@ -204,5 +204,6 @@
   "mcpCopy": "Copy",
   "mcpCopied": "Copied",
   "mcpConfigTip": "In CodeBuddy: Settings → MCP → Add MCP, paste the snippet into ~/.codebuddy/mcp.json",
-  "mcpConfigTokenTip": "The snippet contains your access token. Keep it private; reset it here if leaked."
+  "mcpConfigTokenTip": "The snippet contains your access token. Keep it private; reset it here if leaked.",
+  "mcpConfigRemoteTip": "For connecting from another machine (e.g. a Linux build server), use the HTTP config on this page and replace the address with this machine's LAN IP. Do NOT use the stdio/node configs — they depend on local electron paths and will fail with ENOENT on other machines."
 }

@@ -204,5 +204,6 @@
   "mcpCopy": "复制",
   "mcpCopied": "已复制",
   "mcpConfigTip": "在 CodeBuddy 中：设置 → MCP → 添加 MCP，将片段粘贴到 ~/.codebuddy/mcp.json",
-  "mcpConfigTokenTip": "片段包含访问令牌，请勿外传；若已泄露可在此重置。"
+  "mcpConfigTokenTip": "片段包含访问令牌，请勿外传；若已泄露可在此重置。",
+  "mcpConfigRemoteTip": "跨设备/服务器连接（如 Linux 编译服务器）请使用本页 HTTP 配置，并将地址改为本机局域网 IP；不要用 stdio/node 配置——它们依赖本机 electron 路径，在其他机器上会报 ENOENT。"
 }

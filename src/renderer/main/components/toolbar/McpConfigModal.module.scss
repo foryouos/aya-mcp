@@ -80,3 +80,14 @@
   line-height: 1.6;
   opacity: 0.75;
 }
+
+.tipWarn {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-warning, #e6a23c);
+  border-radius: 6px;
+  color: var(--color-warning, #e6a23c);
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--color-warning-bg, rgba(230, 162, 60, 0.08));
+}
