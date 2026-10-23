@@ -47,6 +47,7 @@
   "uptime": "已开机",
   "cpuNum": "{{count}} 核",
   "webview": "网页",
+  "webviewEmptyTip": "未发现可调试的 WebView\n请确认前台应用使用了 WebView，且已开启 WebView 调试（setWebContentsDebuggingEnabled）",
   "title": "标题",
   "openWithBrowser": "使用默认浏览器打开",
   "close": "关闭",

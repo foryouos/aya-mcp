@@ -29,12 +29,12 @@ export default observer(function Webview() {
   const dataGridRef = useRef<DataGrid>(null)
   const [filter, setFilter] = useState('')
 
-  const { device } = store
-
   useEffect(() => {
     let destroyed = false
 
     async function getWebviews() {
+      // 每次轮询时重新取设备，避免进入面板时还没选中设备就永远拿不到数据
+      const device = store.device
       if (device) {
         if (store.panel === 'webview') {
           try {
@@ -45,7 +45,8 @@ export default observer(function Webview() {
               ])
               setTopPackage({
                 ...topPackage,
-                label: packageInfos[0].label,
+                label:
+                  (packageInfos[0] && packageInfos[0].label) || topPackage.name,
               })
             }
             if (topPackage.pid) {
@@ -141,6 +142,9 @@ export default observer(function Webview() {
           dataGrid.fit()
         }}
       />
+      {webviews.length === 0 && (
+        <div className={Style.empty}>{t('webviewEmptyTip')}</div>
+      )}
     </div>
   )
 })

@@ -47,6 +47,7 @@
   "uptime": "Uptime",
   "cpuNum": "{{count}} Cores",
   "webview": "Webview",
+  "webviewEmptyTip": "No debuggable WebView found\nMake sure the foreground app uses WebView with debugging enabled (setWebContentsDebuggingEnabled)",
   "title": "Title",
   "openWithBrowser": "Open with Default Browser",
   "close": "Close",

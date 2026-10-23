@@ -11,3 +11,20 @@
     vertical-align: top;
   }
 }
+
+.empty {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 31px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  text-align: center;
+  white-space: pre-line;
+  line-height: 1.8;
+  color: #999;
+  pointer-events: none;
+}
