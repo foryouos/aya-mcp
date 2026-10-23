@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, session, Tray, Menu, nativeImage } from 'electron'
 import { getMainStore } from '../lib/store'
 import { getOpenFileFromArgv, handleEvent } from 'share/main/lib/util'
 import * as window from 'share/main/lib/window'
@@ -8,13 +8,65 @@ import log from 'share/common/log'
 import once from 'licia/once'
 import { IpcGetStore, IpcSetStore } from 'share/common/types'
 import isMac from 'licia/isMac'
+import isWindows from 'licia/isWindows'
 import endWith from 'licia/endWith'
+import path from 'path'
 
 const logger = log('mainWin')
 
 const store = getMainStore()
 
 let win: BrowserWindow | null = null
+let tray: Tray | null = null
+let isQuiting = false
+
+// 获取托盘图标：开发态用项目图标，打包后用 exe 图标（createFromPath 对 exe 在 dev 下常返回空图）
+function getTrayIcon(): nativeImage {
+  const candidates: string[] = []
+  if (!app.isPackaged) {
+    candidates.push(
+      path.resolve(app.getAppPath(), 'build', 'icon.ico'),
+      path.resolve(app.getAppPath(), 'build', 'icon.png')
+    )
+  }
+  candidates.push(app.getPath('exe'))
+  for (const p of candidates) {
+    const img = nativeImage.createFromPath(p)
+    if (!img.isEmpty()) {
+      return img
+    }
+  }
+  return nativeImage.createEmpty()
+}
+
+// 创建系统托盘（仅 Windows）。关闭主窗口时隐藏到托盘，右键菜单可退出。
+function setupTray() {
+  if (tray || !isWindows) {
+    return
+  }
+  const icon = getTrayIcon()
+  tray = new Tray(icon)
+  tray.setToolTip(app.getName())
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: '显示',
+        click: () => win?.show(),
+      },
+      {
+        type: 'separator',
+      },
+      {
+        label: '退出',
+        click: () => {
+          isQuiting = true
+          app.quit()
+        },
+      },
+    ])
+  )
+  tray.on('double-click', () => win?.show())
+}
 
 export function showWin() {
   logger.info('show')
@@ -41,11 +93,18 @@ export function showWin() {
     if (screencastWin && screencastWin.isVisible()) {
       e.preventDefault()
       win?.hide()
-    } else {
-      app.quit()
+      return
     }
+    // Windows 下点击关闭：最小化到系统托盘而非退出（类似微信）
+    if (isWindows && !isQuiting) {
+      e.preventDefault()
+      win?.hide()
+      return
+    }
+    app.quit()
   })
 
+  setupTray()
   window.loadPage(win)
 }
 
