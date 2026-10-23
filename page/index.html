@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>AYA MCP · 让 AI 直接操控你的 Android 设备 | 42 个 aya_* 工具</title>
+    <title>AYA MCP · 让 AI 直接操控你的 Android 设备 | 50 个 aya_* 工具</title>
     <meta
       name="description"
-      content="AYA MCP 把 Android 设备能力以 42 个 MCP 工具暴露给 CodeBuddy、WorkBuddy、Claude 等 AI 客户端：截图、UI 层级、点击滑动、装卸载应用、文件传输、logcat、录屏投屏，全部一句话完成。仅监听 127.0.0.1，写操作默认关闭。"
+      content="AYA MCP 把 Android 设备能力以 50 个 MCP 工具暴露给 CodeBuddy、WorkBuddy、Claude 等 AI 客户端：截图、UI 层级、点击滑动、装卸载应用、文件传输、logcat、串口日志、录屏投屏，全部一句话完成。仅监听 127.0.0.1，写操作默认关闭。"
     />
     <meta
       name="keywords"
@@ -29,7 +29,7 @@
     <meta property="og:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备" />
     <meta
       property="og:description"
-      content="42 个 MCP 工具，把截图、UI 层级、点击滑动、应用管理、文件传输、logcat、录屏全部交给 AI。三步接入 CodeBuddy / WorkBuddy / Claude，仅监听 127.0.0.1。"
+      content="50 个 MCP 工具，把截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口启动日志、录屏全部交给 AI。三步接入 CodeBuddy / WorkBuddy / Claude，仅监听 127.0.0.1。"
     />
     <meta property="og:url" content="https://aya-mcp.foryouos.cn/" />
     <meta property="og:image" content="https://aya-mcp.foryouos.cn/og.png" />
@@ -39,7 +39,7 @@
     <meta name="twitter:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备" />
     <meta
       name="twitter:description"
-      content="42 个 MCP 工具，一句话让 AI 帮你操作 Android 手机：截图、点击、装应用、抓日志、录屏。"
+      content="50 个 MCP 工具，一句话让 AI 帮你操作 Android 手机：截图、点击、装应用、抓日志、读串口、录屏。"
     />
     <meta name="twitter:image" content="https://aya-mcp.foryouos.cn/og.png" />
 
@@ -55,14 +55,15 @@
             "applicationSubCategory": "Android 设备控制 / MCP 服务",
             "operatingSystem": "Windows, macOS, Linux",
             "url": "https://aya-mcp.foryouos.cn/",
-            "softwareVersion": "1.14.3+mcp",
-            "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 42 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、端口映射、录屏投屏。",
+            "softwareVersion": "2.1.0",
+            "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 50 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口日志、端口映射、录屏投屏。",
             "featureList": [
-              "42 个 MCP 工具（16 只读 / 26 写）",
+              "50 个 MCP 工具（20 只读 / 30 写）",
               "UI 层级快照与语义化点击",
               "应用安装 / 卸载 / 启停 / 清数据",
               "设备与本机双向文件传输",
               "logcat 结构化过滤与 adb shell",
+              "串口日志按 bootloader / kernel / android 分段",
               "设备端录屏与投屏控制",
               "仅监听 127.0.0.1 + Bearer Token 鉴权"
             ],
@@ -88,7 +89,7 @@
                 "name": "AYA MCP 是什么？",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "AYA 是一款跨平台的 Android adb 桌面工具。本分支在其基础上内置了 MCP（Model Context Protocol）服务，把设备能力封装成 42 个 aya_* 工具，让 CodeBuddy、WorkBuddy、Claude 等 AI 客户端直接用自然语言操控已连接的 Android 设备。"
+                  "text": "AYA 是一款跨平台的 Android adb 桌面工具。本分支在其基础上内置了 MCP（Model Context Protocol）服务，把设备能力封装成 50 个 aya_* 工具，让 CodeBuddy、WorkBuddy、Claude 等 AI 客户端直接用自然语言操控已连接的 Android 设备。"
                 }
               },
               {
@@ -923,7 +924,7 @@
             />
             <path d="M25 36h14" stroke="#fff" stroke-width="5" stroke-linecap="round" />
           </svg>
-          AYA&nbsp;MCP <small>v1.14.3+mcp</small>
+          AYA&nbsp;MCP <small>v2.1.0</small>
         </a>
         <nav class="links" aria-label="主导航">
           <a href="#what">什么是 MCP</a>
@@ -947,16 +948,16 @@
           <h1>让 AI <em>直接操控</em>你的 Android 设备</h1>
           <p class="sub">
             AYA 内置一个只监听 <code>127.0.0.1</code> 的 MCP（Model Context Protocol）服务，把手机能力封装成
-            <strong>42 个 <code>aya_*</code> 工具</strong>。在 CodeBuddy、WorkBuddy、Claude
+            <strong>50 个 <code>aya_*</code> 工具</strong>。在 CodeBuddy、WorkBuddy、Claude
             里说一句“打开设置，把字体调到最大并截图”，剩下的交给 AI —— 不用再写脚本、跑命令、粘输出。
           </p>
           <div class="cta">
             <a class="btn btn-primary" href="#quickstart">3 步接入 MCP</a>
-            <a class="btn btn-ghost" href="#tools">查看 42 个工具</a>
+            <a class="btn btn-ghost" href="#tools">查看 50 个工具</a>
             <a class="btn btn-ghost" href="https://aya.liriliri.io/" rel="noopener">了解原版 AYA</a>
           </div>
           <div class="hero-stats">
-            <div class="stat"><b>42</b><span>MCP 工具（16 只读 / 26 写）</span></div>
+            <div class="stat"><b>50</b><span>MCP 工具（20 只读 / 30 写）</span></div>
             <div class="stat"><b>&lt; 1 min</b><span>从开启到 AI 接管设备</span></div>
             <div class="stat"><b>127.0.0.1</b><span>仅本机监听，不出网</span></div>
             <div class="stat"><b>Win / mac / Linux</b><span>跨平台 Electron 桌面端</span></div>
@@ -971,7 +972,7 @@
           <h2>MCP 是什么？为什么手机需要它</h2>
           <p class="lead">
             MCP 是 AI 客户端与工具之间的开放协议。过去 AI 只能“教你怎么操作手机”，现在它能自己调工具、看结果、再决定下一步。
-            AYA MCP 就是把 adb 的几十年积累，翻译成 AI 听得懂、调得动的 42 个标准工具。
+            AYA MCP 就是把 adb 的几十年积累，翻译成 AI 听得懂、调得动的 50 个标准工具。
           </p>
           <div class="grid g3">
             <div class="card">
@@ -1019,9 +1020,9 @@
       <section id="tools" class="soft">
         <div class="wrap">
           <p class="kicker">Tool Reference</p>
-          <h2>42 个工具，覆盖一台手机的全部能力</h2>
+          <h2>50 个工具，覆盖一台手机的全部能力</h2>
           <p class="lead">
-            工具名统一以 <code>aya_</code> 开头。16 个只读工具默认开放；26 个写工具需在设置中勾选“允许写入操作”后才会出现在客户端。
+            工具名统一以 <code>aya_</code> 开头。20 个只读工具默认开放；30 个写工具需在设置中勾选“允许写入操作”后才会出现在客户端。
           </p>
 
           <div class="toolbox">
@@ -1157,6 +1158,31 @@
                 <tr><td><code>aya_logcat</code></td><td><span class="tag r">只读</span></td><td>日志快照，按级别 / 标签 / 关键字过滤，返回结构化条目</td></tr>
                 <tr><td><code>aya_clear_logcat</code></td><td><span class="tag w">写</span></td><td>清空日志缓冲区</td></tr>
                 <tr><td><code>aya_shell</code></td><td><span class="tag w">写</span></td><td>adb shell，30s 超时，输出截断 20000 字符</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="toolbox" style="margin-top: 18px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <path d="M3 12h4l2-6 4 12 2-6h4" />
+              </svg>
+              串口日志
+              <span class="count">8 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_serial_list_ports</code></td><td><span class="tag r">只读</span></td><td>列出主机串口（<code>COM3</code> / <code>/dev/ttyUSB0</code>），与 adb 端口转发的 <code>aya_list_ports</code> 无关</td></tr>
+                <tr><td><code>aya_serial_status</code></td><td><span class="tag r">只读</span></td><td>连接参数、已收行数 / 字节数、是否暂停、会话日志路径</td></tr>
+                <tr><td><code>aya_serial_logs</code></td><td><span class="tag r">只读</span></td><td>按 <code>source</code>（bootloader / kernel / android / other）、关键字 / 正则、<code>fromSeq</code> 增量读取</td></tr>
+                <tr><td><code>aya_serial_wait</code></td><td><span class="tag r">只读</span></td><td>等待后续日志命中关键字（如 <code>boot_completed</code>），超时返回 <code>matched: false</code></td></tr>
+                <tr><td><code>aya_serial_open</code></td><td><span class="tag w">写</span></td><td>打开串口收 bootloader / kernel / android 日志，8N1，默认 115200</td></tr>
+                <tr><td><code>aya_serial_close</code></td><td><span class="tag w">写</span></td><td>关闭串口，已收日志仍保留在缓冲区与文件</td></tr>
+                <tr><td><code>aya_serial_write</code></td><td><span class="tag w">写</span></td><td>向串口发送命令（如在 bootloader 里发 <code>reboot</code>），默认追加 <code>\r\n</code></td></tr>
+                <tr><td><code>aya_serial_clear</code></td><td><span class="tag w">写</span></td><td>清空缓冲区并新建会话日志文件，串口保持连接</td></tr>
               </tbody>
             </table>
           </div>
@@ -1439,7 +1465,7 @@
             </details>
             <details>
               <summary>客户端只看到 16 个只读工具怎么办？</summary>
-              <p>说明未勾选「允许写入操作」。勾选后重连 MCP 服务，或等待 <code>tools/list_changed</code> 热刷新，即可看到全部 42 个工具。</p>
+              <p>说明未勾选「允许写入操作」。勾选后重连 MCP 服务，或等待 <code>tools/list_changed</code> 热刷新，即可看到全部 50 个工具。</p>
             </details>
             <details>
               <summary>aya_tap 返回 STALE_SNAPSHOT？</summary>
@@ -1488,6 +1514,10 @@
                 <tr><th>版本</th><th>改动</th></tr>
               </thead>
               <tbody>
+                <tr>
+                  <td><code>v2.1.0</code></td>
+                  <td>新增串口调试面板（bootloader / kernel / android 分段识别、关键字与阶段过滤、暂停、保存会话、波特率自动探测）与 8 个 <code>aya_serial_*</code> 工具，工具总数 50；发送框不再记录历史输入；版本号独立于上游，改为 <code>2.1.0</code>。</td>
+                </tr>
                 <tr>
                   <td><code>v1.14.3+mcp</code></td>
                   <td>同步上游至 AYA v1.14.3；Windows 下关闭主窗口改为最小化到系统托盘（托盘右键菜单退出）；更新检查接入 GitHub Releases；优化一键编译脚本与资源准备流程。</td>
@@ -1556,7 +1586,7 @@
           <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（
           <a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">github.com/liriliri/aya</a>，作者
           <b>surunzi / liriliri</b>）二次开发，遵循原项目 <b>AGPL-3.0</b> 许可证；桌面端基础能力（投屏、文件管理、日志、性能、Shell
-          等）均来自上游，。文档中的工具清单与行为描述对应 AYA v1.14.3 + MCP 分支。
+          等）均来自上游，。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.0</b>。
         </div>
 
         <div class="copy-bar">

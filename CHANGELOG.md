@@ -1,3 +1,10 @@
+## v2.1.0 (23 Oct 2026)
+
+* feat: serial port debugging panel
+* feat: detect bootloader, kernel and android stages in serial log
+* feat: send raw data with configurable newline
+* feat: mcp server with serial tools
+
 ## v1.14.2 (28 Nov 2025)
 
 * fix: application icon display error [#151](https://github.com/liriliri/aya/issues/151)

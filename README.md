@@ -6,11 +6,12 @@
 
 AYA 是一款跨平台（Windows / macOS / Linux）的 Android `adb` 桌面工具，提供投屏、文件管理、日志、性能监控、Shell、应用管理等能力。
 
-**本分支（aya-mcp）** 在完整保留上游全部桌面能力的基础上，新增了一层 **MCP（Model Context Protocol）服务**：把 Android 设备能力封装为 42 个 `aya_*` 工具，让 CodeBuddy、WorkBuddy、Claude 等 AI 客户端直接用自然语言操控已连接的设备。MCP 的工具清单与接入方式由 [`page/index.html`](page/index.html) 详细介绍。
+**本分支（aya-mcp）** 在完整保留上游全部桌面能力的基础上，新增两块能力：
 
- 优化一些日常使用过程中需要的功能。
+- **MCP 服务**：把 Android 设备能力封装为 50 个 `aya_*` 工具（20 只读 / 30 写），让 CodeBuddy、WorkBuddy、Claude 等 AI 客户端直接用自然语言操控已连接的设备。工具清单与接入方式由 [`page/index.html`](page/index.html) 详细介绍。
+- **串口调试面板**：直接接收主板启动日志，自动划分 bootloader / kernel / android 阶段，支持阶段与关键字过滤、暂停、保存会话、波特率自动探测。
 
-
+当前版本 **v2.1.0**（版本号独立于上游 AYA）。
 
 > 关闭设置中的 MCP 开关时，它就是原版 AYA，使用方式完全不变。
 
@@ -18,7 +19,9 @@ AYA 是一款跨平台（Windows / macOS / Linux）的 Android `adb` 桌面工�
 
 - `src/`：Electron 源码
   - `src/main/lib/mcp/*`：MCP Server（JSON-RPC 2.0 + SSE）、工具实现、鉴权
-  - `src/main/lib/mcp/tools/*`：42 个 `aya_*` 工具（16 只读 / 26 写）
+  - `src/main/lib/mcp/tools/*`：50 个 `aya_*` 工具（20 只读 / 30 写）
+  - `src/main/lib/serial/*`：串口读取、阶段识别、日志缓冲区与会话文件
+  - `src/renderer/.../serial/*`：串口调试面板
   - `src/renderer/.../McpConfigModal.tsx`：设置内的 MCP 开关与配置片段
 - `script/`：构建与资源脚本（`build` / `pack` / `dev` / `adb` / `scrcpy` / `server` / `mcp`）
 - `server/`：Android 端 `aya.dex` 源码（Kotlin，提供 adb 侧能力）
