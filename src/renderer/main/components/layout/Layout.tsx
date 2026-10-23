@@ -57,22 +57,27 @@ export default observer(function Layout() {
     }
 
     setIsLoading(true)
-    const data = await main.screencap(device.id)
-    const url = dataUrl.stringify(data, 'image/png')
-    setHierarchy(null)
-    setSelected(null)
-    loadImg(url, (err, img) => {
-      setImage({
-        url,
-        width: img.width,
-        height: img.height,
+    try {
+      const data = await main.screencap(device.id)
+      const url = dataUrl.stringify(data, 'image/png')
+      setHierarchy(null)
+      setSelected(null)
+      loadImg(url, (err, img) => {
+        setImage({
+          url,
+          width: img.width,
+          height: img.height,
+        })
       })
-    })
-    windowHierarchyRef.current = await main.dumpWindowHierarchy(device.id)
-    const doc = xmlToDom(windowHierarchyRef.current)
-    transformHierarchy(doc, windowHierarchyRef.current)
-    setHierarchy(doc)
-    setIsLoading(false)
+      windowHierarchyRef.current = await main.dumpWindowHierarchy(device.id)
+      const doc = xmlToDom(windowHierarchyRef.current)
+      transformHierarchy(doc, windowHierarchyRef.current)
+      setHierarchy(doc)
+    } catch (e) {
+      console.error('refresh layout failed', e)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   function save() {
@@ -272,11 +277,17 @@ function transformHierarchy(hierarchy: Document, windowHierarchy: string) {
       el.appendChild(hierarchy.createTextNode(text))
     } else {
       each(el.childNodes, (child) => transformRecursively(child as Element))
-      // for xpath
-      ;(el as any).children = filter(
-        el.childNodes,
-        (child) => child.nodeType === 1
-      )
+      // for xpath: xmldom 0.9+ exposes `children` as a getter-only accessor on
+      // Element.prototype, so only define it when missing — assigning it
+      // directly throws "Cannot set property children".
+      if (!('children' in el)) {
+        Object.defineProperty(el, 'children', {
+          value: filter(el.childNodes, (child) => child.nodeType === 1),
+          configurable: true,
+          enumerable: true,
+          writable: true,
+        })
+      }
     }
   }
 
