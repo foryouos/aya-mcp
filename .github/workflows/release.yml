@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-latest # Apple Silicon (arm64)
+            platform: mac
+            arch: arm64
+          - os: macos-13 # Intel (x64)
+            platform: mac
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 按当前平台下载 adb / scrcpy 资源（resources/adb、resources/scrcpy.jar）
+      - name: Provision adb
+        run: npm run adb
+      - name: Provision scrcpy
+        run: npm run scrcpy
+      # AYA 安卓端模块（resources/aya.dex），需要 JDK17 + Android SDK；缺失仅影响部分设备功能
+      - name: Build aya.dex
+        run: npm run server
+        continue-on-error: true
+
+      # 打包 dist/（main/preload/renderer + resources）
+      - name: Build bundles
+        run: npm run build
+
+      - name: Pack (Windows / Linux)
+        if: matrix.platform != 'mac'
+        run: npm run pack
+
+      - name: Pack (macOS)
+        if: matrix.platform == 'mac'
+        run: npm run pack -- --${{ matrix.arch }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aya-${{ matrix.platform }}-${{ matrix.arch || 'x64' }}
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten & compute SHA256
+        run: |
+          mkdir -p out
+          find artifacts -type f -exec cp {} out/ \;
+          cd out
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true

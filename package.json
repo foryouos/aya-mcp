@@ -18,6 +18,7 @@
     "pack:mas-dev": "zx script/pack.mjs --mas-dev",
     "pack:mas": "zx script/pack.mjs --mas",
     "pack:appx": "zx script/pack.mjs --appx",
+    "release": "npm run build && npm run pack",
     "adb": "zx script/adb.mjs",
     "scrcpy": "zx script/scrcpy.mjs",
     "server": "zx script/server.mjs",
