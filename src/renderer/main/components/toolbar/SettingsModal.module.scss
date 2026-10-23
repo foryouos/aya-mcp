@@ -1,3 +1,52 @@
+.layout {
+  display: flex;
+  gap: 16px;
+  min-height: 300px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 96px;
+  flex: none;
+  border-right: 1px solid var(--color-border);
+  padding-right: 12px;
+}
+
+.navItem {
+  border: none;
+  background: none;
+  color: var(--color-text);
+  opacity: 0.7;
+  text-align: left;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+
+  &:hover {
+    opacity: 1;
+    background: var(--color-bg-hover, rgba(128, 128, 128, 0.12));
+  }
+}
+
+.navActive {
+  opacity: 1;
+  color: var(--color-primary);
+  background: var(--color-primary-bg, rgba(24, 144, 255, 0.12));
+  font-weight: 600;
+}
+
+.pane {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  max-height: 420px;
+}
+
 .settings {
   :global(.luna-setting-item) {
     padding-left: 0;

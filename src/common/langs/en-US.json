@@ -184,7 +184,7 @@
   "mcpAllowWrite": "Allow write operations",
   "mcpAllowWriteDesc": "Expose tap, swipe, input, key and shell tools (11 tools in total)",
   "mcpPort": "Port",
-  "mcpPortDesc": "Listens on 127.0.0.1; when LAN is enabled it listens on 0.0.0.0, port range 1024-65535",
+  "mcpPortDesc": "Port range 1024-65535",
   "mcpLan": "Allow LAN access",
   "mcpLanHint": "LAN access enabled; server listens on 0.0.0.0. Make sure the firewall allows this port; see the status above for the connect URL",
   "mcpStatus": "Status",
