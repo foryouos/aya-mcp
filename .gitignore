@@ -11,3 +11,9 @@ local.properties
 
 build/*.provisionprofile
 .codebuddy/
+
+# 本地运行 / 测试临时产物
+.run-out.log
+.run-err.log
+.tmp-*/
+.tmp-mcp-test/
