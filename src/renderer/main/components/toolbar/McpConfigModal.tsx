@@ -16,14 +16,30 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'http', label: 'mcpConfigHttp' },
 ]
 
+// 从 url 里取主机部分，如 http://192.168.1.65:7788/mcp -> 192.168.1.65
+function hostOf(url: string): string {
+  const m = url.match(/^https?:\/\/([^:/]+)/)
+  return m ? m[1] : ''
+}
+
+// 把片段里所有 http://host:port 的 host 替换为指定 IP
+function replaceHost(code: string, ip: string): string {
+  return code.replace(
+    /(https?:\/\/)([A-Za-z0-9.\-]+)(:\d+)/g,
+    (_m, p1, _host, p3) => p1 + ip + p3
+  )
+}
+
 export default observer(function McpConfigModal(props: IModalProps) {
   const [tab, setTab] = useState<TabKey>('stdio')
+  const [ipOverride, setIpOverride] = useState<string | null>(null)
   const [copied, setCopied] = useState('')
   const timerRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (props.visible) {
       setCopied('')
+      setIpOverride(null)
       // 开启局域网时默认展示 HTTP 配置，方便跨设备/服务器复制
       setTab(store.mcp.lan ? 'http' : 'stdio')
       store.mcp.getConfigs()
@@ -39,7 +55,10 @@ export default observer(function McpConfigModal(props: IModalProps) {
   }, [])
 
   const configs = store.mcp.configs
-  const code = configs ? configs[tab] : ''
+  const rawCode = configs ? configs[tab] : ''
+  const autoIp = hostOf(store.mcp.url)
+  const activeIp = ipOverride || autoIp
+  const code = tab === 'http' && ipOverride ? replaceHost(rawCode, ipOverride) : rawCode
 
   async function copy() {
     if (!code) {
@@ -81,7 +100,14 @@ export default observer(function McpConfigModal(props: IModalProps) {
           <div className={Style.lanIps}>
             <span className={Style.lanIpsLabel}>{t('mcpLanIps')}</span>
             {store.mcp.lanIps.map((ip) => (
-              <code key={ip} className={Style.lanIp}>
+              <code
+                key={ip}
+                className={className(
+                  Style.lanIp,
+                  ip === activeIp && Style.lanIpActive
+                )}
+                onClick={() => setIpOverride(ip)}
+              >
                 {ip}
               </code>
             ))}

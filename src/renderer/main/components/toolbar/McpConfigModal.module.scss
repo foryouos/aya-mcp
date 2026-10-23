@@ -114,6 +114,20 @@
   border: 1px solid var(--color-border, rgba(128, 128, 128, 0.3));
   color: var(--color-text);
   font-family: var(--font-family-mono, monospace);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease,
+    background 0.15s ease;
+
+  &:hover {
+    border-color: var(--color-primary, #1890ff);
+    color: var(--color-primary, #1890ff);
+  }
+}
+
+.lanIpActive {
+  background: var(--color-primary-bg, rgba(24, 144, 255, 0.12));
+  border-color: var(--color-primary, #1890ff);
+  color: var(--color-primary, #1890ff);
 }
 
 .lanIpsHint {
