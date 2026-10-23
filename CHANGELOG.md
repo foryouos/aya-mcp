@@ -1,3 +1,8 @@
+## v2.2.1 (23 Oct 2026)
+
+* fix: check update failed on packaged build, read releases from github api instead of latest.yml
+* feat: pick newest release by version and ignore test tags like x.y.z.Test
+
 ## v2.1.0 (23 Oct 2026)
 
 * feat: serial port debugging panel

@@ -20,22 +20,35 @@ let win: BrowserWindow | null = null
 let tray: Tray | null = null
 let isQuiting = false
 
-// 获取托盘图标：开发态用项目图标，打包后用 exe 图标（createFromPath 对 exe 在 dev 下常返回空图）
+// 获取托盘图标：必须读取独立的图标文件。
+// 打包后 app.asar 内没有 build/icon.ico，且 nativeImage.createFromPath(exe)
+// 无法从 exe 提取图标（返回空图），因此由 electron-builder 把图标复制到
+// resources/tray.ico 与 resources/tray.png。
 function getTrayIcon(): nativeImage {
   const candidates: string[] = []
-  if (!app.isPackaged) {
+  if (app.isPackaged) {
     candidates.push(
+      path.join(process.resourcesPath, 'tray.png'),
+      path.join(process.resourcesPath, 'tray.ico')
+    )
+  } else {
+    candidates.push(
+      path.resolve(app.getAppPath(), 'build', 'tray.png'),
       path.resolve(app.getAppPath(), 'build', 'icon.ico'),
       path.resolve(app.getAppPath(), 'build', 'icon.png')
     )
   }
-  candidates.push(app.getPath('exe'))
   for (const p of candidates) {
-    const img = nativeImage.createFromPath(p)
-    if (!img.isEmpty()) {
-      return img
+    try {
+      const img = nativeImage.createFromPath(p)
+      if (!img.isEmpty()) {
+        return img
+      }
+    } catch {
+      logger.warn(`load tray icon failed: ${p}`)
     }
   }
+  logger.warn('tray icon not found')
   return nativeImage.createEmpty()
 }
 
@@ -45,7 +58,23 @@ function setupTray() {
     return
   }
   const icon = getTrayIcon()
-  tray = new Tray(icon)
+  try {
+    tray = new Tray(icon)
+  } catch (e) {
+    logger.error(`create tray failed: ${e}`)
+    return
+  }
+  // 图标文件缺失时退回 exe 内嵌图标，避免托盘区域空白
+  if (icon.isEmpty()) {
+    app
+      .getFileIcon(app.getPath('exe'), { size: 'small' })
+      .then((img) => {
+        if (!img.isEmpty()) {
+          tray?.setImage(img)
+        }
+      })
+      .catch(() => {})
+  }
   tray.setToolTip(app.getName())
   tray.setContextMenu(
     Menu.buildFromTemplate([

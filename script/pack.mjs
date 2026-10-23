@@ -19,11 +19,16 @@ const config = {
   // serialport 原生绑定需要解包，否则 asar 内无法加载 .node
   asarUnpack: ['node_modules/@serialport/**'],
   artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
-  extraResources: {
-    from: 'resources',
-    to: './',
-    filter: ['**/*'],
-  },
+  extraResources: [
+    {
+      from: 'resources',
+      to: './',
+      filter: ['**/*'],
+    },
+    // 托盘图标必须是独立文件：Windows 下 nativeImage 无法从 exe 提取图标
+    { from: 'build/tray.png', to: 'tray.png' },
+    { from: 'build/icon.ico', to: 'tray.ico' },
+  ],
   nsis: {
     allowToChangeInstallationDirectory: true,
     oneClick: false,
