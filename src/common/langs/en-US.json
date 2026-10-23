@@ -29,6 +29,7 @@
   "package": "Package",
   "tag": "Tag",
   "search": "Search",
+  "clearHistory": "Clear History",
   "scrollToEnd": "Scroll to End",
   "restart": "Restart",
   "softWrap": "Soft Wrap",

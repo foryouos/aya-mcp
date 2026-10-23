@@ -67,3 +67,82 @@
     padding: 0 1px;
   }
 }
+
+/* 日志过滤输入框的历史记录下拉（挂载在 body 上，避开 toolbar 的 overflow 裁剪） */
+.logcat-history-panel {
+  position: fixed;
+  z-index: 3000;
+  padding: 4px 0;
+  min-width: 160px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--luna-color-bg-container, #fff);
+  border: 1px solid var(--luna-color-border, #d9d9d9);
+  border-radius: 4px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--luna-color-text, rgba(0, 0, 0, 0.88));
+  user-select: none;
+}
+
+.logcat-history-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 4px 3px 8px;
+  cursor: pointer;
+
+  &:hover,
+  &.active {
+    background: var(--luna-color-fill-secondary, rgba(0, 0, 0, 0.06));
+  }
+}
+
+.logcat-history-text {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.logcat-history-remove {
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  color: #999;
+  visibility: hidden;
+  font-size: 14px;
+  line-height: 1;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #333;
+  }
+}
+
+.logcat-history-item:hover .logcat-history-remove,
+.logcat-history-item.active .logcat-history-remove {
+  visibility: visible;
+}
+
+.logcat-history-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--luna-color-border, #d9d9d9);
+}
+
+.logcat-history-clear {
+  cursor: pointer;
+  color: var(--luna-color-primary, #1a73e8);
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

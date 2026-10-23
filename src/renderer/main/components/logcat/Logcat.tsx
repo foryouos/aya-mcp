@@ -1,12 +1,12 @@
 import { observer } from 'mobx-react-lite'
 import LunaToolbar, {
-  LunaToolbarInput,
   LunaToolbarSelect,
   LunaToolbarSeparator,
   LunaToolbarSpace,
 } from 'luna-toolbar/react'
 import LunaLogcat from 'luna-logcat/react'
 import Logcat from 'luna-logcat'
+import HistoryInput, { recordHistory } from './HistoryInput'
 import map from 'licia/map'
 import rpad from 'licia/rpad'
 import dateFormat from 'licia/dateFormat'
@@ -164,8 +164,10 @@ export default observer(function Logcat() {
         return
       }
       if (el.classList.contains('luna-logcat-package')) {
+        recordHistory('package', text)
         setFilter((f) => ({ ...f, package: text }))
       } else if (el.classList.contains('luna-logcat-tag')) {
+        recordHistory('tag', text)
         setFilter((f) => ({ ...f, tag: text }))
       } else {
         const priority = PRIORITY_LETTERS.indexOf(text)
@@ -274,21 +276,6 @@ export default observer(function Logcat() {
                 priority: toNum(val),
               })
               break
-            case 'package':
-              setFilter({
-                ...filter,
-                package: val,
-              })
-              break
-            case 'tag':
-              setFilter({
-                ...filter,
-                tag: val,
-              })
-              break
-            case 'search':
-              setSearch(val)
-              break
           }
         }}
       >
@@ -314,20 +301,23 @@ export default observer(function Logcat() {
             ERROR: '6',
           }}
         />
-        <LunaToolbarInput
-          keyName="tag"
+        <HistoryInput
           placeholder={t('tag')}
           value={filter.tag || ''}
+          historyKey="tag"
+          onChange={(val) => setFilter((f) => ({ ...f, tag: val }))}
         />
-        <LunaToolbarInput
-          keyName="package"
+        <HistoryInput
           placeholder={t('package')}
           value={filter.package || ''}
+          historyKey="package"
+          onChange={(val) => setFilter((f) => ({ ...f, package: val }))}
         />
-        <LunaToolbarInput
-          keyName="search"
+        <HistoryInput
           placeholder={t('search')}
           value={search}
+          historyKey="search"
+          onChange={setSearch}
         />
         <LunaToolbarSpace />
         <ToolbarIcon

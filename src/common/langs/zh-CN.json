@@ -29,6 +29,7 @@
   "package": "包名",
   "tag": "标签",
   "search": "搜索",
+  "clearHistory": "清空历史",
   "scrollToEnd": "滚动到底部",
   "restart": "重启",
   "softWrap": "自动换行",
