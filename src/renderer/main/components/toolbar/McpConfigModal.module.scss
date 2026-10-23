@@ -91,3 +91,32 @@
   line-height: 1.6;
   background: var(--color-warning-bg, rgba(230, 162, 60, 0.08));
 }
+
+.lanIps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.lanIpsLabel {
+  color: var(--color-text-secondary, var(--color-text));
+  opacity: 0.75;
+}
+
+.lanIp {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--color-background-secondary, #2a2a2a);
+  border: 1px solid var(--color-border, #3a3a3a);
+  font-family: var(--font-family-mono, monospace);
+}
+
+.lanIpsHint {
+  flex-basis: 100%;
+  color: var(--color-text-secondary, var(--color-text));
+  opacity: 0.6;
+}

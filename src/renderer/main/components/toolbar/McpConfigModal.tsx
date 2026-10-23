@@ -79,6 +79,17 @@ export default observer(function McpConfigModal(props: IModalProps) {
         <p className={Style.tip}>{t('mcpConfigTip')}</p>
         <p className={Style.tip}>{t('mcpConfigTokenTip')}</p>
         <p className={Style.tipWarn}>{t('mcpConfigRemoteTip')}</p>
+        {store.mcp.lan && store.mcp.lanIps.length > 0 && (
+          <div className={Style.lanIps}>
+            <span className={Style.lanIpsLabel}>{t('mcpLanIps')}</span>
+            {store.mcp.lanIps.map((ip) => (
+              <code key={ip} className={Style.lanIp}>
+                {ip}
+              </code>
+            ))}
+            <span className={Style.lanIpsHint}>{t('mcpLanIpsHint')}</span>
+          </div>
+        )}
       </div>
     </LunaModal>,
     document.body

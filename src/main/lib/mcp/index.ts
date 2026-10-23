@@ -5,7 +5,7 @@ import log from 'share/common/log'
 import { getSettingsStore } from '../store'
 import { IMcpConfigs, IMcpStatus } from 'common/types'
 import * as server from './server'
-import { getConfigs, getEndpoint } from './config'
+import { getConfigs, getEndpoint, getLanIps } from './config'
 import {
   ensureToken,
   getPort,
@@ -29,6 +29,7 @@ function buildStatus(): IMcpStatus {
     lan: isLan(),
     port,
     url: getEndpoint(),
+    lanIps: isLan() ? getLanIps() : [],
     allowWrite: isAllowWrite(),
     toolCount: getVisibleTools().length,
     rev: runtime.rev,

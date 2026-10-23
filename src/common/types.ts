@@ -69,6 +69,7 @@ export interface IMcpStatus {
   lan: boolean
   port: number
   url: string
+  lanIps: string[]
   allowWrite: boolean
   toolCount: number
   rev: number

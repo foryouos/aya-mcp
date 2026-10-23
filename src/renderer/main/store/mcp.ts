@@ -7,6 +7,7 @@ export class Mcp {
   lan = false
   port = 7788
   url = ''
+  lanIps: string[] = []
   allowWrite = false
   toolCount = 0
   error = ''
@@ -19,6 +20,7 @@ export class Mcp {
       lan: observable,
       port: observable,
       url: observable,
+      lanIps: observable,
       allowWrite: observable,
       toolCount: observable,
       error: observable,
@@ -43,6 +45,7 @@ export class Mcp {
     this.lan = status.lan
     this.port = status.port
     this.url = status.url
+    this.lanIps = status.lanIps || []
     this.allowWrite = status.allowWrite
     this.toolCount = status.toolCount
     this.error = status.error || ''
