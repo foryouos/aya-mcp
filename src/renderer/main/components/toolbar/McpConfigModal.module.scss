@@ -110,8 +110,9 @@
 .lanIp {
   padding: 2px 8px;
   border-radius: 4px;
-  background: var(--color-background-secondary, #2a2a2a);
-  border: 1px solid var(--color-border, #3a3a3a);
+  background: var(--color-bg-hover, rgba(128, 128, 128, 0.16));
+  border: 1px solid var(--color-border, rgba(128, 128, 128, 0.3));
+  color: var(--color-text);
   font-family: var(--font-family-mono, monospace);
 }
 
