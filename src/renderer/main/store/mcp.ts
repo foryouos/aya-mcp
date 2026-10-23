@@ -4,6 +4,7 @@ import { IMcpConfigs, IMcpStatus } from 'common/types'
 export class Mcp {
   running = false
   enabled = false
+  lan = false
   port = 7788
   url = ''
   allowWrite = false
@@ -15,6 +16,7 @@ export class Mcp {
     makeObservable(this, {
       running: observable,
       enabled: observable,
+      lan: observable,
       port: observable,
       url: observable,
       allowWrite: observable,
@@ -38,6 +40,7 @@ export class Mcp {
     }
     this.running = status.running
     this.enabled = status.enabled
+    this.lan = status.lan
     this.port = status.port
     this.url = status.url
     this.allowWrite = status.allowWrite
@@ -69,6 +72,13 @@ export class Mcp {
 
   async setPort(port: number) {
     const status = await main.mcpSetPort(port)
+    this.apply(status)
+
+    return status
+  }
+
+  async setLan(lan: boolean) {
+    const status = await main.mcpSetLan(lan)
     this.apply(status)
 
     return status

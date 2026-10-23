@@ -45,3 +45,7 @@ export function isAllowWrite(): boolean {
 export function isEnabled(): boolean {
   return !!settingsStore.get('mcpEnabled')
 }
+
+export function isLan(): boolean {
+  return !!settingsStore.get('mcpLan')
+}

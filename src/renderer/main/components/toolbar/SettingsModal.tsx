@@ -37,9 +37,11 @@ export default observer(function SettingsModal(props: IModalProps) {
 
   function onChange(key, val) {
     // MCP 相关配置由主进程托管，走专用 IPC 而不是通用设置存储
-    if (contain(['mcpEnabled', 'mcpAllowWrite'], key)) {
+    if (contain(['mcpEnabled', 'mcpAllowWrite', 'mcpLan'], key)) {
       if (key === 'mcpEnabled') {
         toggleEnabled(val)
+      } else if (key === 'mcpLan') {
+        toggleLan(val)
       } else {
         toggleAllowWrite(val)
       }
@@ -72,6 +74,13 @@ export default observer(function SettingsModal(props: IModalProps) {
     await store.mcp.setAllowWrite(allowWrite)
     if (allowWrite) {
       notify(t('mcpWriteToolsHint'), { icon: 'info' })
+    }
+  }
+
+  async function toggleLan(lan: boolean) {
+    await store.mcp.setLan(lan)
+    if (lan) {
+      notify(t('mcpLanHint'), { icon: 'info' })
     }
   }
 
@@ -155,6 +164,12 @@ export default observer(function SettingsModal(props: IModalProps) {
           keyName="mcpAllowWrite"
           value={store.mcp.allowWrite}
           description={t('mcpAllowWrite')}
+          disabled={!store.mcp.enabled}
+        />
+        <LunaSettingCheckbox
+          keyName="mcpLan"
+          value={store.mcp.lan}
+          description={t('mcpLan')}
           disabled={!store.mcp.enabled}
         />
         <LunaSettingNumber

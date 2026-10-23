@@ -5,12 +5,13 @@ import log from 'share/common/log'
 import { getSettingsStore } from '../store'
 import { IMcpConfigs, IMcpStatus } from 'common/types'
 import * as server from './server'
-import { getConfigs } from './config'
+import { getConfigs, getEndpoint } from './config'
 import {
   ensureToken,
   getPort,
   isAllowWrite,
   isEnabled,
+  isLan,
   resetToken,
   runtime,
 } from './state'
@@ -25,8 +26,9 @@ function buildStatus(): IMcpStatus {
   return {
     running: runtime.running,
     enabled: !!settingsStore.get('mcpEnabled'),
+    lan: isLan(),
     port,
-    url: `http://127.0.0.1:${port}/mcp`,
+    url: getEndpoint(),
     allowWrite: isAllowWrite(),
     toolCount: getVisibleTools().length,
     rev: runtime.rev,
@@ -63,7 +65,7 @@ export async function start(): Promise<IMcpStatus> {
   const port = getPort()
   try {
     ensureToken()
-    await server.start(port)
+    await server.start(port, isLan())
     runtime.running = true
     runtime.error = ''
     logger.info('server started on port', port)
@@ -134,6 +136,20 @@ export async function init() {
     }
     settingsStore.set('mcpPort', next)
     await restartIfRunning()
+
+    return buildStatus()
+  })
+
+  handleEvent('mcpSetLan', async (lan: boolean) => {
+    settingsStore.set('mcpLan', !!lan)
+
+    if (lan) {
+      // 局域网模式需要 0.0.0.0 监听，必须重启才能让新的 bind 地址生效
+      await restartIfRunning()
+    } else if (runtime.running) {
+      // 关闭局域网：重新绑定回 127.0.0.1
+      await restartIfRunning()
+    }
 
     return buildStatus()
   })

@@ -1,9 +1,27 @@
+import os from 'node:os'
 import { resolveResources } from 'share/main/lib/util'
 import { IMcpConfigs } from 'common/types'
-import { getPort, getToken, ensureToken } from './state'
+import { getPort, getToken, ensureToken, isLan } from './state'
+
+// 局域网模式下返回本机在局域网内的 IPv4 地址，方便其他机器复制连接地址；
+// 取第一个非回环、非链路本地（169.254.*）的 IPv4；找不到时回退到 127.0.0.1
+export function getLanIp(): string {
+  const ifaces = os.networkInterfaces()
+  for (const name of Object.keys(ifaces)) {
+    for (const info of ifaces[name] || []) {
+      if (info.family === 'IPv4' && !info.internal && !info.address.startsWith('169.254.')) {
+        return info.address
+      }
+    }
+  }
+
+  return '127.0.0.1'
+}
 
 export function getEndpoint() {
-  return `http://127.0.0.1:${getPort()}/mcp`
+  const host = isLan() ? getLanIp() : '127.0.0.1'
+
+  return `http://${host}:${getPort()}/mcp`
 }
 
 export function getBridgePath() {
@@ -17,7 +35,7 @@ function stringify(config: unknown) {
 export function getConfigs(): IMcpConfigs {
   const port = getPort()
   const token = ensureToken()
-  const url = `http://127.0.0.1:${port}/mcp`
+  const url = getEndpoint()
   const bridge = getBridgePath()
   const exe = process.execPath
 

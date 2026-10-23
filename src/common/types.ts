@@ -66,6 +66,7 @@ export interface IProcess {
 export interface IMcpStatus {
   running: boolean
   enabled: boolean
+  lan: boolean
   port: number
   url: string
   allowWrite: boolean
@@ -150,6 +151,7 @@ export type IpcMcpGetStatus = () => Promise<IMcpStatus>
 export type IpcMcpSetEnabled = (enabled: boolean) => Promise<IMcpStatus>
 export type IpcMcpSetAllowWrite = (allowWrite: boolean) => Promise<IMcpStatus>
 export type IpcMcpSetPort = (port: number) => Promise<IMcpStatus>
+export type IpcMcpSetLan = (lan: boolean) => Promise<IMcpStatus>
 export type IpcMcpGetConfigs = () => Promise<IMcpConfigs>
 export type IpcMcpResetToken = IpcMcpGetConfigs
 export type IpcReverseTcp = (

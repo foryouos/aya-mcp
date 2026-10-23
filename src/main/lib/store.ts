@@ -30,5 +30,6 @@ export const getSettingsStore = memoize(function () {
     mcpPort: 7788,
     mcpToken: '',
     mcpAllowWrite: false,
+    mcpLan: false,
   })
 })

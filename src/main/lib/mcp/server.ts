@@ -1,7 +1,7 @@
 import http from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import { handleMessage } from './protocol'
-import { getToken } from './state'
+import { getToken, isLan } from './state'
 import log from 'share/common/log'
 
 const logger = log('mcp')
@@ -34,7 +34,25 @@ function isAllowedOrigin(req: http.IncomingMessage) {
     return true
   }
 
-  return LOCAL_ORIGIN.test(origin)
+  if (LOCAL_ORIGIN.test(origin)) {
+    return true
+  }
+
+  // 局域网模式：放行来自局域网客户端的请求（仅靠 Bearer 令牌鉴权）
+  return isLan()
+}
+
+// 局域网模式下面向浏览器/跨源客户端开放必要的 CORS 头；仅本地模式不附加
+function corsHeaders(req: http.IncomingMessage): Record<string, string> {
+  if (!isLan()) {
+    return {}
+  }
+
+  return {
+    'Access-Control-Allow-Origin': req.headers.origin || '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  }
 }
 
 function sendJson(
@@ -117,16 +135,18 @@ function handleEvents(req: http.IncomingMessage, res: http.ServerResponse) {
 }
 
 async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
+  const ch = corsHeaders(req)
+
   if (req.method !== 'POST') {
-    sendJson(res, 405, { error: 'Method Not Allowed' }, { Allow: 'POST' })
+    sendJson(res, 405, { error: 'Method Not Allowed' }, { Allow: 'POST', ...ch })
     return
   }
   if (!isAllowedOrigin(req)) {
-    sendText(res, 403, 'Forbidden origin')
+    sendText(res, 403, 'Forbidden origin', ch)
     return
   }
   if (!isAuthorized(req)) {
-    sendText(res, 401, 'Unauthorized: invalid or missing bearer token')
+    sendText(res, 401, 'Unauthorized: invalid or missing bearer token', ch)
     return
   }
 
@@ -135,11 +155,16 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
     return ''
   })
   if (!body) {
-    sendJson(res, 400, {
-      jsonrpc: '2.0',
-      id: null,
-      error: { code: -32700, message: 'Parse error' },
-    })
+    sendJson(
+      res,
+      400,
+      {
+        jsonrpc: '2.0',
+        id: null,
+        error: { code: -32700, message: 'Parse error' },
+      },
+      ch
+    )
     return
   }
 
@@ -147,11 +172,16 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
   try {
     parsed = JSON.parse(body)
   } catch {
-    sendJson(res, 400, {
-      jsonrpc: '2.0',
-      id: null,
-      error: { code: -32700, message: 'Parse error' },
-    })
+    sendJson(
+      res,
+      400,
+      {
+        jsonrpc: '2.0',
+        id: null,
+        error: { code: -32700, message: 'Parse error' },
+      },
+      ch
+    )
     return
   }
 
@@ -189,10 +219,16 @@ async function handleMcp(req: http.IncomingMessage, res: http.ServerResponse) {
     return
   }
 
-  sendJson(res, 200, payload)
+  sendJson(res, 200, payload, ch)
 }
 
 function onRequest(req: http.IncomingMessage, res: http.ServerResponse) {
+  // 局域网模式下浏览器/跨源客户端会先发 OPTIONS 预检，直接放行
+  if (req.method === 'OPTIONS') {
+    sendText(res, 204, '', corsHeaders(req))
+    return
+  }
+
   const url = new URL(req.url || '/', 'http://127.0.0.1')
 
   if (url.pathname === '/mcp/events') {
@@ -201,7 +237,7 @@ function onRequest(req: http.IncomingMessage, res: http.ServerResponse) {
   }
 
   if (url.pathname !== '/mcp') {
-    sendJson(res, 404, { error: 'Not Found' })
+    sendJson(res, 404, { error: 'Not Found' }, corsHeaders(req))
     return
   }
 
@@ -217,7 +253,7 @@ function onRequest(req: http.IncomingMessage, res: http.ServerResponse) {
   })
 }
 
-export function start(port: number): Promise<void> {
+export function start(port: number, lan = false): Promise<void> {
   return new Promise((resolve, reject) => {
     const srv = http.createServer(onRequest)
 
@@ -227,7 +263,8 @@ export function start(port: number): Promise<void> {
     }
 
     srv.once('error', onError)
-    srv.listen(port, '127.0.0.1', () => {
+    // 局域网模式监听 0.0.0.0，否则仅本机回环；host 由调用方按当前开关传入
+    srv.listen(port, lan ? '0.0.0.0' : '127.0.0.1', () => {
       srv.removeListener('error', onError)
       srv.on('error', (err) => logger.error('server error', err.message))
       server = srv
