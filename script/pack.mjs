@@ -15,7 +15,9 @@ const config = {
   directories: {
     output: `../release/${pkg.version}`,
   },
-  files: ['main', 'preload', 'renderer'],
+  files: ['main', 'preload', 'renderer', 'node_modules/**/*'],
+  // serialport 原生绑定需要解包，否则 asar 内无法加载 .node
+  asarUnpack: ['node_modules/@serialport/**'],
   artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
   extraResources: {
     from: 'resources',

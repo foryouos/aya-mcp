@@ -10,6 +10,7 @@ import packageTools from './package'
 import performanceTools from './performance'
 import fileTools from './file'
 import logcatTools from './logcat'
+import serialTools from './serial'
 import batchTools from './batch'
 import waitTools from './wait'
 import portTools from './port'
@@ -32,6 +33,7 @@ const toolGroups: McpTool[][] = [
   performanceTools,
   fileTools,
   logcatTools,
+  serialTools,
   portTools,
   webviewTools,
   recordTools,

@@ -16,7 +16,8 @@ export default defineConfig({
       formats: ['cjs'],
     },
     rollupOptions: {
-      external: builtins,
+      // serialport 含原生模块，不能打包进 bundle
+      external: [...builtins, 'serialport'],
     },
   },
   resolve: {

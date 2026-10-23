@@ -214,3 +214,104 @@ export type IpcGetFileUrl = (
   path: string,
   port?: number
 ) => Promise<string>
+
+export type SerialSource = 'bootloader' | 'kernel' | 'android' | 'other'
+
+export interface ISerialPortInfo {
+  path: string
+  manufacturer?: string
+  serialNumber?: string
+  pnpId?: string
+  vendorId?: string
+  productId?: string
+  friendlyName?: string
+}
+
+export interface ISerialLine {
+  seq: number
+  time: number
+  source: SerialSource
+  text: string
+}
+
+export interface ISerialStatus {
+  open: boolean
+  path: string
+  baudRate: number
+  dataBits: number
+  stopBits: number
+  parity: string
+  paused: boolean
+  sessionId: string
+  startedAt: number
+  lines: number
+  seq: number
+  dropped: number
+  bytes: number
+  logFile: string
+  logFiles: string[]
+  logFileSize: number
+  maxLines: number
+  error: string
+}
+
+export interface ISerialQuery {
+  // 0 表示不限制（导出场景）
+  lines?: number
+  keyword?: string
+  regex?: boolean
+  source?: SerialSource | 'all'
+  fromSeq?: number
+  toSeq?: number
+  // true 时返回命中的最后 N 行（查看最新日志），否则返回最早 N 行
+  latest?: boolean
+}
+
+export interface ISerialQueryResult {
+  total: number
+  matched: number
+  returned: number
+  truncated: boolean
+  lines: ISerialLine[]
+  status: ISerialStatus
+}
+
+export interface ISerialData {
+  sessionId: string
+  lines: ISerialLine[]
+  dropped: number
+  bytes: number
+  logFileSize: number
+}
+
+export type IpcSerialListPorts = () => Promise<ISerialPortInfo[]>
+export type IpcSerialOpen = (
+  path: string,
+  baudRate: number
+) => Promise<ISerialStatus>
+export type IpcSerialClose = () => Promise<ISerialStatus>
+export type IpcSerialStatus = () => Promise<ISerialStatus>
+export type IpcSerialSetPaused = (paused: boolean) => Promise<ISerialStatus>
+export type IpcSerialClear = () => Promise<ISerialStatus>
+export type IpcSerialQuery = (query: ISerialQuery) => Promise<ISerialQueryResult>
+export type IpcSerialSave = (
+  mode: 'view' | 'session',
+  query?: ISerialQuery
+) => Promise<string>
+export type IpcSerialWrite = (
+  data: string,
+  newline?: boolean | 'crlf' | 'lf' | 'none'
+) => Promise<void>
+export type IpcSerialSetBaud = (baudRate: number) => Promise<ISerialStatus>
+export type IpcSerialDetectBaud = () => Promise<{
+  rate: number
+  detected: boolean
+}>
+export type IpcSerialWait = (
+  pattern: string,
+  options?: { regex?: boolean; timeout?: number }
+) => Promise<{
+  matched: boolean
+  waited: number
+  line: ISerialLine | null
+}>

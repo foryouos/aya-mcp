@@ -1,5 +1,6 @@
 import Toolbar from './components/toolbar/Toolbar'
 import Logcat from './components/logcat/Logcat'
+import Serial from './components/serial/Serial'
 import Shell from './components/shell/Shell'
 import Overview from './components/overview/Overview'
 import Screenshot from './components/screenshot/Screenshot'
@@ -38,6 +39,9 @@ export default observer(function App() {
             </Panel>
             <Panel panel="logcat">
               <Logcat />
+            </Panel>
+            <Panel panel="serial">
+              <Serial />
             </Panel>
             <Panel panel="shell">
               <Shell />

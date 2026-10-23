@@ -2,6 +2,7 @@ import { app } from 'electron'
 import * as menu from './lib/menu'
 import * as main from './window/main'
 import * as adb from './lib/adb'
+import * as serial from './lib/serial'
 import * as mcp from './lib/mcp'
 import * as terminal from 'share/main/window/terminal'
 import * as window from 'share/main/lib/window'
@@ -22,6 +23,7 @@ app.on('ready', () => {
 
   terminal.init()
   adb.init()
+  serial.init()
   mcp.init()
   main.showWin()
   menu.init()

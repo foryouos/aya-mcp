@@ -7,6 +7,8 @@ export class Settings {
   adbPath = ''
   killAdbWhenExit = false
   useNativeTitlebar = false
+  serialPath = ''
+  serialBaudRate = 115200
   constructor() {
     makeObservable(this, {
       language: observable,
@@ -14,6 +16,8 @@ export class Settings {
       adbPath: observable,
       killAdbWhenExit: observable,
       useNativeTitlebar: observable,
+      serialPath: observable,
+      serialBaudRate: observable,
       set: action,
     })
 
@@ -26,6 +30,8 @@ export class Settings {
       'adbPath',
       'killAdbWhenExit',
       'useNativeTitlebar',
+      'serialPath',
+      'serialBaudRate',
     ]
     for (let i = 0, len = names.length; i < len; i++) {
       const name = names[i]

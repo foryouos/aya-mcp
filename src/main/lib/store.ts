@@ -31,5 +31,8 @@ export const getSettingsStore = memoize(function () {
     mcpToken: '',
     mcpAllowWrite: false,
     mcpLan: false,
+    serialPath: '',
+    serialBaudRate: 115200,
+    serialMaxLines: 200000,
   })
 })

@@ -15,6 +15,10 @@ interface IHistoryInputProps {
   value: string
   historyKey: string
   onChange: (val: string) => void
+  // 回车提交后触发（失焦不触发），用于串口发送
+  onEnter?: (val: string) => void
+  // 串口发送需要保留首尾空格，默认仍然 trim
+  trimValue?: boolean
 }
 
 export function loadHistory(key: string): string[] {
@@ -118,7 +122,7 @@ export default function HistoryInput(props: IHistoryInputProps) {
   }
 
   function commit(val: string) {
-    const text = val.trim()
+    const text = props.trimValue === false ? val : val.trim()
     if (text) {
       recordHistory(props.historyKey, text)
       setHistory(loadHistory(props.historyKey))
@@ -129,6 +133,7 @@ export default function HistoryInput(props: IHistoryInputProps) {
     }
     setOpen(false)
     setActive(-1)
+    return text
   }
 
   function removeItem(item: string, e: ReactMouseEvent) {
@@ -157,11 +162,10 @@ export default function HistoryInput(props: IHistoryInputProps) {
     }
     if (e.key === 'Enter') {
       e.preventDefault()
-      if (open && active > -1 && history[active]) {
-        commit(history[active])
-      } else {
-        commit(props.value)
-      }
+      const val =
+        open && active > -1 && history[active] ? history[active] : props.value
+      const text = commit(val)
+      props.onEnter?.(text)
       return
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {

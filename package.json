@@ -99,5 +99,8 @@
     "webm-muxer": "^5.1.2",
     "xml2js": "^0.6.2",
     "zx": "^8.8.0"
+  },
+  "dependencies": {
+    "serialport": "^13.0.0"
   }
 }

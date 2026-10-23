@@ -1,0 +1,182 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background-color: var(--color-bg-container-darker);
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  user-select: text;
+}
+
+.sendBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-bg-container);
+
+  .sendInput {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    margin: 0;
+    padding: 0 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    background-color: var(--color-bg-container);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+
+    &:focus {
+      border-color: var(--color-primary);
+    }
+  }
+}
+
+.newline {
+  flex: none;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  background-color: var(--color-bg-container);
+  color: var(--color-text);
+  font-size: 12px;
+  outline: none;
+}
+
+.sendBtn {
+  flex: none;
+  height: 24px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 2px;
+  background-color: var(--color-primary);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+}
+
+.content {
+  position: relative;
+  min-width: 100%;
+}
+
+.row {
+  position: absolute;
+  left: 0;
+  height: 18px;
+  line-height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  white-space: pre;
+  border-left: 2px solid transparent;
+
+  &:hover {
+    background-color: var(--color-bg-container);
+  }
+}
+
+// 阶段区分：左侧色条 + 阶段起始分隔线
+.row_bootloader {
+  border-left-color: #8e44ad;
+  background-color: rgba(142, 68, 173, 0.07);
+
+  .text {
+    color: var(--color-text-secondary);
+  }
+}
+
+.row_kernel {
+  border-left-color: #2d7ff9;
+}
+
+.row_android {
+  border-left-color: #27ae60;
+  background-color: rgba(39, 174, 96, 0.05);
+}
+
+.row_other {
+  border-left-color: #7f8c8d;
+}
+
+.stageStart {
+  border-top: 1px dashed var(--color-border);
+}
+
+.time {
+  flex: none;
+  color: var(--color-text-secondary);
+  opacity: 0.75;
+}
+
+.badge {
+  flex: none;
+  width: 42px;
+  text-align: center;
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 14px;
+  color: #fff;
+}
+
+.bootloader {
+  background-color: #8e44ad;
+}
+
+.kernel {
+  background-color: #2d7ff9;
+}
+
+.android {
+  background-color: #27ae60;
+}
+
+.other {
+  background-color: #7f8c8d;
+}
+
+.text {
+  white-space: pre;
+}
+
+.highlight {
+  background-color: #ffe08a;
+  color: #333;
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  white-space: pre-line;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
