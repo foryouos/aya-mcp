@@ -18,29 +18,49 @@ export function showWin() {
 
   initIpc()
 
-  win = window.create({
+  const next = window.create({
     name: 'screencast',
     minWidth: 430,
     minHeight: 640,
     width: 430,
     height: 640,
   })
+  win = next
 
-  win.on('close', () => {
-    win?.destroy()
-    win = null
+  next.on('close', () => {
+    if (win === next) {
+      win = null
+    }
     const mainWin = window.getWin('main')
     if (mainWin) {
       mainWin.show()
     }
   })
+  next.on('closed', () => {
+    if (win === next) {
+      win = null
+    }
+  })
 
-  window.loadPage(win, { page: 'screencast' })
+  window.loadPage(next, { page: 'screencast' })
+}
+
+export function isShown() {
+  return !!win && !win.isDestroyed()
 }
 
 export function closeWin() {
-  if (win) {
-    win.close()
+  const target = win
+  win = null
+  if (!target || target.isDestroyed()) {
+    return
+  }
+
+  target.destroy()
+
+  const mainWin = window.getWin('main')
+  if (mainWin) {
+    mainWin.show()
   }
 }
 

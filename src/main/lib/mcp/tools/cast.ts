@@ -1,4 +1,3 @@
-import { getWin } from 'share/main/lib/window'
 import { getScreencastStore } from '../../store'
 import * as screencast from '../../../window/screencast'
 import { resolveDeviceId } from '../lib/device'
@@ -12,14 +11,27 @@ const deviceIdProperty = {
 
 const DEFAULT_SETTINGS = { videoBitRate: 8000000, maxSize: 0 }
 
+// 以 screencast 模块持有的窗口句柄为准：getWin 表在窗口销毁后可能残留，
+// 用它判断会出现“窗口已关但 visible 仍为 true”
 function isCastVisible() {
-  const win = getWin('screencast')
-
-  return !!(win && win.isVisible())
+  return screencast.isShown()
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// 窗口创建与销毁都是异步的，轮询到目标状态再返回，避免返回过期的可见性
+async function waitVisible(expected: boolean, timeout = 2500) {
+  const start = Date.now()
+  while (Date.now() - start < timeout) {
+    if (isCastVisible() === expected) {
+      return true
+    }
+    await sleep(100)
+  }
+
+  return isCastVisible() === expected
 }
 
 function readSettings(deviceId: string) {
@@ -99,13 +111,14 @@ const castWindow: McpTool = {
       screencast.showWin()
     }
 
-    // 窗口创建/销毁是异步的，稍等再读可见性
-    await sleep(200)
+    // close 走 destroy，窗口对象销毁后句柄表可能残留，以操作结果为准
+    const visible =
+      action === 'close' ? false : await waitVisible(true, 6000)
 
     return jsonResult({
       ok: true,
       action,
-      visible: isCastVisible(),
+      visible,
       hint:
         action === 'open' || action === 'restart'
           ? '投屏窗口在桌面弹出，截图/点击请继续用 aya_screencap / aya_tap'
@@ -162,7 +175,6 @@ const castSettings: McpTool = {
       await sleep(300)
       screencast.showWin()
       restarted = true
-      await sleep(200)
     }
 
     return jsonResult({
@@ -172,7 +184,7 @@ const castSettings: McpTool = {
       restarted,
       videoBitRate: next.videoBitRate,
       maxSize: next.maxSize,
-      visible: isCastVisible(),
+      visible: restarted ? await waitVisible(true, 6000) : isCastVisible(),
       hint: changed && !restarted ? '设置已保存，重启投屏窗口后生效' : '',
     })
   },

@@ -6,7 +6,14 @@ import { getSettingsStore } from '../store'
 import { IMcpConfigs, IMcpStatus } from 'common/types'
 import * as server from './server'
 import { getConfigs } from './config'
-import { ensureToken, getPort, isAllowWrite, resetToken, runtime } from './state'
+import {
+  ensureToken,
+  getPort,
+  isAllowWrite,
+  isEnabled,
+  resetToken,
+  runtime,
+} from './state'
 import { getVisibleTools } from './tools'
 
 const logger = log('mcp')
@@ -101,6 +108,8 @@ async function restartIfRunning() {
 }
 
 export async function init() {
+  logger.info('init', `enabled=${isEnabled()} port=${getPort()}`)
+
   handleEvent('mcpGetStatus', async () => buildStatus())
 
   // getConfigs() 内部会 ensureToken()，首次获取即生成并持久化令牌
