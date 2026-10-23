@@ -271,14 +271,16 @@ try {
     foreach ($p in $running) {
       Warn "running: $($p.ProcessName) (pid $($p.Id)) $($p.Path)"
     }
-    if ($KillRunning) {
+    # Dev builds always keep AYA's single instance lock inside %APPDATA%\AYA,
+    # so a running instance makes a new process quit silently. In dev mode we
+    # therefore kill it automatically (no flag needed); in prod mode the kill
+    # stays opt-in via -KillRunning.
+    if ($Mode -eq 'dev' -or $KillRunning) {
       Step 'Close conflicting instances'
       if (-not (Stop-ConflictingInstances)) {
         Fail 'could not close running AYA instances'
       }
       Ok 'conflicting instances closed'
-    } elseif ($Mode -eq 'dev') {
-      Fail 'AYA is already running and holds the single instance lock. Close it first, or add -KillRunning.'
     } else {
       Warn 'another AYA is running; it holds the lock, the new window may quit immediately'
     }

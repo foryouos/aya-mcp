@@ -56,7 +56,15 @@ const settingsStore = getSettingsStore()
 let client: Client
 
 export const getDevices: IpcGetDevices = async function () {
-  let devices = await client.listDevices()
+  let devices: Device[]
+  try {
+    devices = await client.listDevices()
+  } catch (e) {
+    // adb server 可能尚未就绪（冷启动），等待后重试一次
+    logger.warn('list devices failed, retry', e)
+    await sleep(1000)
+    devices = await client.listDevices()
+  }
   devices = filter(
     devices,
     (device: Device) => device.type === 'emulator' || device.type === 'device'
@@ -427,7 +435,13 @@ export async function init() {
       })
     } catch (e) {
       logger.error('track error', e)
+      // adb server 可能尚未启动（冷启动），等待后重试，否则设备列表会永远为空
+      await sleep(2000)
+      track()
+      return
     }
+    // adb 就绪后主动通知渲染进程刷新一次设备列表，兜底启动早期的失败查询
+    setTimeout(() => window.sendAll('changeDevice'), 2000)
   }
   function onDeviceChange() {
     logger.info('device change')

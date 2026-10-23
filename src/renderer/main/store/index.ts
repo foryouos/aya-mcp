@@ -78,7 +78,13 @@ class Store extends BaseStore {
     }
   }
   refreshDevices = async () => {
-    const devices = await main.getDevices()
+    let devices: IDevice[]
+    try {
+      devices = await main.getDevices()
+    } catch {
+      // adb 未就绪等场景，保持现状，等待下一次 changeDevice 事件再刷新
+      return
+    }
     runInAction(() => {
       this.devices = devices
       setMemStore('devices', devices)
