@@ -31,7 +31,10 @@ export function useResizeSensor(
   }, [])
 }
 
-export function useCheckUpdate(url: string) {
+// 更新提示应指向本分支的 Release 页，而非上游官网
+export const RELEASES_PAGE = 'https://github.com/foryouos/aya-mcp/releases'
+
+export function useCheckUpdate(url: string = RELEASES_PAGE) {
   useEffect(() => {
     const offUpdateError = main.on('updateError', () => {
       Modal.alert(t('updateErr'))
