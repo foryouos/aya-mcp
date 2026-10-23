@@ -191,17 +191,23 @@ export function getAdbPath() {
   return bin
 }
 
-export function spawnAdb(args: string[]): Promise<{
+export function spawnAdb(
+  args: string[],
+  deviceId?: string
+): Promise<{
   stdout: string
   stderr: string
   code: number | null
 }> {
   const bin = getAdbPath()
+  // 多设备环境下必须指定 -s，否则 adb 报 "more than one device/emulator"
+  const fullArgs = deviceId ? ['-s', deviceId, ...args] : args
 
   return new Promise((resolve, reject) => {
-    const cp = childProcess.spawn(bin, args, {
+    // 不用 shell:true：args 数组直接交给 adb.exe，避免 Windows cmd 把设备侧
+    // shell 命令里的 &（后台符）当成 cmd 分隔符拆分
+    const cp = childProcess.spawn(bin, fullArgs, {
       env: { ...process.env },
-      shell: true,
     })
 
     let stdout = ''

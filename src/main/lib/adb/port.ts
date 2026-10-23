@@ -44,8 +44,8 @@ export const reverse: IpcReverse = async function (deviceId, remote, local) {
 }
 
 // adbkit 没有提供移除接口，走 adb 可执行文件的 host 命令
-async function runAdb(args: string[], action: string) {
-  const { code, stdout, stderr } = await spawnAdb(args)
+async function runAdb(args: string[], action: string, deviceId?: string) {
+  const { code, stdout, stderr } = await spawnAdb(args, deviceId)
   if (code !== 0) {
     throw new Error(`${action}失败：${stderr || stdout || `exit ${code}`}`)
   }
@@ -53,21 +53,23 @@ async function runAdb(args: string[], action: string) {
   return (stdout || stderr || '').trim()
 }
 
-export async function removeForward(target: string) {
+export async function removeForward(deviceId: string, target: string) {
   return runAdb(
     target === 'all'
       ? ['forward', '--remove-all']
       : ['forward', '--remove', target],
-    target === 'all' ? '清空本机端口转发' : `移除端口转发 ${target}`
+    target === 'all' ? '清空本机端口转发' : `移除端口转发 ${target}`,
+    deviceId
   )
 }
 
-export async function removeReverse(target: string) {
+export async function removeReverse(deviceId: string, target: string) {
   return runAdb(
     target === 'all'
       ? ['reverse', '--remove-all']
       : ['reverse', '--remove', target],
-    target === 'all' ? '清空设备反向转发' : `移除反向转发 ${target}`
+    target === 'all' ? '清空设备反向转发' : `移除反向转发 ${target}`,
+    deviceId
   )
 }
 

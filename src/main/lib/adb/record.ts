@@ -1,4 +1,4 @@
-import { getDeviceStore, setDeviceStore, shell } from './base'
+import { getDeviceStore, setDeviceStore, shell, spawnAdb } from './base'
 import { deleteFile, statFile } from './file'
 
 export interface IRecordingOptions {
@@ -108,11 +108,15 @@ export async function startRecording(
   }
   args.push(remotePath)
 
-  // nohup + & 让 screenrecord 脱离 adb shell 会话，命令立即返回
-  await shell(
-    deviceId,
-    `nohup ${args.join(' ')} </dev/null >/dev/null 2>&1 &`
+  // nohup + & 让 screenrecord 脱离 adb shell 会话；用 CLI adb 启动以确保进程在
+  // adb 连接关闭后不被 SIGHUP 杀掉（adbkit 的 shell 会在命令结束后关闭底层连接）
+  const { code, stderr } = await spawnAdb(
+    ['shell', `nohup ${args.join(' ')} </dev/null >/dev/null 2>&1 &`],
+    deviceId
   )
+  if (code !== 0) {
+    throw new Error('screenrecord 启动命令失败：' + (stderr || `exit ${code}`))
+  }
 
   const startedPid = await getScreenrecordPid(deviceId)
   if (!startedPid) {

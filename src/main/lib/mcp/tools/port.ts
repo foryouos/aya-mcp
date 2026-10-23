@@ -163,9 +163,9 @@ const removePort: McpTool = {
 
     try {
       if (direction === 'forward') {
-        await port.removeForward(target)
+        await port.removeForward(deviceId, target)
       } else {
-        await port.removeReverse(target)
+        await port.removeReverse(deviceId, target)
       }
     } catch (err) {
       throw new McpError(
