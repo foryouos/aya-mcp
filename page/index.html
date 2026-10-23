@@ -1,0 +1,1568 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!--
+      ============================================================================
+      AYA · MCP 功能宣传页（静态单文件，可直接部署到 Cloudflare Pages）
+      ============================================================================
+      【二次开发备注 / Fork Note】
+      1. 上游项目：AYA — https://aya.liriliri.io/（源码 https://github.com/liriliri/aya）
+         上游作者：surunzi（liriliri），许可证：AGPL-3.0（见仓库根目录 LICENSE）
+      2. 本分支（aya-mcp）基于 AYA v1.14.2 二次开发，仅新增 / 强化「MCP 服务」能力：
+         - src/main/lib/mcp/*        MCP Server（JSON-RPC 2.0 + SSE）、工具实现、鉴权
+         - src/main/lib/mcp/tools/*  42 个 aya_* 工具（16 只读 / 26 写）
+         - script/mcp/aya-mcp-stdio.cjs  stdio 桥接脚本
+         - src/renderer/.../McpConfigModal.tsx  设置内的 MCP 开关与配置片段
+         桌面端其余能力（投屏、文件管理、日志、性能、Shell 等）均来自上游，未做改动。
+      3. 部署：本文件为纯静态页（无构建、无外部依赖），把 page/ 目录作为 output
+         directory 上传到 Cloudflare Pages / Workers Assets 即可。
+      4. 上线前必须替换的占位符（全局搜索 REPLACE_ME）：
+         - https://aya-mcp.pages.dev  → 你的正式域名（canonical / og:url / JSON-LD）
+         - https://aya-mcp.pages.dev/og.png → 1200x630 社交分享图（需自行上传）
+         - 下载链接 https://github.com/liriliri/aya/releases → 你自己的发布地址
+      5. SEO：已内置 title / description / keywords / canonical / robots、
+         Open Graph、Twitter Card、JSON-LD（SoftwareApplication + FAQPage）。
+         建议额外在站点根目录放 robots.txt 与 sitemap.xml。
+      ============================================================================
+    -->
+
+    <title>AYA MCP · 让 AI 直接操控你的 Android 设备 | 42 个 aya_* 工具</title>
+    <meta
+      name="description"
+      content="AYA MCP 把 Android 设备能力以 42 个 MCP 工具暴露给 CodeBuddy、WorkBuddy、Claude 等 AI 客户端：截图、UI 层级、点击滑动、装卸载应用、文件传输、logcat、录屏投屏，全部一句话完成。仅监听 127.0.0.1，写操作默认关闭。"
+    />
+    <meta
+      name="keywords"
+      content="AYA,MCP,Model Context Protocol,Android,adb,AI 控制手机,AI 自动化测试,Android 自动化,设备控制,UI 自动化,logcat,scrcpy,liriliri"
+    />
+    <meta name="author" content="AYA MCP（基于 liriliri/aya 二次开发）" />
+    <meta name="theme-color" content="#0f1712" />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1" />
+    <meta name="googlebot" content="index,follow" />
+    <link rel="canonical" href="https://aya-mcp.pages.dev/" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234fb155'/%3E%3Cpath d='M20 44 32 18l12 26' stroke='%23fff' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M25 36h14' stroke='%23fff' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+
+    <!-- Open Graph / Twitter Card：REPLACE_ME 替换为正式域名与分享图 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AYA MCP" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备" />
+    <meta
+      property="og:description"
+      content="42 个 MCP 工具，把截图、UI 层级、点击滑动、应用管理、文件传输、logcat、录屏全部交给 AI。三步接入 CodeBuddy / WorkBuddy / Claude，仅监听 127.0.0.1。"
+    />
+    <meta property="og:url" content="https://aya-mcp.pages.dev/" />
+    <meta property="og:image" content="https://aya-mcp.pages.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备" />
+    <meta
+      name="twitter:description"
+      content="42 个 MCP 工具，一句话让 AI 帮你操作 Android 手机：截图、点击、装应用、抓日志、录屏。"
+    />
+    <meta name="twitter:image" content="https://aya-mcp.pages.dev/og.png" />
+
+    <!-- 结构化数据：软件 + FAQ，帮助搜索引擎理解页面 -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "AYA MCP",
+            "applicationCategory": "DeveloperApplication",
+            "applicationSubCategory": "Android 设备控制 / MCP 服务",
+            "operatingSystem": "Windows, macOS, Linux",
+            "url": "https://aya-mcp.pages.dev/",
+            "softwareVersion": "1.14.2+mcp",
+            "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 42 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、端口映射、录屏投屏。",
+            "featureList": [
+              "42 个 MCP 工具（16 只读 / 26 写）",
+              "UI 层级快照与语义化点击",
+              "应用安装 / 卸载 / 启停 / 清数据",
+              "设备与本机双向文件传输",
+              "logcat 结构化过滤与 adb shell",
+              "设备端录屏与投屏控制",
+              "仅监听 127.0.0.1 + Bearer Token 鉴权"
+            ],
+            "isBasedOn": "https://aya.liriliri.io/",
+            "author": {
+              "@type": "Person",
+              "name": "surunzi (liriliri)",
+              "url": "https://github.com/liriliri"
+            },
+            "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "CNY",
+              "availability": "https://schema.org/InStock"
+            }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "AYA MCP 是什么？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "AYA 是一款跨平台的 Android adb 桌面工具。本分支在其基础上内置了 MCP（Model Context Protocol）服务，把设备能力封装成 42 个 aya_* 工具，让 CodeBuddy、WorkBuddy、Claude 等 AI 客户端直接用自然语言操控已连接的 Android 设备。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "需要 Root 或安装 App 吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不需要 Root，也不需要在手机上安装任何 App。AYA 通过 adb 与设备通信，只需开启 USB 调试（或无线调试）并在电脑上启动 AYA。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "数据会上传到云端吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不会。MCP 服务只监听 127.0.0.1，校验 Origin，请求体限制 2MB，并通过 Bearer Token 鉴权；令牌可随时在设置中重置。写操作默认隐藏，需手动开启“允许写入操作”。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "和原版 AYA 有什么区别？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "原版 AYA 提供投屏、文件管理、日志、性能、Shell 等桌面端能力；本分支完全保留这些能力，只新增了 MCP 服务层（设置 → MCP），不改变原有使用习惯。"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <style>
+      :root {
+        --primary: #4fb155;
+        --primary-dark: #3d9146;
+        --primary-soft: rgba(79, 177, 85, 0.12);
+        --bg: #ffffff;
+        --bg-soft: #f7f8fa;
+        --ink: #1a1d21;
+        --ink-2: #4a5058;
+        --ink-3: #7b828c;
+        --border: #e4e7ec;
+        --dark: #0f1712;
+        --radius: 14px;
+        --max: 1140px;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 76px;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+          "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.75;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a {
+        color: var(--primary-dark);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      img,
+      svg {
+        max-width: 100%;
+      }
+
+      .wrap {
+        width: 100%;
+        max-width: var(--max);
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      /* ---------- Header ---------- */
+      header.nav {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(255, 255, 255, 0.86);
+        backdrop-filter: saturate(180%) blur(12px);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .nav-inner {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        height: 64px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--ink);
+        letter-spacing: 0.2px;
+      }
+
+      .brand:hover {
+        text-decoration: none;
+      }
+
+      .brand svg {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+      }
+
+      .brand small {
+        font-weight: 500;
+        font-size: 12px;
+        color: var(--ink-3);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1px 8px;
+      }
+
+      nav.links {
+        margin-left: auto;
+        display: flex;
+        gap: 22px;
+        font-size: 15px;
+      }
+
+      nav.links a {
+        color: var(--ink-2);
+      }
+
+      nav.links a:hover {
+        color: var(--primary-dark);
+        text-decoration: none;
+      }
+
+      @media (max-width: 860px) {
+        nav.links {
+          display: none;
+        }
+      }
+
+      /* ---------- Hero ---------- */
+      .hero {
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(1200px 500px at 12% -10%, #1d3a26 0%, transparent 60%),
+          radial-gradient(900px 420px at 88% 0%, #14432a 0%, transparent 55%), var(--dark);
+        color: #fff;
+        padding: 88px 0 96px;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+        background-size: 46px 46px;
+        mask-image: radial-gradient(700px 380px at 70% 20%, #000 0%, transparent 70%);
+        pointer-events: none;
+      }
+
+      .hero .wrap {
+        position: relative;
+        z-index: 1;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(79, 177, 85, 0.16);
+        border: 1px solid rgba(79, 177, 85, 0.42);
+        color: #9be3a2;
+        border-radius: 999px;
+        padding: 5px 14px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #63d66d;
+        box-shadow: 0 0 0 4px rgba(99, 214, 109, 0.18);
+      }
+
+      h1 {
+        font-size: clamp(32px, 5.2vw, 54px);
+        line-height: 1.18;
+        margin: 22px 0 18px;
+        letter-spacing: -0.5px;
+      }
+
+      h1 em {
+        font-style: normal;
+        background: linear-gradient(92deg, #7fe08a, #4fb155 70%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .sub {
+        max-width: 680px;
+        font-size: clamp(16px, 1.6vw, 19px);
+        color: #c2ccc6;
+        margin: 0 0 32px;
+      }
+
+      .cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 10px;
+        padding: 12px 22px;
+        font-weight: 600;
+        font-size: 15px;
+        border: 1px solid transparent;
+        transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+      }
+
+      .btn:hover {
+        text-decoration: none;
+        transform: translateY(-1px);
+      }
+
+      .btn-primary {
+        background: var(--primary);
+        color: #06210c;
+      }
+
+      .btn-primary:hover {
+        background: #5cbc62;
+      }
+
+      .btn-ghost {
+        background: rgba(255, 255, 255, 0.05);
+        color: #e8efea;
+        border-color: rgba(255, 255, 255, 0.22);
+      }
+
+      .btn-ghost:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .hero-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px;
+        margin-top: 52px;
+        padding-top: 30px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .stat b {
+        display: block;
+        font-size: 30px;
+        line-height: 1.2;
+        color: #fff;
+      }
+
+      .stat span {
+        font-size: 13px;
+        color: #93a29a;
+      }
+
+      /* ---------- Sections ---------- */
+      section {
+        padding: 76px 0;
+      }
+
+      section.soft {
+        background: var(--bg-soft);
+        border-block: 1px solid var(--border);
+      }
+
+      .kicker {
+        color: var(--primary-dark);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        margin: 0 0 10px;
+      }
+
+      h2 {
+        font-size: clamp(26px, 3.4vw, 36px);
+        line-height: 1.3;
+        margin: 0 0 14px;
+        letter-spacing: -0.3px;
+      }
+
+      .lead {
+        max-width: 760px;
+        color: var(--ink-2);
+        margin: 0 0 40px;
+        font-size: 17px;
+      }
+
+      /* ---------- Cards ---------- */
+      .grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .g3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .g4 {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      @media (max-width: 980px) {
+        .g4 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .g3 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 620px) {
+        .g4,
+        .g3 {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+      }
+
+      .card:hover {
+        border-color: rgba(79, 177, 85, 0.45);
+        box-shadow: 0 10px 30px rgba(24, 40, 28, 0.08);
+        transform: translateY(-2px);
+      }
+
+      .card h3 {
+        margin: 14px 0 8px;
+        font-size: 17px;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--ink-2);
+        font-size: 14.5px;
+        line-height: 1.7;
+      }
+
+      .ico {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        display: grid;
+        place-items: center;
+      }
+
+      .ico svg {
+        width: 21px;
+        height: 21px;
+      }
+
+      /* ---------- Steps ---------- */
+      .steps {
+        counter-reset: s;
+        display: grid;
+        gap: 18px;
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      @media (max-width: 860px) {
+        .steps {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .step {
+        position: relative;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 26px 24px 24px;
+      }
+
+      .step::before {
+        counter-increment: s;
+        content: counter(s);
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--primary);
+        color: #06210c;
+        font-weight: 700;
+        margin-bottom: 14px;
+      }
+
+      .step h3 {
+        margin: 0 0 8px;
+        font-size: 17px;
+      }
+
+      .step p {
+        margin: 0;
+        color: var(--ink-2);
+        font-size: 14.5px;
+      }
+
+      /* ---------- Code ---------- */
+      .code-wrap {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: #12171a;
+      }
+
+      .code-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: #191f23;
+        border-bottom: 1px solid #262d32;
+      }
+
+      .tab {
+        background: transparent;
+        border: 0;
+        color: #8d979e;
+        font: inherit;
+        font-size: 13.5px;
+        padding: 5px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      .tab[aria-selected="true"] {
+        background: rgba(79, 177, 85, 0.16);
+        color: #9be3a2;
+      }
+
+      .copy {
+        margin-left: auto;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid #2c343a;
+        color: #d7dee2;
+        font: inherit;
+        font-size: 13px;
+        padding: 5px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      .copy:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      pre {
+        margin: 0;
+        padding: 20px;
+        overflow-x: auto;
+        color: #d6e2d9;
+        font-family: var(--mono);
+        font-size: 13.5px;
+        line-height: 1.7;
+        tab-size: 2;
+      }
+
+      pre[hidden] {
+        display: none;
+      }
+
+      /* 深色区块（Hero / Footer）内的行内代码需要更高对比度 */
+      .hero code,
+      footer code {
+        background: rgba(79, 177, 85, 0.16);
+        color: #9be3a2;
+      }
+
+      .c-key {
+        color: #8fd694;
+      }
+      .c-str {
+        color: #e3c88b;
+      }
+      .c-com {
+        color: #6b7a72;
+        font-style: italic;
+      }
+      .c-num {
+        color: #9fc7f0;
+      }
+
+      /* ---------- Tool table ---------- */
+      .toolbox {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: #fff;
+        overflow: hidden;
+      }
+
+      .tool-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 16px 20px;
+        background: var(--bg-soft);
+        border-bottom: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 15px;
+      }
+
+      .tool-head .count {
+        margin-left: auto;
+        font-weight: 500;
+        font-size: 13px;
+        color: var(--ink-3);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14.5px;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 11px 20px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+
+      th {
+        font-size: 13px;
+        color: var(--ink-3);
+        font-weight: 600;
+        background: #fcfcfd;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 13px;
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        padding: 1px 6px;
+        border-radius: 5px;
+        white-space: nowrap;
+      }
+
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--ink-3);
+        white-space: nowrap;
+      }
+
+      .tag.w {
+        border-color: #f0c98a;
+        background: #fdf5e7;
+        color: #96601a;
+      }
+
+      .tag.r {
+        border-color: #bfe0c2;
+        background: #f0f9f1;
+        color: #2f7a37;
+      }
+
+      .note {
+        margin-top: 14px;
+        padding: 14px 18px;
+        border-left: 3px solid var(--primary);
+        background: var(--primary-soft);
+        border-radius: 0 10px 10px 0;
+        font-size: 14.5px;
+        color: var(--ink-2);
+      }
+
+      /* ---------- Scenarios ---------- */
+      .scene {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+
+      @media (max-width: 860px) {
+        .scene {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .scene .card {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+
+      .scene .ico {
+        flex: 0 0 40px;
+      }
+
+      .scene code {
+        white-space: normal;
+      }
+
+      /* ---------- Security ---------- */
+      .sec-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 12px;
+      }
+
+      .sec-list li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 14px 18px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        font-size: 15px;
+      }
+
+      .check {
+        flex: 0 0 20px;
+        width: 20px;
+        height: 20px;
+        margin-top: 3px;
+        color: var(--primary);
+      }
+
+      /* ---------- FAQ ---------- */
+      details {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0 20px;
+        margin-bottom: 12px;
+      }
+
+      details[open] {
+        border-color: rgba(79, 177, 85, 0.4);
+      }
+
+      summary {
+        cursor: pointer;
+        padding: 16px 0;
+        font-weight: 600;
+        list-style: none;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      summary::-webkit-details-marker {
+        display: none;
+      }
+
+      summary::after {
+        content: "+";
+        color: var(--ink-3);
+        font-weight: 400;
+      }
+
+      details[open] summary::after {
+        content: "−";
+      }
+
+      details p {
+        margin: 0 0 16px;
+        color: var(--ink-2);
+        font-size: 14.8px;
+      }
+
+      /* ---------- Footer ---------- */
+      footer {
+        background: var(--dark);
+        color: #9aa8a1;
+        padding: 56px 0 32px;
+        font-size: 14px;
+      }
+
+      .foot-grid {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr 1fr;
+        gap: 36px;
+        padding-bottom: 30px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      @media (max-width: 760px) {
+        .foot-grid {
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+      }
+
+      footer h4 {
+        color: #fff;
+        margin: 0 0 12px;
+        font-size: 14px;
+        letter-spacing: 0.4px;
+      }
+
+      footer ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 8px;
+      }
+
+      footer a {
+        color: #9aa8a1;
+      }
+
+      footer a:hover {
+        color: #7fe08a;
+        text-decoration: none;
+      }
+
+      .fork-note {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-top: 26px;
+        font-size: 13.5px;
+        line-height: 1.8;
+      }
+
+      .fork-note b {
+        color: #dfe7e2;
+      }
+
+      .copy-bar {
+        padding-top: 22px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-between;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ======================= 导航 ======================= -->
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="#top">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <rect width="64" height="64" rx="14" fill="#4fb155" />
+            <path
+              d="M20 44 32 18l12 26"
+              stroke="#fff"
+              stroke-width="6"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M25 36h14" stroke="#fff" stroke-width="5" stroke-linecap="round" />
+          </svg>
+          AYA&nbsp;MCP <small>v1.14.2+mcp</small>
+        </a>
+        <nav class="links" aria-label="主导航">
+          <a href="#what">什么是 MCP</a>
+          <a href="#tools">工具清单</a>
+          <a href="#quickstart">三步接入</a>
+          <a href="#scenes">使用场景</a>
+          <a href="#security">安全机制</a>
+          <a href="#faq">常见问题</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- ======================= Hero ======================= -->
+      <section class="hero">
+        <div class="wrap">
+          <span class="badge"><span class="dot"></span>MCP 服务已内置于 AYA 桌面端</span>
+          <h1>让 AI <em>直接操控</em>你的 Android 设备</h1>
+          <p class="sub">
+            AYA 内置一个只监听 <code>127.0.0.1</code> 的 MCP（Model Context Protocol）服务，把手机能力封装成
+            <strong>42 个 <code>aya_*</code> 工具</strong>。在 CodeBuddy、WorkBuddy、Claude
+            里说一句“打开设置，把字体调到最大并截图”，剩下的交给 AI —— 不用再写脚本、跑命令、粘输出。
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary" href="#quickstart">3 步接入 MCP</a>
+            <a class="btn btn-ghost" href="#tools">查看 42 个工具</a>
+            <a class="btn btn-ghost" href="https://aya.liriliri.io/" rel="noopener">了解原版 AYA</a>
+          </div>
+          <div class="hero-stats">
+            <div class="stat"><b>42</b><span>MCP 工具（16 只读 / 26 写）</span></div>
+            <div class="stat"><b>&lt; 1 min</b><span>从开启到 AI 接管设备</span></div>
+            <div class="stat"><b>127.0.0.1</b><span>仅本机监听，不出网</span></div>
+            <div class="stat"><b>Win / mac / Linux</b><span>跨平台 Electron 桌面端</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= 什么是 MCP ======================= -->
+      <section id="what">
+        <div class="wrap">
+          <p class="kicker">Model Context Protocol</p>
+          <h2>MCP 是什么？为什么手机需要它</h2>
+          <p class="lead">
+            MCP 是 AI 客户端与工具之间的开放协议。过去 AI 只能“教你怎么操作手机”，现在它能自己调工具、看结果、再决定下一步。
+            AYA MCP 就是把 adb 的几十年积累，翻译成 AI 听得懂、调得动的 42 个标准工具。
+          </p>
+          <div class="grid g3">
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M4 7h16M4 12h16M4 17h10" />
+                </svg>
+              </div>
+              <h3>会说人话就够了</h3>
+              <p>不用记 <code>adb shell am start -n ...</code>。自然语言描述目标，AI 自己选择并组合工具，失败还会根据返回的错误自我纠正。</p>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M12 3v6l4 2" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+              </div>
+              <h3>看得见界面，不只是命令</h3>
+              <p><code>aya_ui_dump</code> 返回带坐标与索引的 UI 层级树，<code>aya_screencap</code> 回传截图。AI 既读结构也看画面，点得准、判得对。</p>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
+                </svg>
+              </div>
+              <h3>一次调用干完一串动作</h3>
+              <p><code>aya_batch</code> 串行执行最多 20 个动作，中间不经过模型思考，彻底避开播放器控制栏、Toast 这类 1–3 秒就消失的控件。</p>
+            </div>
+          </div>
+
+          <!-- 二次开发备注：本段说明与上游 AYA 的关系 -->
+          <div class="note">
+            <strong>关于二次开发：</strong>本分支基于开源项目
+            <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（
+            <a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">liriliri/aya</a>，作者 surunzi，AGPL-3.0）
+            二次开发，完整保留原版投屏、文件管理、日志、性能、Shell 等桌面能力，<b>仅新增 MCP 服务层</b>：设置 → MCP →
+            启用即可，不影响原有使用习惯。
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= 工具清单 ======================= -->
+      <section id="tools" class="soft">
+        <div class="wrap">
+          <p class="kicker">Tool Reference</p>
+          <h2>42 个工具，覆盖一台手机的全部能力</h2>
+          <p class="lead">
+            工具名统一以 <code>aya_</code> 开头。16 个只读工具默认开放；26 个写工具需在设置中勾选“允许写入操作”后才会出现在客户端。
+          </p>
+
+          <div class="toolbox">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <rect x="6" y="2" width="12" height="20" rx="3" />
+                <path d="M11 18h2" />
+              </svg>
+              设备与画面
+              <span class="count">6 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_list_devices</code></td><td><span class="tag r">只读</span></td><td>列出在线设备，标出 AYA 当前选中设备</td></tr>
+                <tr><td><code>aya_device_info</code></td><td><span class="tag r">只读</span></td><td>机型、系统版本、分辨率、CPU / 内存 / 电量摘要</td></tr>
+                <tr><td><code>aya_screencap</code></td><td><span class="tag r">只读</span></td><td>截图（默认缩放到 900px 宽，返回 <code>scale</code>）</td></tr>
+                <tr><td><code>aya_ui_dump</code></td><td><span class="tag r">只读</span></td><td>UI 层级树，节点带 <code>bounds</code> / <code>center</code> / 全局索引 <code>i</code></td></tr>
+                <tr><td><code>aya_current_app</code></td><td><span class="tag r">只读</span></td><td>前台包名与 pid</td></tr>
+                <tr><td><code>aya_set_font_scale</code></td><td><span class="tag w">写</span></td><td>设置系统字体缩放（0.5–2.0），返回改动前后值</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="toolbox" style="margin-top: 18px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <path d="M9 4v16M15 4v16M4 9h16M4 15h16" />
+              </svg>
+              交互
+              <span class="count">7 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_tap</code></td><td><span class="tag w">写</span></td><td>坐标 / <code>nodeIndex</code>+<code>snapshotId</code> / <code>text</code>·<code>id</code>·<code>desc</code> 选择器，默认点完立即回传新界面</td></tr>
+                <tr><td><code>aya_tap_text</code></td><td><span class="tag w">写</span></td><td><code>aya_tap{text}</code> 的语义化快捷方式</td></tr>
+                <tr><td><code>aya_batch</code></td><td><span class="tag w">写</span></td><td>一次调用串行执行最多 20 个动作，最后统一回传界面</td></tr>
+                <tr><td><code>aya_wait_for</code></td><td><span class="tag r">只读</span></td><td>轮询等待控件出现 / 消失，命中或超时都返回当前界面</td></tr>
+                <tr><td><code>aya_swipe</code></td><td><span class="tag w">写</span></td><td>滑动，<code>duration</code> 默认 300ms</td></tr>
+                <tr><td><code>aya_key</code></td><td><span class="tag w">写</span></td><td><code>back</code> / <code>home</code> / <code>enter</code> / <code>recent</code> / <code>volume_up</code> 等按键</td></tr>
+                <tr><td><code>aya_text</code></td><td><span class="tag w">写</span></td><td>输入文本（仅可打印 ASCII，中文走 <code>aya_shell</code> + 输入法）</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="toolbox" style="margin-top: 18px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" />
+                <rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" />
+              </svg>
+              应用管理
+              <span class="count">8 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_list_packages</code></td><td><span class="tag r">只读</span></td><td>包名列表（apk 路径、是否系统应用），可关键字过滤 / 仅第三方</td></tr>
+                <tr><td><code>aya_app_info</code></td><td><span class="tag r">只读</span></td><td>版本号、sdk、安装 / 更新时间、启用状态、运行状态与 pid</td></tr>
+                <tr><td><code>aya_start_app</code></td><td><span class="tag w">写</span></td><td>启动 Launcher Activity</td></tr>
+                <tr><td><code>aya_stop_app</code></td><td><span class="tag w">写</span></td><td><code>am force-stop</code> 强杀进程</td></tr>
+                <tr><td><code>aya_clear_app_data</code></td><td><span class="tag w">写</span></td><td><code>pm clear</code> 清空数据与缓存（不可撤销）</td></tr>
+                <tr><td><code>aya_set_app_enabled</code></td><td><span class="tag w">写</span></td><td>启用 / 禁用应用（<code>pm enable</code> / <code>pm disable-user</code>）</td></tr>
+                <tr><td><code>aya_install_app</code></td><td><span class="tag w">写</span></td><td>安装本机 apk（覆盖安装保留数据）</td></tr>
+                <tr><td><code>aya_uninstall_app</code></td><td><span class="tag w">写</span></td><td>卸载应用（含数据）</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="toolbox" style="margin-top: 18px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <path d="M3 17l5-6 4 4 5-7 4 5" />
+              </svg>
+              性能与进程
+              <span class="count">2 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_performance</code></td><td><span class="tag r">只读</span></td><td>CPU 各核负载 / 温度、内存占用、电量、开机时长、前台帧率</td></tr>
+                <tr><td><code>aya_list_processes</code></td><td><span class="tag r">只读</span></td><td>运行中的进程名与 pid，可关键字过滤</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="toolbox" style="margin-top: 18px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+              文件
+              <span class="count">7 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_list_dir</code></td><td><span class="tag r">只读</span></td><td>列目录（目录优先，含大小 / 时间 / mime）</td></tr>
+                <tr><td><code>aya_stat_path</code></td><td><span class="tag r">只读</span></td><td>路径属性：是否存在、文件 / 目录、大小、权限</td></tr>
+                <tr><td><code>aya_pull_file</code></td><td><span class="tag w">写</span></td><td>设备 → 本机，省略目标路径时存到临时目录 <code>aya-mcp/</code></td></tr>
+                <tr><td><code>aya_push_file</code></td><td><span class="tag w">写</span></td><td>本机 → 设备</td></tr>
+                <tr><td><code>aya_delete_path</code></td><td><span class="tag w">写</span></td><td>删除文件 / 目录，目录必须显式 <code>recursive: true</code></td></tr>
+                <tr><td><code>aya_make_dir</code></td><td><span class="tag w">写</span></td><td><code>mkdir -p</code></td></tr>
+                <tr><td><code>aya_rename_path</code></td><td><span class="tag w">写</span></td><td>重命名 / 移动</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="toolbox" style="margin-top: 18px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <path d="M8 6h11M8 12h11M8 18h11M4 6h.01M4 12h.01M4 18h.01" />
+              </svg>
+              日志与命令
+              <span class="count">3 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_logcat</code></td><td><span class="tag r">只读</span></td><td>日志快照，按级别 / 标签 / 关键字过滤，返回结构化条目</td></tr>
+                <tr><td><code>aya_clear_logcat</code></td><td><span class="tag w">写</span></td><td>清空日志缓冲区</td></tr>
+                <tr><td><code>aya_shell</code></td><td><span class="tag w">写</span></td><td>adb shell，30s 超时，输出截断 20000 字符</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="toolbox" style="margin-top: 18px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18" />
+              </svg>
+              端口映射与 WebView
+              <span class="count">4 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_list_ports</code></td><td><span class="tag r">只读</span></td><td>列出 <code>adb forward</code> / <code>adb reverse</code> 的全部映射</td></tr>
+                <tr><td><code>aya_add_port</code></td><td><span class="tag w">写</span></td><td>新增映射，<code>direction</code>: <code>forward</code>（主机→设备）或 <code>reverse</code>（设备→主机）</td></tr>
+                <tr><td><code>aya_remove_port</code></td><td><span class="tag w">写</span></td><td>按 <code>local</code> / <code>remote</code> 移除，<code>all: true</code> 清空该方向</td></tr>
+                <tr><td><code>aya_list_webviews</code></td><td><span class="tag r">只读</span></td><td>列出应用内 WebView 的调试页面（title / url / devtoolsFrontendUrl）</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="toolbox" style="margin-top: 18px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <path d="M3 6h13v12H3zM16 10l5-3v10l-5-3z" />
+              </svg>
+              录屏与投屏
+              <span class="count">5 个工具</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>aya_start_recording</code></td><td><span class="tag w">写</span></td><td>设备端 <code>screenrecord</code> 后台开录，可设时长（≤180s）、码率、分辨率</td></tr>
+                <tr><td><code>aya_stop_recording</code></td><td><span class="tag w">写</span></td><td>停止录制并拉回本机，返回路径、大小、时长</td></tr>
+                <tr><td><code>aya_recording_status</code></td><td><span class="tag r">只读</span></td><td>是否在录、已录时长、剩余时长、设备端文件大小</td></tr>
+                <tr><td><code>aya_cast_window</code></td><td><span class="tag w">写</span></td><td>打开 / 关闭 / 重启 AYA 投屏窗口</td></tr>
+                <tr><td><code>aya_cast_settings</code></td><td><span class="tag w">写</span></td><td>读取或修改投屏码率、最大边长，<code>restart: true</code> 立即生效</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="note">
+            <strong>点击定位小贴士：</strong><code>aya_ui_dump</code> 返回的 <code>i</code> 是未过滤完整树的 DFS 前序号，过滤只减少返回节点、不改变
+            <code>i</code>。<code>snapshotId</code> 60s 过期，任何输入类工具执行后立即失效，返回 <code>STALE_SNAPSHOT</code> 时重新 dump 即可。
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= 三步接入 ======================= -->
+      <section id="quickstart">
+        <div class="wrap">
+          <p class="kicker">Quick Start</p>
+          <h2>三步，把手机交给 AI</h2>
+          <p class="lead">无需 Root，手机上也无需安装任何 App。只要开启 USB 调试 / 无线调试，电脑上跑着 AYA 就行。</p>
+
+          <div class="steps">
+            <div class="step">
+              <h3>开启 MCP 服务</h3>
+              <p>
+                设置 → MCP → 勾选「启用 MCP 服务」。服务随应用启动自动拉起，默认端口
+                <code>7788</code>，同时生成访问令牌。需要点击、安装、shell 等能力时，再勾选「允许写入操作」。
+              </p>
+            </div>
+            <div class="step">
+              <h3>复制配置片段</h3>
+              <p>
+                弹窗里直接给出三种写好的配置：<strong>stdio（推荐）</strong>、stdio（无 env）、HTTP。点「复制」，片段里已带好端口与令牌。
+              </p>
+            </div>
+            <div class="step">
+              <h3>粘贴到 AI 客户端</h3>
+              <p>
+                CodeBuddy：设置 → MCP → 添加 MCP，粘贴到 <code>~/.codebuddy/mcp.json</code>。其他支持 MCP 的客户端同理，重连后即可看到
+                <code>aya_*</code> 工具列表。
+              </p>
+            </div>
+          </div>
+
+          <div class="code-wrap" style="margin-top: 30px">
+            <div class="code-bar" role="tablist" aria-label="配置方式">
+              <button class="tab" role="tab" aria-selected="true" data-target="code-stdio">stdio（推荐）</button>
+              <button class="tab" role="tab" aria-selected="false" data-target="code-node">stdio（无 env）</button>
+              <button class="tab" role="tab" aria-selected="false" data-target="code-http">HTTP</button>
+              <button class="copy" id="copyBtn" type="button">复制</button>
+            </div>
+            <pre id="code-stdio"><span class="c-com">// AYA 设置 → MCP → 查看配置，直接复制即可（令牌已填好）</span>
+{
+  <span class="c-key">"mcpServers"</span>: {
+    <span class="c-key">"aya"</span>: {
+      <span class="c-key">"type"</span>: <span class="c-str">"stdio"</span>,
+      <span class="c-key">"command"</span>: <span class="c-str">"C:/Path/To/AYA.exe"</span>,      <span class="c-com">// 客户端用 AYA 自带的 node 启动桥接脚本</span>
+      <span class="c-key">"args"</span>: [
+        <span class="c-str">"resources/mcp/aya-mcp-stdio.cjs"</span>,
+        <span class="c-str">"--url=http://127.0.0.1:7788/mcp"</span>,
+        <span class="c-str">"--token=&lt;your-token&gt;"</span>
+      ],
+      <span class="c-key">"env"</span>: {
+        <span class="c-key">"ELECTRON_RUN_AS_NODE"</span>: <span class="c-str">"1"</span>,
+        <span class="c-key">"AYA_MCP_URL"</span>: <span class="c-str">"http://127.0.0.1:7788/mcp"</span>,
+        <span class="c-key">"AYA_MCP_TOKEN"</span>: <span class="c-str">"&lt;your-token&gt;"</span>
+      },
+      <span class="c-key">"description"</span>: <span class="c-str">"AYA Android device control"</span>
+    }
+  }
+}</pre>
+            <pre id="code-node" hidden><span class="c-com">// 客户端找不到 AYA.exe 时，用系统 node 直接跑桥接脚本</span>
+{
+  <span class="c-key">"mcpServers"</span>: {
+    <span class="c-key">"aya"</span>: {
+      <span class="c-key">"type"</span>: <span class="c-str">"stdio"</span>,
+      <span class="c-key">"command"</span>: <span class="c-str">"node"</span>,
+      <span class="c-key">"args"</span>: [
+        <span class="c-str">"resources/mcp/aya-mcp-stdio.cjs"</span>,
+        <span class="c-str">"--url=http://127.0.0.1:7788/mcp"</span>,
+        <span class="c-str">"--token=&lt;your-token&gt;"</span>
+      ],
+      <span class="c-key">"description"</span>: <span class="c-str">"AYA Android device control (no env fallback)"</span>
+    }
+  }
+}</pre>
+            <pre id="code-http" hidden><span class="c-com">// HTTP 无状态：切换写权限后需重新 tools/list（或重连）</span>
+{
+  <span class="c-key">"mcpServers"</span>: {
+    <span class="c-key">"aya"</span>: {
+      <span class="c-key">"type"</span>: <span class="c-str">"http"</span>,
+      <span class="c-key">"url"</span>: <span class="c-str">"http://127.0.0.1:7788/mcp"</span>,
+      <span class="c-key">"headers"</span>: { <span class="c-key">"Authorization"</span>: <span class="c-str">"Bearer &lt;your-token&gt;"</span> },
+      <span class="c-key">"description"</span>: <span class="c-str">"AYA Android device control"</span>
+    }
+  }
+}</pre>
+          </div>
+
+          <div class="note">
+            桥接脚本通过 SSE 收到 <code>notifications/tools/list_changed</code> 后会通知客户端热刷新；客户端不支持热更新时重连一次即可。
+            端口被占用可在设置里改（1024–65535），令牌泄露可点「重置访问令牌」。
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= 使用场景 ======================= -->
+      <section id="scenes" class="soft">
+        <div class="wrap">
+          <p class="kicker">Use Cases</p>
+          <h2>AI 能替你干这些活</h2>
+          <p class="lead">下面每条都是真实可跑的工具组合，把「写脚本 → 运行 → 解析输出」的往返压缩成一句话。</p>
+
+          <div class="scene">
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </div>
+              <div>
+                <h3>自动化回归与冒烟</h3>
+                <p>“装上新构建，依次走完登录 → 下单 → 支付，每步截图，失败就把 logcat 的 E 级日志带回来。”——<code>aya_install_app</code> → <code>aya_batch</code> → <code>aya_screencap</code> → <code>aya_logcat</code>。</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" />
+                </svg>
+              </div>
+              <div>
+                <h3>UI 走查与适配检查</h3>
+                <p>“把字体缩放到 2.0，逐个页面截图，列出文字被截断的控件。”——<code>aya_set_font_scale</code> + <code>aya_ui_dump</code> + <code>aya_screencap</code>。</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3>崩溃与 ANR 排查</h3>
+                <p>“清一下日志，复现这个操作，把 E 级日志和 /sdcard 下的 tombstone 拉回本机。”——<code>aya_clear_logcat</code> → 操作 → <code>aya_logcat{level:'E'}</code> → <code>aya_pull_file</code>。</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M3 6h13v12H3zM16 10l5-3v10l-5-3z" />
+                </svg>
+              </div>
+              <div>
+                <h3>复现视频与缺陷留证</h3>
+                <p>“开始录屏，执行刚才那串操作，停录，把 mp4 存到桌面。”——开录 → <code>aya_batch</code> → <code>aya_stop_recording</code>，全程不碰鼠标。</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M3 17l5-6 4 4 5-7 4 5" />
+                </svg>
+              </div>
+              <div>
+                <h3>性能体检</h3>
+                <p>“滚动首页 30 秒，采样帧率和内存，告诉我掉帧的时段。”——<code>aya_performance</code> + <code>aya_swipe</code> + <code>aya_list_processes</code>。</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18" />
+                </svg>
+              </div>
+              <div>
+                <h3>H5 / 混合应用调试</h3>
+                <p>“列出前台应用的 WebView，把 devtools 调试地址给我。”——<code>aya_list_webviews</code> 自动 <code>adb forward</code> 并访问 <code>/json</code>；配合 <code>aya_add_port</code> 可把手机端口映射到本机。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= 安全 ======================= -->
+      <section id="security">
+        <div class="wrap">
+          <p class="kicker">Security</p>
+          <h2>默认收紧，能力给你、风险留给自己可控</h2>
+          <p class="lead">MCP 服务跑在你自己的电脑上，设备数据不出本机；危险能力需要你显式授权。</p>
+          <ul class="sec-list">
+            <li>
+              <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
+              <div><strong>只监听 127.0.0.1</strong>：外部网络无法访问，端口范围 1024–65535，默认 7788。</div>
+            </li>
+            <li>
+              <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
+              <div><strong>Bearer Token 鉴权</strong>：令牌首次开启时生成并持久化，可随时「重置访问令牌」。</div>
+            </li>
+            <li>
+              <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
+              <div><strong>写操作默认隐藏</strong>：26 个写工具需勾选「允许写入操作」才暴露，只读工具始终可用。</div>
+            </li>
+            <li>
+              <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
+              <div><strong>Origin 校验 + 2MB 请求体限制</strong>：防止网页跨站调用与超大 payload 打爆服务。</div>
+            </li>
+            <li>
+              <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
+              <div><strong>shell 有兜底</strong>：<code>aya_shell</code> 30s 超时、输出截断 20000 字符，破坏性命令仍由客户端按 <code>readOnlyHint</code> 弹确认框。</div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ======================= FAQ ======================= -->
+      <section id="faq" class="soft">
+        <div class="wrap">
+          <p class="kicker">FAQ</p>
+          <h2>常见问题</h2>
+          <div style="max-width: 860px">
+            <details open>
+              <summary>AYA MCP 和原版 AYA 是什么关系？</summary>
+              <p>
+                本分支基于开源项目 <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（liriliri/aya，作者 surunzi，AGPL-3.0）
+                二次开发，完整保留原版投屏、文件管理、日志、性能、Shell、应用管理等桌面能力，<strong>只新增了 MCP 服务层</strong>。
+                关闭 MCP 开关时，它就是原版 AYA。
+              </p>
+            </details>
+            <details>
+              <summary>需要 Root 或在手机上安装 App 吗？</summary>
+              <p>都不需要。AYA 通过 adb 与设备通信，只需在手机上开启 USB 调试（或无线调试）并授权本机调试。</p>
+            </details>
+            <details>
+              <summary>客户端只看到 16 个只读工具怎么办？</summary>
+              <p>说明未勾选「允许写入操作」。勾选后重连 MCP 服务，或等待 <code>tools/list_changed</code> 热刷新，即可看到全部 42 个工具。</p>
+            </details>
+            <details>
+              <summary>aya_tap 返回 STALE_SNAPSHOT？</summary>
+              <p>UI 快照 60s 过期，且任何输入类工具执行后会立即失效。重新 <code>aya_ui_dump</code> 拿到新的 <code>snapshotId</code> 和 <code>nodeIndex</code> 再点。</p>
+            </details>
+            <details>
+              <summary>点开播放器控制栏后读不到控件？</summary>
+              <p>这类控件只停留 1–3 秒。用 <code>aya_tap</code> 默认的 <code>withUi</code>（点完立刻抓一帧）、或把「点击 → 等待 → 再点击」合成一次 <code>aya_batch</code>，就能避开模型思考延迟。</p>
+            </details>
+            <details>
+              <summary>MCP 开关打不开，提示端口被占用？</summary>
+              <p>默认 7788 被其他进程占了。在设置里换一个 1024–65535 的端口重试，设置项会直接显示错误原因。</p>
+            </details>
+            <details>
+              <summary>支持哪些 AI 客户端？</summary>
+              <p>任何支持 MCP 的客户端都可以，包括 CodeBuddy、WorkBuddy、Claude Desktop、Cursor、Cline 等。配置片段在 AYA 设置里一键复制。</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= 结尾 CTA ======================= -->
+      <section>
+        <div class="wrap" style="text-align: center">
+          <h2>现在就让 AI 帮你操作手机</h2>
+          <p class="lead" style="margin-inline: auto">
+            下载 AYA（含 MCP 分支），设置 → MCP → 启用，复制配置粘贴进你的 AI 客户端。整个过程不到一分钟。
+          </p>
+          <div class="cta" style="justify-content: center">
+            <a class="btn btn-primary" href="https://github.com/liriliri/aya/releases" rel="noopener">下载 AYA</a>
+            <a class="btn btn-ghost" style="color: var(--ink); border-color: var(--border)" href="#quickstart">查看接入配置</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ======================= Footer ======================= -->
+    <footer>
+      <div class="wrap">
+        <div class="foot-grid">
+          <div>
+            <h4>AYA MCP</h4>
+            <p style="margin: 0; max-width: 380px">
+              把 Android 设备能力封装成标准 MCP 工具，让 AI 客户端一句话完成截图、点击、装应用、抓日志与录屏。仅监听本机，写操作默认关闭。
+            </p>
+          </div>
+          <div>
+            <h4>页面</h4>
+            <ul>
+              <li><a href="#what">什么是 MCP</a></li>
+              <li><a href="#tools">工具清单</a></li>
+              <li><a href="#quickstart">三步接入</a></li>
+              <li><a href="#security">安全机制</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>相关链接</h4>
+            <ul>
+              <li><a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA 官网</a></li>
+              <li><a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">GitHub · liriliri/aya</a></li>
+              <li><a href="https://github.com/liriliri/aya/releases" target="_blank" rel="noopener">版本下载</a></li>
+              <li><a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener">MCP 协议规范</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 二次开发备注（页面可见版，便于合规署名） -->
+        <div class="fork-note">
+          <b>二次开发备注：</b>本站为 AYA 的 MCP 功能宣传页，基于开源项目
+          <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（
+          <a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">github.com/liriliri/aya</a>，作者
+          <b>surunzi / liriliri</b>）二次开发，遵循原项目 <b>AGPL-3.0</b> 许可证；桌面端基础能力（投屏、文件管理、日志、性能、Shell
+          等）均来自上游，本分支仅新增 MCP 服务层（<code>src/main/lib/mcp/*</code>、<code>script/mcp/aya-mcp-stdio.cjs</code>、
+          设置内 MCP 面板）。文档中的工具清单与行为描述对应 AYA v1.14.2 + MCP 分支。
+        </div>
+
+        <div class="copy-bar">
+          <span>© 2026 AYA MCP · Based on AYA by surunzi (liriliri) · AGPL-3.0</span>
+          <span>本页为纯静态页，部署于 Cloudflare</span>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // 配置片段切换 + 复制（无依赖，保证 Cloudflare 静态部署可用）
+      (function () {
+        var tabs = document.querySelectorAll('.tab')
+        var pres = document.querySelectorAll('.code-wrap pre')
+        var copyBtn = document.getElementById('copyBtn')
+
+        function activePre() {
+          for (var i = 0; i < pres.length; i++) {
+            if (!pres[i].hidden) return pres[i]
+          }
+          return pres[0]
+        }
+
+        tabs.forEach(function (tab) {
+          tab.addEventListener('click', function () {
+            tabs.forEach(function (t) {
+              t.setAttribute('aria-selected', String(t === tab))
+            })
+            pres.forEach(function (p) {
+              p.hidden = p.id !== tab.dataset.target
+            })
+          })
+        })
+
+        copyBtn.addEventListener('click', function () {
+          var text = activePre().innerText
+          var done = function () {
+            copyBtn.textContent = '已复制'
+            setTimeout(function () {
+              copyBtn.textContent = '复制'
+            }, 1600)
+          }
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done)
+          } else {
+            var ta = document.createElement('textarea')
+            ta.value = text
+            ta.style.position = 'fixed'
+            ta.style.opacity = '0'
+            document.body.appendChild(ta)
+            ta.select()
+            try {
+              document.execCommand('copy')
+              done()
+            } catch (e) {}
+            document.body.removeChild(ta)
+          }
+        })
+      })()
+    </script>
+  </body>
+</html>
