@@ -33,3 +33,37 @@
   height: 100%;
   overflow-y: auto;
 }
+
+/* 日志页可双击列（双击自动填充过滤条件） */
+.luna-logcat {
+  /* 包名/标签列宽度随窗口自适应，避免长包名被截断 */
+  .luna-logcat-package {
+    width: clamp(180px, 24vw, 380px);
+    padding-right: 8px;
+  }
+
+  .luna-logcat-tag {
+    width: clamp(120px, 14vw, 240px);
+    padding-right: 8px;
+  }
+
+  .luna-logcat-package,
+  .luna-logcat-tag,
+  .luna-logcat-priority {
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  /* 搜索命中高亮 */
+  .logcat-highlight,
+  mark.logcat-highlight {
+    background: #52c41a;
+    color: #08170a;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+}
