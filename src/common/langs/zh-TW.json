@@ -238,9 +238,8 @@
   "mcpConfigHttp": "HTTP",
   "mcpCopy": "複製",
   "mcpCopied": "已複製",
-  "mcpConfigTip": "在 CodeBuddy 中：設定 → MCP → 新增 MCP，將片段貼上到 ~/.codebuddy/mcp.json",
-  "mcpConfigTokenTip": "片段包含訪問令牌，請勿外傳；若已洩露可在此重置。",
-  "mcpConfigRemoteTip": "跨裝置/伺服器連線（如 Linux 編譯伺服器）請使用本頁 HTTP 配置，並將位址改為本機區域網路 IP；請勿使用 stdio/node 配置——它們依賴本機 electron 路徑，在其他機器上會報 ENOENT。",
-  "mcpLanIps": "本機區域網路位址：",
-  "mcpLanIpsHint": "若上方自動位址在伺服器上連不通，請改用下面任意一個本機 IP（服務監聽 0.0.0.0，任意可達 IP 均可）。"
+  "mcpConfigTip": "將片段貼上到 ~/.codebuddy/mcp.json 即可；片段含訪問令牌，請勿外傳。",
+  "mcpConfigRemoteTip": "僅限本機使用；跨裝置/伺服器連線請改用 HTTP 標籤頁。",
+  "mcpLanIps": "本機位址：",
+  "mcpLanIpsHint": "服務監聽 0.0.0.0，任選一個伺服器可達的 IP 即可。"
 }
