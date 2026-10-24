@@ -1,5 +1,7 @@
-## Unreleased
+## v2.2.2 (24 Oct 2026)
 
+* feat: aya_batch gains a gesture step, so waking the player controls and dragging/tapping a control happen in one injected event stream instead of two round trips
+* feat: aya_gesture accepts several down/up groups in one stream (tap to wake, then drag or tap the target)
 * feat: unify mcp tool results with timing/cost/retryable/snapshot/suggestedNextCall
 * feat: aya_cast_window accepts deviceId and pins the mirror window to that device
 * perf: lower default node budget of aya_ui_dump (300 to 100) and aya_wait_for (40 to 20)
