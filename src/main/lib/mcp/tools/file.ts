@@ -51,6 +51,27 @@ async function statRemote(deviceId: string, remotePath: string) {
   }
 }
 
+// 探测路径是否存在：不存在返回 null，避免把「不存在」当成错误抛出
+async function tryStat(deviceId: string, remotePath: string) {
+  try {
+    return await file.statFile(deviceId, remotePath)
+  } catch {
+    return null
+  }
+}
+
+function toMcpError(action: string, err: unknown) {
+  return new McpError(
+    'INTERNAL',
+    `${action}：${err instanceof Error ? err.message : String(err)}`
+  )
+}
+
+// 去掉末尾多余的 /，用于拼接目录下的文件名
+function trimSlash(value: string) {
+  return value.replace(/\/+$/, '')
+}
+
 const listDir: McpTool = {
   name: 'aya_list_dir',
   description:
@@ -257,10 +278,22 @@ const deletePath: McpTool = {
       )
     }
 
-    if (info.directory) {
-      await file.deleteDir(deviceId, remotePath)
-    } else {
-      await file.deleteFile(deviceId, remotePath)
+    try {
+      if (info.directory) {
+        await file.deleteDir(deviceId, remotePath)
+      } else {
+        await file.deleteFile(deviceId, remotePath)
+      }
+    } catch (err) {
+      throw toMcpError(`删除 ${remotePath} 失败`, err)
+    }
+
+    // 设备端 rm 在权限不足时可能既不报错也不删除，必须回查确认
+    if (await tryStat(deviceId, remotePath)) {
+      throw new McpError(
+        'PERMISSION_DENIED',
+        `${remotePath} 删除后仍然存在，可能是权限不足`
+      )
     }
 
     return jsonResult({
@@ -268,6 +301,7 @@ const deletePath: McpTool = {
       deviceId,
       path: remotePath,
       type: info.directory ? 'dir' : 'file',
+      verified: true,
     })
   },
 }
@@ -293,9 +327,26 @@ const makeDir: McpTool = {
     const deviceId = await resolveDeviceId(args.deviceId)
     const remotePath = normalizeRemote(args.path)
 
-    await file.createDir(deviceId, remotePath)
+    try {
+      await file.createDir(deviceId, remotePath)
+    } catch (err) {
+      throw toMcpError(`创建目录 ${remotePath} 失败`, err)
+    }
 
-    return jsonResult({ ok: true, deviceId, path: remotePath })
+    const info = await tryStat(deviceId, remotePath)
+    if (!info || !info.directory) {
+      throw new McpError(
+        'INTERNAL',
+        `创建目录 ${remotePath} 失败，路径不存在或不是目录`
+      )
+    }
+
+    return jsonResult({
+      ok: true,
+      deviceId,
+      path: remotePath,
+      verified: true,
+    })
   },
 }
 
@@ -320,9 +371,52 @@ const renamePath: McpTool = {
     const to = normalizeRemote(args.to)
     requireSafeDeleteTarget(from)
 
-    await file.moveFile(deviceId, from, to)
+    if (trimSlash(from) === trimSlash(to)) {
+      throw new McpError('INVALID_ARGS', 'from 与 to 相同，无需移动')
+    }
 
-    return jsonResult({ ok: true, deviceId, from, to })
+    const fromInfo = await statRemote(deviceId, from)
+    const destInfo = await tryStat(deviceId, to)
+    // 目标是已存在的目录时，mv 会把源放进该目录下
+    const target =
+      destInfo && destInfo.directory
+        ? `${trimSlash(to)}/${path.basename(trimSlash(from))}`
+        : to
+    const overwritten = !!destInfo && !destInfo.directory
+
+    try {
+      await file.moveFile(deviceId, from, target)
+    } catch (err) {
+      throw toMcpError(`移动 ${from} -> ${target} 失败`, err)
+    }
+
+    const result = await tryStat(deviceId, target)
+    if (!result) {
+      throw new McpError(
+        'INTERNAL',
+        `移动后目标路径不存在：${target}（设备端 mv 未生效）`
+      )
+    }
+    if (await tryStat(deviceId, from)) {
+      throw new McpError('INTERNAL', `移动后源路径仍然存在：${from}`)
+    }
+    if (!fromInfo.directory && result.size !== fromInfo.size) {
+      throw new McpError(
+        'INTERNAL',
+        `移动后大小不一致：源 ${fromInfo.size} 字节，目标 ${result.size} 字节`
+      )
+    }
+
+    return jsonResult({
+      ok: true,
+      deviceId,
+      from,
+      to: target,
+      overwritten,
+      verified: true,
+      type: result.directory ? 'dir' : 'file',
+      size: result.size ?? null,
+    })
   },
 }
 

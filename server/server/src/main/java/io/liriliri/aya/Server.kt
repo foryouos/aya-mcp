@@ -22,6 +22,9 @@ class Server {
     fun start(args: Array<String>) {
         Log.i(TAG, "Start server")
 
+        // UiAutomation 的同步查询依赖主 Looper 派发结果，先起起来再接受请求
+        Ui.startMainLooper()
+
         val server = LocalServerSocket("aya")
         Log.i(TAG, "Server started, listening on ${server.localSocketAddress}")
 

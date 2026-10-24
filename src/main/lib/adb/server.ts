@@ -114,6 +114,34 @@ async function getAyaClient(deviceId: string): Promise<AyaClient> {
   return ayaClient
 }
 
+/**
+ * 常驻 UiAutomation 通道取界面树（uiautomator 同构 XML）。
+ * 失败时抛错，由调用方降级到 `uiautomator dump`。
+ */
+export async function dumpUiXml(
+  deviceId: string,
+  options: { maxNodes?: number; maxDepth?: number } = {}
+): Promise<string> {
+  const ayaClient = await getAyaClient(deviceId)
+  const result = await ayaClient.sendMessage('ui.dump', options)
+  if (result && result.error) {
+    throw new Error(String(result.error))
+  }
+
+  return (result && result.xml) || ''
+}
+
+export async function getUiState(deviceId: string): Promise<{
+  available: boolean
+  error: string
+  mainLoop: boolean
+}> {
+  const ayaClient = await getAyaClient(deviceId)
+  const result = await ayaClient.sendMessage('ui.state')
+
+  return (result && result.state) || { available: false, error: '', mainLoop: false }
+}
+
 const getPackageInfos: IpcGetPackageInfos = singleton(async function (
   deviceId,
   packageNames

@@ -70,6 +70,25 @@ class Connection(private val client: LocalSocket) : Thread() {
                 result.put("running", running)
             }
 
+            "ui.dump" -> {
+                val options = JSONObject(params)
+                try {
+                    result.put(
+                        "xml",
+                        Ui.dumpXml(options.optInt("maxNodes", 1500), options.optInt("maxDepth", 60))
+                    )
+                } catch (e: Throwable) {
+                    // 通道不可用不切断连接，交由主进程降级到 uiautomator dump
+                    Log.e(TAG, "ui.dump failed", e)
+                    result.put("xml", "")
+                    result.put("error", e.toString())
+                }
+            }
+
+            "ui.state" -> {
+                result.put("state", Ui.state())
+            }
+
             else -> {
                 Log.e(TAG, "Unknown method: $method")
             }

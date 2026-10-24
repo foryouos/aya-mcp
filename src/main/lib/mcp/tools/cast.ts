@@ -1,6 +1,6 @@
 import { getScreencastStore } from '../../store'
 import * as screencast from '../../../window/screencast'
-import { resolveDeviceId } from '../lib/device'
+import { getCurrentDeviceId, resolveDeviceId } from '../lib/device'
 import { jsonResult, McpError } from '../lib/result'
 import { McpTool } from './types'
 
@@ -77,7 +77,7 @@ function normalizeMaxSize(value: unknown) {
 const castWindow: McpTool = {
   name: 'aya_cast_window',
   description:
-    '控制 AYA 的投屏（scrcpy）窗口：open 打开、close 关闭、restart 重启（重启常用于让新设置生效）。只影响桌面窗口，不改变设备状态。',
+    '控制 AYA 的投屏（scrcpy）窗口：open 打开、close 关闭、restart 重启（重启常用于让新设置生效）。只影响桌面窗口，不改变设备状态。可传 deviceId 指定投屏哪个设备（不传则跟随 AYA 当前选中设备，传了则窗口固定该设备）。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -86,6 +86,7 @@ const castWindow: McpTool = {
         enum: ['open', 'close', 'restart'],
         description: 'open 打开投屏窗口，close 关闭，restart 关闭后重新打开',
       },
+      deviceId: deviceIdProperty,
     },
     required: ['action'],
     additionalProperties: false,
@@ -101,14 +102,19 @@ const castWindow: McpTool = {
       )
     }
 
+    // close 不依赖设备：设备全掉线时也要能关掉窗口
+    const deviceId =
+      action === 'close' ? '' : await resolveDeviceId(args.deviceId)
+    const pinned = typeof args.deviceId === 'string' && !!args.deviceId
+
     if (action === 'open') {
-      screencast.showWin()
+      screencast.showWin(deviceId || undefined)
     } else if (action === 'close') {
       screencast.closeWin()
     } else {
       screencast.closeWin()
       await sleep(300)
-      screencast.showWin()
+      screencast.showWin(deviceId || undefined)
     }
 
     // close 走 destroy，窗口对象销毁后句柄表可能残留，以操作结果为准
@@ -118,11 +124,15 @@ const castWindow: McpTool = {
     return jsonResult({
       ok: true,
       action,
+      deviceId: deviceId || getCurrentDeviceId(),
+      pinned,
       visible,
       hint:
-        action === 'open' || action === 'restart'
-          ? '投屏窗口在桌面弹出，截图/点击请继续用 aya_screencap / aya_tap'
-          : '投屏窗口已关闭',
+        action === 'close'
+          ? '投屏窗口已关闭'
+          : pinned
+            ? '投屏窗口已打开并固定到该设备；截图/点击请继续用 aya_screencap / aya_tap'
+            : '投屏窗口在桌面弹出，截图/点击请继续用 aya_screencap / aya_tap',
     })
   },
 }

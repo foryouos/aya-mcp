@@ -19,10 +19,28 @@ export interface ITarget {
   candidates: any[]
 }
 
-async function ensureSnapshot(deviceId: string): Promise<ISnapshot> {
+// 按文本/资源 id 定位时只允许复用极新的快照，
+// 否则会拿几十秒前的坐标去点一个早已切走的界面
+const SELECTOR_SNAPSHOT_TTL = 1000
+
+async function ensureSnapshot(
+  deviceId: string,
+  mode: 'auto' | 'snapshot' | 'dump' = 'auto'
+): Promise<ISnapshot> {
   const existing = getSnapshot(deviceId)
-  if (existing && existing.root) {
+
+  // snapshot：显式要求复用现有快照，一次 dump 都不做（最快，但坐标可能已过时）
+  if (mode === 'snapshot' && existing && existing.root) {
     return existing
+  }
+
+  if (mode === 'auto' && existing && existing.root) {
+    const fresh = Date.now() - existing.createdAt <= SELECTOR_SNAPSHOT_TTL
+
+    // 过期不删：交给 dump 复核，若界面完全一致 parseSnapshot 会直接复用同一快照
+    if (fresh && !existing.stale) {
+      return existing
+    }
   }
 
   const dumped = await dumpFast(deviceId)
@@ -37,7 +55,7 @@ function lookupIndex(snapshot: ISnapshot, index: number) {
     throw new McpError(
       'NO_MATCH',
       `快照中不存在节点索引 ${index}`,
-      { snapshotId: snapshot.id, total: snapshot.flat.length }
+      { snapshotId: snapshot.id, deviceId: snapshot.deviceId, total: snapshot.flat.length }
     )
   }
 
@@ -54,7 +72,9 @@ export async function resolveTarget(args: any): Promise<ITarget> {
         '使用 nodeIndex 时必须同时提供 aya_ui_dump 返回的 snapshotId'
       )
     }
-    const snapshot = requireSnapshot(deviceId, args.snapshotId)
+    const snapshot = requireSnapshot(deviceId, args.snapshotId, {
+      allowStale: args.allowStale === true,
+    })
     const node = lookupIndex(snapshot, args.nodeIndex)
 
     return {
@@ -86,7 +106,11 @@ export async function resolveTarget(args: any): Promise<ITarget> {
     )
   }
 
-  const snapshot = await ensureSnapshot(deviceId)
+  const mode =
+    args.resolve === 'snapshot' || args.resolve === 'dump'
+      ? args.resolve
+      : 'auto'
+  const snapshot = await ensureSnapshot(deviceId, mode)
   const matched = findMatches(snapshot.flat, {
     text: args.text,
     id: args.id,
@@ -98,7 +122,11 @@ export async function resolveTarget(args: any): Promise<ITarget> {
     throw new McpError(
       'NO_MATCH',
       '没有找到匹配的控件，可尝试 exact:false 做模糊匹配，或先用 aya_ui_dump 查看节点',
-      { snapshotId: snapshot.id, query: { text: args.text, id: args.id, desc: args.desc } }
+      {
+        snapshotId: snapshot.id,
+        deviceId: snapshot.deviceId,
+        query: { text: args.text, id: args.id, desc: args.desc },
+      }
     )
   }
 
@@ -109,6 +137,7 @@ export async function resolveTarget(args: any): Promise<ITarget> {
       `共匹配 ${matched.length} 个控件，index ${index} 超出范围`,
       {
         snapshotId: snapshot.id,
+        deviceId: snapshot.deviceId,
         matchedCount: matched.length,
         candidates: matched.slice(0, 5).map(brief),
       }

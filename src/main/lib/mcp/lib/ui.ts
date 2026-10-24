@@ -52,6 +52,59 @@ export function brief(node: IUiNode) {
   }
 }
 
+// aya_ui_dump 的 fields 参数：只保留调用方要的字段，进一步压缩返回体积。
+// i 永远保留，否则拿不到节点索引；center 在只给 bounds 时仍需要，故一并保留可选。
+export function projectNode(
+  node: IUiNode,
+  fields?: string[] | null
+): Record<string, unknown> {
+  const base = brief(node)
+  if (!fields || !fields.length) {
+    return base
+  }
+
+  const wanted = new Set(fields.map((field) => field.toLowerCase()))
+  const ret: Record<string, unknown> = { i: node.i }
+
+  if (wanted.has('text') && node.text) {
+    ret.text = node.text
+  }
+  if (wanted.has('desc') && node.desc) {
+    ret.desc = node.desc
+  }
+  if (wanted.has('id') && node.id) {
+    ret.id = node.id
+  }
+  if (wanted.has('class')) {
+    ret.class = node.cls
+  }
+  if (wanted.has('bounds')) {
+    ret.bounds = node.bounds
+  }
+  if (wanted.has('center') || wanted.has('bounds')) {
+    ret.center = node.center
+  }
+  if (wanted.has('clickable') && node.clickable) {
+    ret.clickable = true
+  }
+  if (wanted.has('flags')) {
+    if (node.scrollable) {
+      ret.scrollable = true
+    }
+    if (node.focused) {
+      ret.focused = true
+    }
+    if (node.checked || node.selected) {
+      ret.selected = true
+    }
+    if (!node.enabled) {
+      ret.enabled = false
+    }
+  }
+
+  return ret
+}
+
 function shortClass(cls: string) {
   if (!cls) {
     return ''
@@ -87,6 +140,9 @@ export function labelNode(node: IUiNode) {
   }
   if (node.checked || node.selected) {
     ret.selected = true
+  }
+  if (node.focused) {
+    ret.focused = true
   }
   if (!node.enabled) {
     ret.enabled = false
@@ -128,39 +184,49 @@ export function pickActionable(flat: IUiNode[], limit: number) {
 function compactNode(
   node: IUiNode,
   maxDepth: number,
-  budget: { left: number; truncated: boolean }
+  budget: { left: number; truncated: boolean },
+  fields: Set<string> | null
 ): any {
   budget.left--
 
-  const ret: any = {
-    i: node.i,
-    bounds: node.bounds,
-    center: node.center,
-  }
+  // fields 为 null 时保持旧行为（全字段）；否则按需裁剪，i 与 children 始终保留
+  const want = (name: string) => !fields || fields.has(name)
+  const ret: any = { i: node.i }
 
-  if (node.text) {
+  if (want('bounds')) {
+    ret.bounds = node.bounds
+  }
+  if (want('center') || want('bounds')) {
+    ret.center = node.center
+  }
+  if (want('text') && node.text) {
     ret.text = node.text
   }
-  if (node.desc) {
+  if (want('desc') && node.desc) {
     ret.desc = node.desc
   }
-  if (node.id) {
+  if (want('id') && node.id) {
     ret.id = node.id
   }
-  if (node.cls) {
+  if (want('class') && node.cls) {
     ret.class = node.cls
   }
-  if (node.clickable) {
+  if (want('clickable') && node.clickable) {
     ret.clickable = true
   }
-  if (node.scrollable) {
-    ret.scrollable = true
-  }
-  if (node.checked || node.selected) {
-    ret.selected = true
-  }
-  if (!node.enabled) {
-    ret.enabled = false
+  if (!fields || want('flags')) {
+    if (node.scrollable) {
+      ret.scrollable = true
+    }
+    if (node.checked || node.selected) {
+      ret.selected = true
+    }
+    if (node.focused) {
+      ret.focused = true
+    }
+    if (!node.enabled) {
+      ret.enabled = false
+    }
   }
 
   if (node.depth < maxDepth && node.children.length) {
@@ -170,7 +236,7 @@ function compactNode(
         budget.truncated = true
         break
       }
-      children.push(compactNode(node.children[i], maxDepth, budget))
+      children.push(compactNode(node.children[i], maxDepth, budget, fields))
     }
     if (children.length) {
       ret.children = children
@@ -183,10 +249,15 @@ function compactNode(
 export function compactTree(
   root: IUiNode,
   maxDepth: number,
-  maxNodes: number
+  maxNodes: number,
+  fields?: string[] | null
 ) {
   const budget = { left: maxNodes, truncated: false }
-  const nodes = [compactNode(root, maxDepth, budget)]
+  const wanted =
+    fields && fields.length
+      ? new Set(fields.map((field) => String(field).toLowerCase()))
+      : null
+  const nodes = [compactNode(root, maxDepth, budget, wanted)]
 
   return {
     nodes,

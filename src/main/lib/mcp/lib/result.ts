@@ -7,6 +7,7 @@ export type McpErrorCode =
   | 'AMBIGUOUS_MATCH'
   | 'WRITE_DISABLED'
   | 'NOT_FOUND'
+  | 'PERMISSION_DENIED'
   | 'TIMEOUT'
   | 'PORT_IN_USE'
   | 'INVALID_ARGS'

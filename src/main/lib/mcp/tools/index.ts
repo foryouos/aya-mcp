@@ -17,6 +17,8 @@ import portTools from './port'
 import webviewTools from './webview'
 import recordTools from './record'
 import castTools from './cast'
+import adaptTools from './adapt'
+import statsTools from './stats'
 
 export type { McpTool } from './types'
 
@@ -36,6 +38,8 @@ const toolGroups: McpTool[][] = [
   serialTools,
   portTools,
   webviewTools,
+  adaptTools,
+  statsTools,
   recordTools,
   castTools,
 ]

@@ -160,6 +160,54 @@ export function parseLogcat(output: string): ILogEntry[] {
   return ret
 }
 
+export interface ILogSummary {
+  fatal: boolean
+  anr: boolean
+  process: string
+  exceptionClass: string
+  hint: string
+}
+
+const FATAL_LINE = /FATAL EXCEPTION|ANR in |java\.lang\.|native crash|signal \d+/i
+
+/**
+ * 从日志条目里抽出崩溃摘要。
+ * 只认 FATAL EXCEPTION / ANR / 具体异常类，避免把 HwcComposer 之类的噪声当成错误提示。
+ */
+export function summarizeLogcat(entries: ILogEntry[]): ILogSummary {
+  const joined = entries.map((entry) => entry.message).join('\n')
+  const fatal = /FATAL EXCEPTION/.test(joined)
+  const anr = /\bANR in\b/.test(joined)
+
+  let process = ''
+  const fatalMatch = joined.match(/FATAL EXCEPTION:\s*([^\n]+)/)
+  if (fatalMatch) {
+    process = fatalMatch[1].trim()
+  }
+  if (!process) {
+    const anrMatch = joined.match(/ANR in ([^\s(]+)/)
+    if (anrMatch) {
+      process = anrMatch[1]
+    }
+  }
+
+  let exceptionClass = ''
+  const excMatch = joined.match(
+    /\b([A-Za-z_$][\w$]*(?:\.[\w$]+){1,}(?:Exception|Error))\b/
+  )
+  if (excMatch) {
+    exceptionClass = excMatch[1]
+  }
+
+  let hint = ''
+  if (fatal || anr) {
+    const hit = entries.find((entry) => FATAL_LINE.test(entry.message))
+    hint = hit ? `${hit.tag}: ${hit.message.split('\n')[0].slice(0, 300)}` : ''
+  }
+
+  return { fatal, anr, process, exceptionClass, hint }
+}
+
 export function filterLogcat(
   entries: ILogEntry[],
   options: { level?: string; tag?: string; keyword?: string } = {}

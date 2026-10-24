@@ -55,6 +55,16 @@ const stepSchema = {
       type: 'number',
       description: '本步结束后的等待毫秒数，默认 120',
     },
+    resolve: {
+      type: 'string',
+      enum: ['auto', 'snapshot', 'dump'],
+      description:
+        "文本/id 定位时如何取界面：auto（默认，快照过期才 dump）、snapshot（复用当前快照，不 dump，最快但坐标可能过时）、dump（强制重新 dump）",
+    },
+    clear: {
+      type: 'boolean',
+      description: 'action=text 时是否先清空输入框，默认 true',
+    },
   },
   required: ['action'],
   additionalProperties: false,
@@ -63,7 +73,7 @@ const stepSchema = {
 const batch: McpTool = {
   name: 'aya_batch',
   description:
-    '一次调用串行执行最多 20 个动作，最后统一返回界面。用于「点击播放器 → 等 200ms → 点控制栏按钮」这类中间态只存在 1-3 秒的场景：模型无需在动作之间往返，彻底消除思考延迟。步骤可用 text 定位（服务端每步自动 dump），失败即停并在 failedAt 指出位置，仍会返回当前界面便于纠正。',
+    '一次调用串行执行最多 20 个动作，最后统一返回界面。用于「点击播放器 → 等 200ms → 点控制栏按钮」这类中间态只存在 1-3 秒的场景：模型无需在动作之间往返，彻底消除思考延迟。纯坐标/nodeIndex 步骤不产生 dump；text/id 定位默认按需 dump，也可用 resolve:snapshot 完全复用现有快照。失败即停并在 failedAt（0 基）指出位置，仍会返回当前界面便于纠正。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -80,13 +90,19 @@ const batch: McpTool = {
         type: 'number',
         description: '每步默认等待毫秒数，默认 120',
       },
+      ui: {
+        type: 'string',
+        enum: ['none', 'diff', 'full'],
+        description:
+          '结束后的界面返回粒度：diff（默认，只返回变化节点 + 可交互节点）、none（不返回，最省时间）、full（返回更多节点，上限由 uiMaxNodes 决定）',
+      },
       withUi: {
         type: 'boolean',
-        description: '结束后是否返回界面（默认 true）',
+        description: '结束后是否返回界面（旧参数，等价于 ui:diff/none）',
       },
       uiMaxNodes: {
         type: 'number',
-        description: '回传的可交互节点上限，默认 60',
+        description: '回传的可交互节点上限，默认 diff 60 / full 120',
       },
     },
     required: ['steps'],
@@ -95,6 +111,7 @@ const batch: McpTool = {
   write: true,
   timeout: 60000,
   handler: async (args) => {
+    const batchStarted = Date.now()
     const deviceId = await resolveDeviceId(args.deviceId)
     const steps = Array.isArray(args.steps) ? args.steps : []
 
@@ -178,12 +195,19 @@ const batch: McpTool = {
             break
           }
           case 'text': {
-            await performText(deviceId, String(step.text || ''), settle)
+            const typed = await performText(
+              deviceId,
+              String(step.text || ''),
+              settle,
+              { clear: step.clear !== false }
+            )
             results.push({
               index,
               action,
               ok: true,
               text: step.text,
+              cleared: typed.cleared,
+              imeSwitched: typed.ime.switched,
               ms: Date.now() - started,
             })
             break
@@ -213,11 +237,25 @@ const batch: McpTool = {
       }
     }
 
+    const uiMode =
+      args.ui === 'none' || args.ui === 'diff' || args.ui === 'full'
+        ? args.ui
+        : args.withUi === false
+          ? 'none'
+          : 'diff'
+
     let ui: Awaited<ReturnType<typeof captureUi>> | null = null
     let uiError: string | null = null
-    if (args.withUi !== false) {
+    if (uiMode !== 'none') {
       try {
-        ui = await captureUi(deviceId, { maxNodes: args.uiMaxNodes })
+        ui = await captureUi(deviceId, {
+          maxNodes:
+            typeof args.uiMaxNodes === 'number'
+              ? args.uiMaxNodes
+              : uiMode === 'full'
+                ? 120
+                : 60,
+        })
       } catch (err) {
         uiError = err instanceof Error ? err.message : String(err)
       }
@@ -228,15 +266,18 @@ const batch: McpTool = {
       deviceId,
       executed: results.length,
       results,
+      uiMode,
       ui,
       uiError,
+      totalMs: Date.now() - batchStarted,
     }
 
     if (failedAt !== null) {
       payload.failedAt = failedAt
+      payload.failedStep = steps[failedAt]
       payload.error = error
       payload.hint =
-        '失败步骤之前的动作已生效；用返回的 ui.nodes 重新定位后再次调用 aya_batch 从失败处继续'
+        'failedAt 为 0 基下标；失败步骤之前的动作已生效。可用 ui.nodes 重新定位后再次调用 aya_batch 从失败处继续'
     }
 
     return jsonResult(payload)

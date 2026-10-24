@@ -31,6 +31,7 @@ import throttle from 'licia/throttle'
 import Semaphore from 'licia/Semaphore'
 import splitPath from 'licia/splitPath'
 import mime from 'licia/mime'
+import toNum from 'licia/toNum'
 
 let client: Client
 
@@ -63,7 +64,7 @@ const pullFile: IpcPullFile = async function (deviceId, src, dest) {
       if (!(await isRooted(deviceId))) {
         tmpFilePath = '/data/local/tmp/' + uuid()
         await shell(deviceId, `touch "${tmpFilePath}"`)
-        await fileShell(deviceId, 'cp', src, tmpFilePath)
+        await fileShellChecked(deviceId, 'cp', src, tmpFilePath)
         src = tmpFilePath
       }
     }
@@ -139,15 +140,15 @@ const openFile: IpcOpenFile = async function (deviceId, p) {
 }
 
 const deleteFile: IpcDeleteFile = async function (deviceId, path) {
-  await fileShell(deviceId, 'rm', path)
+  await fileShellChecked(deviceId, 'rm', path)
 }
 
 const deleteDir: IpcDeleteDir = async function (deviceId, path) {
-  await fileShell(deviceId, 'rm -rf', path)
+  await fileShellChecked(deviceId, 'rm -rf', path)
 }
 
 const createDir: IpcCreateDir = async function (deviceId, path) {
-  await fileShell(deviceId, 'mkdir -p', path)
+  await fileShellChecked(deviceId, 'mkdir -p', path)
 }
 
 const pushFile: IpcPushFile = async function (
@@ -193,8 +194,8 @@ const pushFile: IpcPushFile = async function (
     return new Promise((resolve, reject) => {
       const cleanup = async (err?: any) => {
         if (tmpFilePath) {
-          await fileShell(deviceId, 'cp', tmpFilePath, dest)
-          deleteFile(deviceId, tmpFilePath)
+          await fileShellChecked(deviceId, 'cp', tmpFilePath, dest)
+          deleteFile(deviceId, tmpFilePath).catch(() => {})
         }
         fileSemaphore.signal()
         window.sendTo('main', 'finishTransfer', id)
@@ -373,32 +374,82 @@ function parseLsLine(line: string) {
   }
 }
 
+// adb shell 默认丢弃命令退出码，只能靠回显 $? 才能区分「执行成功」和「静默失败」
+const EXIT_MARK = '__AYA_EXIT__'
+
+async function shellWithCode(deviceId: string, command: string) {
+  const out = await shell(deviceId, `${command} 2>&1; echo "${EXIT_MARK}:$?"`)
+  const lines = out.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const index = lines[i].indexOf(EXIT_MARK)
+    if (index < 0) {
+      continue
+    }
+    const code = toNum(lines[i].slice(index + EXIT_MARK.length + 1)) || 0
+    const rest = trim(lines[i].slice(0, index))
+    if (rest) {
+      lines[i] = rest
+    } else {
+      lines.splice(i, 1)
+    }
+    return { output: trim(lines.join('\n')), code }
+  }
+  return { output: trim(out), code: 0 }
+}
+
+function buildFileCommand(
+  deviceId: string,
+  rooted: boolean,
+  cmd: string,
+  path: string,
+  dest?: string
+) {
+  const suffix = dest ? ` "${dest}"` : ''
+  if (!rooted && (startWith(path, '/data/data/') || (dest && startWith(dest, '/data/data/')))) {
+    // run-as 只能进入自己应用的目录，取包名时优先用目标路径
+    const base = dest && startWith(dest, '/data/data/') ? dest : path
+    const pkg = base.replace('/data/data/', '').split('/')[0]
+    return `run-as ${pkg} ${cmd} "${path}"${suffix}`
+  }
+  return `${cmd} "${path}"${suffix}`
+}
+
+async function runFileShell(
+  deviceId: string,
+  cmd: string,
+  path: string,
+  dest?: string
+) {
+  const rooted = await isRooted(deviceId)
+  const command = buildFileCommand(deviceId, rooted, cmd, path, dest)
+  return shellWithCode(deviceId, command)
+}
+
+// 容错版本：调用方自行判断输出，用于 ls 这类「失败也正常」的场景
 async function fileShell(
   deviceId: string,
   cmd: string,
   path: string,
   dest?: string
 ) {
-  if (
-    startWith(path, '/data/data/') ||
-    (dest && startWith(dest, '/data/data/'))
-  ) {
-    if (!(await isRooted(deviceId))) {
-      let segments: string[] = []
-      if (dest && startWith(dest, '/data/data/')) {
-        segments = dest.replace('/data/data/', '').split('/')
-      } else {
-        segments = path.replace('/data/data/', '').split('/')
-      }
-      const pkg = segments[0]
-      return shell(
-        deviceId,
-        `run-as ${pkg} ${cmd} "${path}"${dest ? ` "${dest}"` : ''}`
-      )
-    }
-  }
+  const { output } = await runFileShell(deviceId, cmd, path, dest)
+  return output
+}
 
-  return shell(deviceId, `${cmd} "${path}"`)
+// 严格版本：写操作必须校验退出码，否则会把失败当成成功返回给调用方
+async function fileShellChecked(
+  deviceId: string,
+  cmd: string,
+  path: string,
+  dest?: string
+) {
+  const { output, code } = await runFileShell(deviceId, cmd, path, dest)
+  if (code !== 0) {
+    throw new Error(
+      output || `failed to ${cmd} ${path}${dest ? ` -> ${dest}` : ''} (exit ${code})`
+    )
+  }
+  return output
 }
 
 const statFile: IpcStatFile = async function (deviceId, path) {

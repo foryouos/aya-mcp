@@ -1,4 +1,4 @@
-import { captureUi, performTap, resolveSettle } from '../lib/action'
+import { captureUi, performTap, resolveSettle, resolveWithUi } from '../lib/action'
 import { brief } from '../lib/ui'
 import { jsonResult } from '../lib/result'
 import { McpTool } from './types'
@@ -34,19 +34,25 @@ const targetProps = {
     description: '点击后到抓取界面的等待毫秒数，默认 120（withUi:false 时 300）',
   },
   withUi: {
-    type: 'boolean',
+    type: ['boolean', 'string'],
     description:
-      '点击后立即抓取新界面返回（默认 true）。一次调用即可看到点击结果，避免再调 aya_ui_dump 期间控件已自动隐藏',
+      '点击后是否立即抓取新界面返回。默认 "auto"（等同 true）：一次调用即可看到点击结果，避免再调 aya_ui_dump 期间控件已自动隐藏；传 false 可省掉 0.3-1s',
   },
   uiMaxNodes: {
     type: 'number',
     description: '回传的可交互节点上限，默认 60',
   },
+  allowStale: {
+    type: 'boolean',
+    description:
+      '按 nodeIndex 点击时是否允许使用已过期的快照坐标，默认 false（过期会要求重新 dump）',
+  },
 }
 
 async function tapHandler(args: any) {
-  const withUi = args.withUi !== false
+  const withUi = resolveWithUi(args.withUi, true)
   const settle = resolveSettle(args, withUi ? 120 : 300)
+  const started = Date.now()
   const { target, settledMs } = await performTap(args, settle)
 
   const payload: any = {
@@ -71,6 +77,9 @@ async function tapHandler(args: any) {
       payload.uiError = err instanceof Error ? err.message : String(err)
     }
   }
+
+ // 端到端耗时：定位 + 点击 + 等待 + 可选抓帧，便于判断瓶颈在哪一段
+  payload.totalMs = Date.now() - started
 
   return jsonResult(payload)
 }

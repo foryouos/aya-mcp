@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { DOMParser, Element } from '@xmldom/xmldom'
 import { McpError } from './result'
 
@@ -11,6 +11,7 @@ export interface IUiNode {
   pkg: string
   clickable: boolean
   focusable: boolean
+  focused: boolean
   scrollable: boolean
   checked: boolean
   selected: boolean
@@ -29,6 +30,11 @@ export interface ISnapshot {
   flat: IUiNode[]
   compressed: boolean
   createdAt: number
+  // 界面 XML 的短指纹，用于判断两帧是否完全一致，省掉逐节点比对
+  fingerprint: string
+  // 输入类操作后坐标可能已失效：保留快照供 diff 使用，但默认拒绝按索引点击
+  stale: boolean
+  staleReason: string
 }
 
 export interface IFrame {
@@ -38,9 +44,13 @@ export interface IFrame {
 }
 
 const SNAPSHOT_TTL = 60 * 1000
+export const SNAPSHOT_TTL_MS = SNAPSHOT_TTL
 const snapshots: { [deviceId: string]: ISnapshot } = {}
 // 输入类操作会作废旧快照，但保留上一帧的节点签名，用于比对新界面
 const lastFrames: { [deviceId: string]: IFrame } = {}
+// 最近几帧快照按 id 存档，供 diffFrom 对照（只留 4 帧，避免内存膨胀）
+const history: { [snapshotId: string]: { at: number; frame: IFrame } } = {}
+const HISTORY_LIMIT = 4
 
 function attr(el: Element, name: string) {
   const val = el.getAttribute(name)
@@ -74,6 +84,7 @@ function parseNode(el: Element, counter: { value: number }, depth: number) {
     pkg: attr(el, 'package'),
     clickable: toBool(attr(el, 'clickable')),
     focusable: toBool(attr(el, 'focusable')),
+    focused: toBool(attr(el, 'focused')),
     scrollable: toBool(attr(el, 'scrollable')),
     checked: toBool(attr(el, 'checked')),
     selected: toBool(attr(el, 'selected')),
@@ -117,6 +128,10 @@ export function flatten(nodes: IUiNode[]): IUiNode[] {
   return ret
 }
 
+export function snapshotFingerprint(xml: string) {
+  return createHash('sha1').update(xml).digest('hex').slice(0, 12)
+}
+
 export function parseSnapshot(
   deviceId: string,
   xml: string,
@@ -124,6 +139,9 @@ export function parseSnapshot(
 ): ISnapshot {
   const existing = getSnapshot(deviceId)
   if (existing && existing.xml === xml && existing.compressed === compressed) {
+    // XML 完全一致说明界面没有变化，之前的 stale 标记可以撤销
+    existing.stale = false
+    existing.staleReason = ''
     return existing
   }
 
@@ -164,11 +182,77 @@ export function parseSnapshot(
     flat: root ? flatten([root]) : [],
     compressed,
     createdAt: Date.now(),
+    fingerprint: snapshotFingerprint(xml),
+    stale: false,
+    staleReason: '',
   }
 
   snapshots[deviceId] = snapshot
+  rememberSnapshot(snapshot)
 
   return snapshot
+}
+
+function frameOf(snapshot: ISnapshot): IFrame {
+  const keys: { [key: string]: true } = {}
+  const nodes: { key: string; node: IUiNode }[] = []
+  for (let i = 0; i < snapshot.flat.length; i++) {
+    const node = snapshot.flat[i]
+    const key = `${node.cls}\u0001${node.text}\u0001${node.desc}\u0001${node.id}\u0001${node.bounds.join(',')}`
+    keys[key] = true
+    nodes.push({ key, node })
+  }
+
+  return { at: snapshot.createdAt, keys, nodes }
+}
+
+function rememberSnapshot(snapshot: ISnapshot) {
+  if (history[snapshot.id]) {
+    return
+  }
+  history[snapshot.id] = { at: Date.now(), frame: frameOf(snapshot) }
+
+  const ids = Object.keys(history)
+  if (ids.length > HISTORY_LIMIT) {
+    ids
+      .sort((a, b) => history[a].at - history[b].at)
+      .slice(0, ids.length - HISTORY_LIMIT)
+      .forEach((id) => delete history[id])
+  }
+}
+
+export interface ISnapshotDiff {
+  available: boolean
+  changed: boolean
+  appeared: IUiNode[]
+  disappeared: IUiNode[]
+}
+
+// 与指定的历史快照对比，只返回新增/消失的节点，便于判断「点了之后界面到底变了什么」
+export function diffSnapshot(
+  fromId: string,
+  current: ISnapshot,
+  limit = 40
+): ISnapshotDiff {
+  const from = history[fromId]
+  if (!from) {
+    return { available: false, changed: false, appeared: [], disappeared: [] }
+  }
+
+  const currentFrame = frameOf(current)
+  const appeared = currentFrame.nodes
+    .filter((item) => !from.frame.keys[item.key])
+    .map((item) => item.node)
+  const disappeared = from.frame.nodes
+    .filter((item) => !currentFrame.keys[item.key])
+    .map((item) => item.node)
+
+  return {
+    available: true,
+    changed: appeared.length > 0 || disappeared.length > 0,
+    appeared: appeared.slice(0, limit),
+    disappeared: disappeared.slice(0, limit),
+  }
 }
 
 export function getSnapshot(deviceId: string): ISnapshot | null {
@@ -184,7 +268,11 @@ export function getSnapshot(deviceId: string): ISnapshot | null {
   return snapshot
 }
 
-export function requireSnapshot(deviceId: string, id: string): ISnapshot {
+export function requireSnapshot(
+  deviceId: string,
+  id: string,
+  options: { allowStale?: boolean } = {}
+): ISnapshot {
   const snapshot = getSnapshot(deviceId)
   if (!snapshot || !snapshot.root) {
     throw new McpError(
@@ -199,8 +287,42 @@ export function requireSnapshot(deviceId: string, id: string): ISnapshot {
       { snapshotId: snapshot.id }
     )
   }
+  if (snapshot.stale && options.allowStale !== true) {
+    throw new McpError(
+      'STALE_SNAPSHOT',
+      `快照已过期（${snapshot.staleReason || '界面已变化'}），节点坐标可能不再有效；请重新 aya_ui_dump，或传 allowStale:true 强制按旧坐标点击`,
+      { snapshotId: snapshot.id, deviceId: snapshot.deviceId, stale: true }
+    )
+  }
 
   return snapshot
+}
+
+// 输入类操作后不立刻删快照：保留节点签名用于 diff，同时标记为过期
+export function markSnapshotStale(deviceId: string, reason = '输入操作后界面已变化') {
+  const snapshot = snapshots[deviceId]
+  if (!snapshot) {
+    return
+  }
+  saveFrame(deviceId)
+  snapshot.stale = true
+  snapshot.staleReason = reason
+}
+
+export function getSnapshotMeta(deviceId: string) {
+  const snapshot = getSnapshot(deviceId)
+  if (!snapshot) {
+    return null
+  }
+
+  return {
+    snapshotId: snapshot.id,
+    fingerprint: snapshot.fingerprint,
+    ageMs: Date.now() - snapshot.createdAt,
+    stale: snapshot.stale,
+    staleReason: snapshot.staleReason,
+    total: snapshot.flat.length,
+  }
 }
 
 export function invalidateSnapshot(deviceId?: string) {
@@ -226,16 +348,7 @@ function saveFrame(deviceId: string) {
     return
   }
 
-  const keys: { [key: string]: true } = {}
-  const nodes: { key: string; node: IUiNode }[] = []
-  for (let i = 0; i < snapshot.flat.length; i++) {
-    const node = snapshot.flat[i]
-    const key = nodeKey(node)
-    keys[key] = true
-    nodes.push({ key, node })
-  }
-
-  lastFrames[deviceId] = { at: snapshot.createdAt, keys, nodes }
+  lastFrames[deviceId] = frameOf(snapshot)
 }
 
 export function dropSnapshot(deviceId: string) {

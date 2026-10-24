@@ -4,6 +4,7 @@ import { action, makeObservable, observable, runInAction, toJS } from 'mobx'
 import ScrcpyClient from './lib/ScrcpyClient'
 import { ScrcpyOptions3_1 } from '@yume-chan/scrcpy'
 import defaults from 'licia/defaults'
+import getUrlParam from 'licia/getUrlParam'
 
 class Store extends BaseStore {
   device!: IDevice
@@ -12,6 +13,8 @@ class Store extends BaseStore {
   settings = defaultSettings
   screenOff = false
   recording = false
+  // MCP 指定设备时固定投屏目标，不再跟随主窗口的选中设备
+  pinnedDeviceId = ''
   constructor() {
     super()
 
@@ -93,7 +96,7 @@ class Store extends BaseStore {
     main.setScreencastStore('settings', deviceSettings)
   }
   private async init() {
-    const device = await main.getMainStore('device')
+    const device = await this.resolveInitialDevice()
     this.setDevice(device)
     const alwaysOnTop = await main.getScreencastStore('alwaysOnTop')
     if (alwaysOnTop) {
@@ -101,9 +104,26 @@ class Store extends BaseStore {
       runInAction(() => (this.alwaysOnTop = true))
     }
   }
+  // 窗口带 deviceId 打开时（MCP 指定设备）固定该设备，否则跟随主窗口选中项
+  private async resolveInitialDevice() {
+    this.pinnedDeviceId = getUrlParam('deviceId') || ''
+    if (this.pinnedDeviceId) {
+      try {
+        const devices = await main.getDevices()
+        const found = devices.find((item) => item.id === this.pinnedDeviceId)
+        if (found) {
+          return found
+        }
+      } catch {
+        // adb 尚未就绪时回退到主窗口的选中设备
+      }
+    }
+
+    return await main.getMainStore('device')
+  }
   private bindEvent() {
     main.on('changeMainStore', (name: string, val: any) => {
-      if (name === 'device') {
+      if (name === 'device' && !this.pinnedDeviceId) {
         this.setDevice(val)
       }
     })

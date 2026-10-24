@@ -248,6 +248,7 @@ export interface ISerialStatus {
   seq: number
   dropped: number
   bytes: number
+  txBytes: number
   logFile: string
   logFiles: string[]
   logFileSize: number

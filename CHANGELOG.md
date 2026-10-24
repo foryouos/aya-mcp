@@ -1,3 +1,9 @@
+## Unreleased
+
+* feat: unify mcp tool results with timing/cost/retryable/snapshot/suggestedNextCall
+* feat: aya_cast_window accepts deviceId and pins the mirror window to that device
+* perf: lower default node budget of aya_ui_dump (300 to 100) and aya_wait_for (40 to 20)
+
 ## v2.2.1 (23 Oct 2026)
 
 * fix: check update failed on packaged build, read releases from github api instead of latest.yml

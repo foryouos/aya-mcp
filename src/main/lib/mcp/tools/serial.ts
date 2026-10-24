@@ -1,10 +1,13 @@
 import {
   clearSerial,
   closeSerial,
+  detectSerialBaudRate,
+  getSerialStages,
   getStatus,
   listPorts,
   openSerial,
   queryLines,
+  setSerialPaused,
   waitSerial,
   writeSerial,
 } from '../../serial'
@@ -246,18 +249,20 @@ const open: McpTool = {
         description: '串口路径，如 Windows 的 COM3、Linux 的 /dev/ttyUSB0',
       },
       baudRate: {
-        type: 'number',
-        enum: [115200, 460800, 921600, 1500000, 3000000],
-        description: '波特率，默认 115200（常用 115200/921600/1500000）',
+        type: ['number', 'string'],
+        enum: [115200, 460800, 921600, 1500000, 3000000, 'auto'],
+        description:
+          '波特率，默认 115200；传 "auto" 会以 115200 打开后依次尝试 1500000/921600/115200 并按可读字符比例打分，返回 detectedBaudRate 与 confidence',
       },
     },
     additionalProperties: false,
   },
   write: true,
-  timeout: 30000,
+  timeout: 60000,
   handler: async (args) => {
     let path = String(args.path || '').trim()
-    const baudRate = Number(args.baudRate) || 115200
+    const autoBaud = args.baudRate === 'auto'
+    const baudRate = autoBaud ? 115200 : Number(args.baudRate) || 115200
     if (baudRate < 300 || baudRate > 4000000) {
       throw new McpError('INVALID_ARGS', `波特率不合法：${baudRate}`)
     }
@@ -280,10 +285,27 @@ const open: McpTool = {
     }
 
     const state = await openSerial(path, baudRate)
+
+    if (!autoBaud) {
+      return jsonResult({
+        ok: true,
+        ...state,
+        hint: '已开始接收并落盘。用 aya_serial_logs 读取，完整日志见 logFiles。',
+      })
+    }
+
+    // 自动波特率：先以 115200 打开，再逐个采样打分
+    const detection = await detectSerialBaudRate()
+
     return jsonResult({
       ok: true,
-      ...state,
-      hint: '已开始接收并落盘。用 aya_serial_logs 读取，完整日志见 logFiles。',
+      ...getStatus(),
+      detectedBaudRate: detection.rate,
+      confidence: detection.confidence,
+      score: Math.round(detection.score),
+      hint: detection.detected
+        ? `自动识别到 ${detection.rate}（置信度 ${detection.confidence}），已切换并继续接收。日志若仍乱码，可关闭后用 aya_serial_open 指定固定波特率重试。`
+        : '未能自动识别波特率（设备可能没有输出）。请确认板子在上电/重启，或指定固定 baudRate 重试。',
     })
   },
 }
@@ -319,19 +341,50 @@ const write: McpTool = {
         type: 'boolean',
         description: '是否追加 \\r\\n，默认 true',
       },
+      waitForEcho: {
+        type: 'string',
+        description:
+          '写入后等待该关键字/正则出现在串口回显中（如提示符或命令回显），省略则不等待',
+      },
+      regex: {
+        type: 'boolean',
+        description: 'waitForEcho 是否按正则解析，默认 false',
+      },
+      timeout: {
+        type: 'number',
+        description: 'waitForEcho 的超时毫秒数，默认 2000',
+      },
     },
     required: ['data'],
     additionalProperties: false,
   },
   write: true,
-  timeout: 30000,
+  timeout: 60000,
   handler: async (args) => {
     const data = String(args.data ?? '')
     if (!data) {
       throw new McpError('INVALID_ARGS', 'data 不能为空')
     }
-    await writeSerial(data, args.newline !== false)
-    return jsonResult({ ok: true, sent: data })
+    const sentBytes = await writeSerial(data, args.newline !== false)
+
+    const payload: any = { ok: true, sent: data, sentBytes }
+
+    const echo = String(args.waitForEcho || '').trim()
+    if (echo) {
+      const res = await waitSerial(echo, {
+        regex: !!args.regex,
+        timeout: Number(args.timeout) || 2000,
+      })
+      payload.echo = {
+        matched: res.matched,
+        waitedMs: res.waited,
+        line: res.line
+          ? { seq: res.line.seq, source: res.line.source, text: res.line.text }
+          : null,
+      }
+    }
+
+    return jsonResult(payload)
   },
 }
 
@@ -356,13 +409,79 @@ const clear: McpTool = {
   },
 }
 
+const pause: McpTool = {
+  name: 'aya_serial_pause',
+  description:
+    '暂停串口日志推送（设备仍在接收并落盘，只是不再向前端/MCP 推送新行）。配合 aya_serial_resume 恢复，无需关闭重开串口。',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+    additionalProperties: false,
+  },
+  write: true,
+  timeout: 30000,
+  handler: async () => {
+    const state = setSerialPaused(true)
+    return jsonResult({ ok: true, ...state })
+  },
+}
+
+const resume: McpTool = {
+  name: 'aya_serial_resume',
+  description:
+    '恢复串口日志推送（先前的 aya_serial_pause）。暂停期间产生的日志仍可从缓冲区读到。',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+    additionalProperties: false,
+  },
+  write: true,
+  timeout: 30000,
+  handler: async () => {
+    const state = setSerialPaused(false)
+    return jsonResult({ ok: true, ...state })
+  },
+}
+
+const stages: McpTool = {
+  name: 'aya_serial_stages',
+  description:
+    '按 bootloader/kernel/android/other 返回串口日志的阶段切分（startSeq/endSeq/durationMs/行数），用于快速定位「卡在哪个阶段」，避免拉全量日志自行切分。',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+    additionalProperties: false,
+  },
+  write: false,
+  annotations: { readOnlyHint: true },
+  timeout: 30000,
+  handler: async () => {
+    const state = getStatus()
+    const list = getSerialStages()
+
+    return jsonResult({
+      ok: true,
+      open: state.open,
+      paused: state.paused,
+      seq: state.seq,
+      stages: list,
+      hint: list.length
+        ? '用 aya_serial_logs 的 fromSeq/toSeq 精确读取某个阶段；阶段边界由日志特征行推断，可能在重启时回退到 bootloader。'
+        : '缓冲区暂无日志，先用 aya_serial_open 打开串口并让设备输出。',
+    })
+  },
+}
+
 export default [
   status,
   logs,
   wait,
+  stages,
   listPortsTool,
   open,
   close,
+  pause,
+  resume,
   write,
   clear,
 ]

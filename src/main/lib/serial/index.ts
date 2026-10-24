@@ -56,6 +56,7 @@ let head = 0
 let seq = 0
 let dropped = 0
 let bytes = 0
+let txBytes = 0
 let maxLines = DEFAULT_MAX_LINES
 
 let decoder = new StringDecoder('utf8')
@@ -257,6 +258,7 @@ export function getStatus(): ISerialStatus {
     seq,
     dropped,
     bytes,
+    txBytes,
     logFile,
     logFiles: logFiles.slice(),
     logFileSize: spoolBytes,
@@ -299,6 +301,7 @@ function resetSession(portPath: string, baudRate: number) {
   seq = 0
   dropped = 0
   bytes = 0
+  txBytes = 0
   decoder = new StringDecoder('utf8')
   pendingText = ''
   stage = 'other'
@@ -506,6 +509,8 @@ function scoreSerialBuffer(buf: Buffer) {
 export async function detectSerialBaudRate(): Promise<{
   rate: number
   detected: boolean
+  score: number
+  confidence: 'high' | 'medium' | 'low' | 'none'
 }> {
   if (!port || !port.isOpen) {
     throw new Error('serial port is not open')
@@ -556,7 +561,16 @@ export async function detectSerialBaudRate(): Promise<{
     if (rate !== original) {
       resetDecoder()
     }
-    return { rate, detected: bestScore >= 8 }
+    const confidence =
+      bestScore >= 2000
+        ? 'high'
+        : bestScore >= 500
+          ? 'medium'
+          : bestScore >= 8
+            ? 'low'
+            : 'none'
+
+    return { rate, detected: bestScore >= 8, score: bestScore, confidence }
   } finally {
     detecting = false
     detectChunks = []
@@ -573,6 +587,7 @@ export function clearSerial(): ISerialStatus {
   pendingEmit = []
   seq = 0
   bytes = 0
+  txBytes = 0
   pendingText = ''
   decoder = new StringDecoder('utf8')
   // 清空只清显示缓冲，设备仍处在原来的阶段（已开机就是 Android），
@@ -758,6 +773,51 @@ export async function writeSerial(
   await new Promise<void>((resolve) => {
     port!.drain(() => resolve())
   })
+  txBytes += Buffer.byteLength(data + suffix, 'utf8')
+  sendStatus()
+
+  return Buffer.byteLength(data + suffix, 'utf8')
+}
+
+export interface ISerialStage {
+  source: SerialSource
+  startSeq: number
+  endSeq: number
+  startTime: number
+  endTime: number
+  durationMs: number
+  lines: number
+}
+
+// 把缓冲区按 bootloader/kernel/android 切成阶段，省掉调用方拉全量日志自行切分
+export function getSerialStages(): ISerialStage[] {
+  const ret: ISerialStage[] = []
+
+  for (let i = head; i < lines.length; i++) {
+    const line = lines[i]
+    const last = ret[ret.length - 1]
+    if (last && last.source === line.source) {
+      last.endSeq = line.seq
+      last.endTime = line.time
+      last.lines++
+      continue
+    }
+    ret.push({
+      source: line.source,
+      startSeq: line.seq,
+      endSeq: line.seq,
+      startTime: line.time,
+      endTime: line.time,
+      durationMs: 0,
+      lines: 1,
+    })
+  }
+
+  ret.forEach((stage) => {
+    stage.durationMs = Math.max(stage.endTime - stage.startTime, 0)
+  })
+
+  return ret
 }
 
 export async function waitSerial(

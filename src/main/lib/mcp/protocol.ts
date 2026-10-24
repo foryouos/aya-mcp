@@ -1,6 +1,8 @@
 import pkg from '../../../../package.json'
 import { findTool, getToolSchema, getVisibleTools } from './tools'
 import { errorResult, McpError, withTimeout } from './lib/result'
+import { decorateResult } from './lib/envelope'
+import { recordTool } from './lib/stats'
 import log from 'share/common/log'
 
 const logger = log('mcp')
@@ -49,24 +51,39 @@ function listTools() {
 async function callTool(name: string, args: Record<string, unknown>) {
   const tool = findTool(name)
   if (!tool) {
-    return errorResult(
-      new McpError(
-        'INVALID_ARGS',
-        `工具 ${name} 不存在或当前不可用（写操作需在 AYA 设置中开启“允许写操作”）`
-      )
+    return decorateResult(
+      errorResult(
+        new McpError(
+          'INVALID_ARGS',
+          `工具 ${name} 不存在或当前不可用（写操作需在 AYA 设置中开启“允许写操作”）`
+        )
+      ),
+      0
     )
   }
 
+  const started = Date.now()
+
   try {
-    return await withTimeout(
+    const result = await withTimeout(
       tool.handler(args || {}),
       tool.timeout || (tool.name === 'aya_shell' ? 30000 : TOOL_TIMEOUT),
       tool.name
     )
+    const elapsed = Date.now() - started
+    recordTool(tool.name, elapsed)
+
+    return decorateResult(result, elapsed)
   } catch (err) {
+    const elapsed = Date.now() - started
+    recordTool(
+      tool.name,
+      elapsed,
+      err instanceof McpError ? err.code : 'INTERNAL'
+    )
     logger.error('tool failed', name, err instanceof Error ? err.message : err)
 
-    return errorResult(err)
+    return decorateResult(errorResult(err), elapsed)
   }
 }
 
@@ -89,7 +106,7 @@ export async function handleMessage(msg: any): Promise<any | null> {
         },
         serverInfo: SERVER_INFO,
         instructions:
-          'AYA 提供 Android 设备控制。先用 aya_list_devices 确认设备，用 aya_ui_dump 获取带坐标的界面节点树，再调用 aya_tap / aya_swipe 操作。',
+          'AYA 提供 Android 设备控制。先用 aya_list_devices 确认设备，用 aya_ui_dump 获取带坐标的界面节点树，再调用 aya_tap / aya_swipe 操作。所有工具返回统一附带 timing（totalMs/dumpMs/captureMs 分解）、cost（low/medium/high，越高越费时）、retryable（失败是否值得原样重试）、snapshot（id/expiresAt/stale）与 suggestedNextCall（失败时的下一步建议调用）；dumpMs 占比高时优先复用 snapshotId 或改用 aya_webview_* 通道。',
       })
     case 'notifications/initialized':
     case 'notifications/cancelled':

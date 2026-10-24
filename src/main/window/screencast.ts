@@ -10,7 +10,7 @@ const store = getScreencastStore()
 
 let win: BrowserWindow | null = null
 
-export function showWin() {
+export function showWin(deviceId?: string) {
   if (win) {
     win.focus()
     return
@@ -42,7 +42,11 @@ export function showWin() {
     }
   })
 
-  window.loadPage(next, { page: 'screencast' })
+  // deviceId 可选：MCP 调用指定设备时，让投屏窗口固定该设备而不是跟随主窗口选中项
+  window.loadPage(next, {
+    page: 'screencast',
+    ...(deviceId ? { deviceId } : {}),
+  })
 }
 
 export function isShown() {
