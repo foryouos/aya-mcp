@@ -127,3 +127,65 @@
 2. **串口是 BSP 场景不可替代的通道**：`aya_serial_*` 采集到 7,968 行、1 MB 的真实开机日志，`bootloader/kernel/android` 分段准确，`boot_completed` 于 17.2 s 命中；该能力 adb logcat 无法提供。使用要点：波特率必须与板子一致（本机 1,500,000，115200 会得到乱码）。
 3. **效率瓶颈在 dump**：单次 dump 2.4–4.9 s，是点击（120–300 ms）的一个数量级以上；`aya_batch` 只省往返不省时间，`aya_wait_for` 是唯一能压掉轮询次数的工具。
 4. **必须优先修的两个正确性缺陷**：`aya_rename_path` 假成功（数据安全隐患）、`aya_start_app` 冷启动竞态（自动化脚本首步易失败）；`aya_text` 受 IME 改写仍是 H5 场景最大正确性风险。
+
+## 6. 专项复测：播放器快进 / 播放 / 手势注入
+
+### 6.1 环境与口径
+
+| 项 | 值 |
+| --- | --- |
+| 被测应用 | `com.tudou.video`（前台播放页） |
+| 设备 | 1920×1080，density 140（physical 160），单显示 |
+| 应用窗口 | 1421×1031（`playerContainer` 从 y=21 起），dump 坐标即注入坐标 |
+| 视频时长 | 1:51:50（6710 s） |
+| 进度条 | `seekBar` 轨道 x=12→1409，触摸 y≈972 |
+| 涉及工具 | `aya_gesture`（多段注入）、`aya_batch`（新增 `gesture` 步骤）、`aya_tap`、`aya_ui_dump`、`aya_shell` |
+
+### 6.2 用例结果
+
+| 用例 | 结果 | 实测数据 |
+| --- | --- | --- |
+| 快进 10 % | 通过 | 00:41 → 11:12（期望 11:11，偏差 +1 s） |
+| 快进 30 % | 通过 | → 33:34（期望 33:33，偏差 +1 s） |
+| 快进 50 % | 通过 | 23:01 → 55:57（期望 55:55，偏差 +2 s） |
+| 快进 90 % | 通过 | → 1:40:42（期望 1:40:39，偏差 +3 s） |
+| 快退 | 通过 | 1:40:42 → 22:32（期望 22:22，偏差 +10 s），app 弹出“快退中” |
+| 方向提示 | 通过 | 前进拖动 `appeared` 含“快进中”，并显示预览时间 `04:47` |
+| 暂停 | 通过 | 22:56 冻结（间隔 3 s 两次读取一致，`desc="播放"` 不变） |
+| 恢复播放 | 通过 | 22:56 → 23:01 |
+| 单段手势“唤醒 + 拖动” | 通过 | 1:40:42 → 22:32，`gestureMs=599`，一次调用完成 |
+| 单段手势“唤醒 + 点按钮” | 通过 | 22:43 冻结，`(1268,1004)` 中心点即生效 |
+| `aya_batch` 手势“唤醒 + 快进” | 通过 | 一次调用 `totalMs=2,709`，`executed:2`、`gestureSteps:5`，落到 1:18:18（期望 1:18:17，偏差 +1 s）；重建重启后复验 `totalMs=2,848`（其中 `ui:full` dump 492 ms）、`gestureMs=684`、落点仍为 1:18:18 |
+| `aya_batch` 手势“唤醒 + 暂停” | 通过 | 1:18:18 冻结，间隔 3 s 两次采样 `tvTime` 一致 |
+| 暂停态恢复 | 通过 | 同一段手势内连点两次 `btnPlayPause` 会被吞；改为另起一次调用点 `btnCenterPlay (711,525)` 或 `aya_tap (1268,1004)` 即恢复（1:18:57 → 1:19:01） |
+| 分段延时注入 | 通过 | 5 步 `down/move/move/up`，延时 60+300+70+70+110 ms 全部按序生效 |
+| 同排 `btnSpeed` 点击 | 通过 | `(1313,1003)` → 弹出倍速面板（1X/1.25X/…） |
+| 媒体键 `KEYCODE_MEDIA_PLAY_PAUSE` | 不适用 | `input keyevent 85` 无响应，该 app 未监听媒体键（非 AYA 缺陷） |
+
+### 6.3 关键约束（使用要点，务必写进工具说明）
+
+1. **控制栏 3 s 自动隐藏**：一次模型往返 1.5–3 s，几乎必然错过窗口。唤醒与操作必须放进**同一段 `aya_gesture`**：
+   `down/up(视频区) → down(目标控件, delayMs≈300) → up`，实测稳定生效。
+2. **重复点视频区会关闭控制栏**：脚本需先 `aya_ui_dump` 判断 `btnPlayPause` 是否存在，可见则直接点，不可见才补唤醒点。
+3. **`btnPlayPause` 的 `desc` 恒为“播放”**，不能用来判断状态；判定播放/暂停只能用 `tvTime` 两次采样是否变化。
+4. **进度落点公式**：`x = 12 + 1397 × pct`（pct 为 0–1），实测线性、误差 ≤0.15 %。
+5. 早前记录的“按钮中心无效、仅底部有效”为**误判**，真实原因是控制栏在跨调用等待期间已隐藏/滑入动画未完成；同手势内点中心 `(1268,1004)` 正常。
+6. **暂停与恢复要分开做**：同一段手势里连点两次 `btnPlayPause`，第二次会被吞掉；暂停一次手势即可，恢复需另起一次调用点 `btnCenterPlay (711,525)` 或 `btnPlayPause (1268,1004)`。
+7. **优先用 `aya_batch` 的 `gesture` 步骤**：整段手势 + 后续 `wait`/取样可放在一次调用内（实测唤醒+快进 `totalMs=2,709`），比 `aya_gesture` + 额外调用更抗中间态。
+
+### 6.4 新发现缺陷
+
+| 编号 | 严重度 | 状态 | 问题 | 证据 | 根因定位 |
+| --- | --- | --- | --- | --- | --- |
+| BUG-15 | 中 | 已修复 | `aya_batch` 不支持 `gesture` 步骤，无法原子执行“唤醒控制栏→拖动/点击” | 修复前：拆成两次调用约 60 % 概率落在隐藏窗口外（60 % 快进失败、进度停在 33:34）；修复后：一次调用 `totalMs=2,709`、`executed:2`、`gestureSteps:5`，落到 1:18:18（偏差 +1 s） | `tools/batch.ts` 原仅 `tap/tap_text/swipe/key/text/wait` |
+| BUG-16 | 低 | 已修复 | `aya_gesture` 未在描述中说明“一段手势可包含多组 down/up”，导致“轻点唤醒 + 拖动”能力不可发现 | 5 步手势含两次 down/up 实测可用（tap 后 280 ms 再 down）；描述已补示例 | `tools/gesture.ts` 校验只要求首步 down、末步 up，本身允许多组 |
+
+**BUG-15 修复实现**（`src/main/lib/mcp/tools/batch.ts`）：
+
+- `stepSchema.action` 枚举加入 `gesture`，新增 `steps` 子数组（`down/move/up/cancel` + `x/y/delayMs`），与 `aya_gesture` 同构；
+- `case 'gesture'`：`normalizeSteps(step.steps)` 复用同一套校验 → `withDeviceQueue` → `injectGesture(captureAt:-1)` → `settle` → `invalidateDump`，保证后续步骤读到手势后的界面树；
+- 复用了 `tools/gesture.ts` 中导出的 `normalizeSteps`，两个工具的手势校验口径一致。
+
+**BUG-16 修复实现**（`src/main/lib/mcp/tools/gesture.ts`）：`aya_gesture` 描述改为“一段事件流内可包含多组 down/up”，并给出“轻点唤醒 + 拖动进度条”的 5 步示例；`steps` 字段描述同步说明每组独立成对。
+
+> 未遗留建议项：两条缺陷均已随 v2.2.1 之后的本地构建落地（`tools=72`，`aya_batch` 枚举含 `gesture`）；重建重启后 `tools/list` 实测 `aya_gesture.description` 已含“一段事件流内可包含多组 down/up”与 5 步示例、`steps` 字段说明同步更新，真机复验快进落点仍为 1:18:18。

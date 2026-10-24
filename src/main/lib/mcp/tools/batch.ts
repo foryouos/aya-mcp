@@ -1,3 +1,4 @@
+import { injectGesture } from '../../adb/server'
 import { resolveDeviceId } from '../lib/device'
 import {
   captureUi,
@@ -8,10 +9,11 @@ import {
   resolveSettle,
   sleep,
 } from '../lib/action'
-import { invalidateDump } from '../lib/dump'
+import { invalidateDump, withDeviceQueue } from '../lib/dump'
 import { dropSnapshot } from '../lib/snapshot'
 import { jsonResult, McpError } from '../lib/result'
 import { McpTool } from './types'
+import { normalizeSteps } from './gesture'
 
 const MAX_STEPS = 20
 
@@ -20,8 +22,9 @@ const stepSchema = {
   properties: {
     action: {
       type: 'string',
-      enum: ['tap', 'tap_text', 'swipe', 'key', 'text', 'wait'],
-      description: '动作类型',
+      enum: ['tap', 'tap_text', 'swipe', 'gesture', 'key', 'text', 'wait'],
+      description:
+        '动作类型。gesture：本步内注入一段连续手势（同一段事件流内可含「轻点 + 拖动」），用于控制栏 1-3 秒自动隐藏这类中间态',
     },
     x: { type: 'number', description: 'tap：X 坐标' },
     y: { type: 'number', description: 'tap：Y 坐标' },
@@ -46,6 +49,29 @@ const stepSchema = {
     x2: { type: 'number', description: 'swipe：终点 X' },
     y2: { type: 'number', description: 'swipe：终点 Y' },
     duration: { type: 'number', description: 'swipe：滑动时长，默认 300' },
+    steps: {
+      type: 'array',
+      description:
+        'gesture：手势步骤，格式同 aya_gesture（down/move/up/cancel，可带 delayMs）。示例：先轻点唤醒再拖动 = [{action:"down",x:700,y:700},{action:"up",x:700,y:700,delayMs:60},{action:"down",x:300,y:972,delayMs:300},{action:"move",x:710,y:972,delayMs:70},{action:"up",x:710,y:972,delayMs:110}]',
+      items: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['down', 'move', 'up', 'cancel'],
+            description: '手势事件类型',
+          },
+          x: { type: 'number', description: 'X 坐标' },
+          y: { type: 'number', description: 'Y 坐标' },
+          delayMs: {
+            type: 'number',
+            description: '注入该步前的等待毫秒数，可用于长按',
+          },
+        },
+        required: ['action'],
+        additionalProperties: false,
+      },
+    },
     key: {
       type: ['string', 'number'],
       description: 'key：按键名称或 keycode',
@@ -73,7 +99,7 @@ const stepSchema = {
 const batch: McpTool = {
   name: 'aya_batch',
   description:
-    '一次调用串行执行最多 20 个动作，最后统一返回界面。用于「点击播放器 → 等 200ms → 点控制栏按钮」这类中间态只存在 1-3 秒的场景：模型无需在动作之间往返，彻底消除思考延迟。纯坐标/nodeIndex 步骤不产生 dump；text/id 定位默认按需 dump，也可用 resolve:snapshot 完全复用现有快照。失败即停并在 failedAt（0 基）指出位置，仍会返回当前界面便于纠正。',
+    '一次调用串行执行最多 20 个动作，最后统一返回界面。用于「点击播放器 → 等 200ms → 点控制栏按钮」这类中间态只存在 1-3 秒的场景：模型无需在动作之间往返，彻底消除思考延迟。纯坐标/nodeIndex 步骤不产生 dump；text/id 定位默认按需 dump，也可用 resolve:snapshot 完全复用现有快照。gesture 步骤可在同一段注入事件流内完成「轻点唤醒 + 拖动/点击」，避免控制栏自动隐藏。失败即停并在 failedAt（0 基）指出位置，仍会返回当前界面便于纠正。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -179,6 +205,30 @@ const batch: McpTool = {
               action,
               ok: true,
               duration,
+              ms: Date.now() - started,
+            })
+            break
+          }
+          case 'gesture': {
+            const gestureSteps = normalizeSteps(step.steps)
+            const injected = await withDeviceQueue(deviceId, () =>
+              injectGesture(deviceId, {
+                steps: gestureSteps,
+                captureAt: -1,
+                maxNodes: 1200,
+                maxDepth: 50,
+              })
+            )
+            if (settle > 0) {
+              await sleep(settle)
+            }
+            invalidateDump(deviceId)
+            results.push({
+              index,
+              action,
+              ok: true,
+              gestureSteps: gestureSteps.length,
+              gestureMs: injected?.totalMs,
               ms: Date.now() - started,
             })
             break

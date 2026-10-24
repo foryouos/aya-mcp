@@ -179,7 +179,7 @@ const longPress: McpTool = {
   },
 }
 
-function normalizeSteps(input: unknown): IGestureStep[] {
+export function normalizeSteps(input: unknown): IGestureStep[] {
   if (!Array.isArray(input) || !input.length) {
     throw new McpError(
       'INVALID_ARGS',
@@ -233,7 +233,7 @@ function normalizeSteps(input: unknown): IGestureStep[] {
 const gesture: McpTool = {
   name: 'aya_gesture',
   description:
-    '注入一段完整触摸事件流：down → (delayMs) → move... → up，整段只按下一次。用于 aya_swipe 表达不了的手势：按住不动一段时间再拖（长按拖拽）、多段折线拖动、拖到中途停住观察界面（captureAt）。走服务端常驻 UiAutomation，不可用时抛错，请降级为 aya_swipe / aya_long_press。',
+    '注入一段连续触摸事件流，一段事件流内可包含多组 down/up：down → (delayMs) → move... → up → (delayMs) → down → ... → up。用于 aya_swipe 表达不了的手势：按住不动一段时间再拖（长按拖拽）、多段折线拖动、拖到中途停住观察界面（captureAt），以及「轻点唤醒 + 立即操作」——控制栏 1-3 秒自动隐藏时，同一段手势内先点视频区唤醒再点/拖目标控件，避免跨调用错过中间态。示例：先轻点唤醒再拖进度条 = [{action:"down",x:700,y:700},{action:"up",x:700,y:700,delayMs:60},{action:"down",x:300,y:972,delayMs:300},{action:"move",x:710,y:972,delayMs:70},{action:"up",x:710,y:972,delayMs:110}]。走服务端常驻 UiAutomation，不可用时抛错，请降级为 aya_swipe / aya_long_press。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -241,7 +241,7 @@ const gesture: McpTool = {
       steps: {
         type: 'array',
         description:
-          '手势步骤，首步必须 down(带 x,y)，末步必须 up。每步的 delayMs 在注入该事件之前等待',
+          '手势步骤，首步必须 down(带 x,y)，末步必须 up。每步的 delayMs 在注入该事件之前等待。可包含多组 down/up（如「轻点唤醒 + 拖动」），每组独立成对出现',
         items: {
           type: 'object',
           properties: {
