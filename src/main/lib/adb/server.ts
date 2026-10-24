@@ -131,6 +131,35 @@ export async function dumpUiXml(
   return (result && result.xml) || ''
 }
 
+export interface IGestureStep {
+  action: 'down' | 'move' | 'up' | 'cancel'
+  x?: number
+  y?: number
+  delayMs?: number
+}
+
+/**
+ * 通过常驻 UiAutomation 注入一次完整触摸事件流（down → ... → up）。
+ * input swipe 每次都会完整按下抬起，且只能走直线，所以长按拖拽/多段路径只能走这里。
+ */
+export async function injectGesture(
+  deviceId: string,
+  params: {
+    steps: IGestureStep[]
+    captureAt?: number
+    maxNodes?: number
+    maxDepth?: number
+  }
+): Promise<{ xml?: string; totalMs?: number }> {
+  const ayaClient = await getAyaClient(deviceId)
+  const result = await ayaClient.sendMessage('ui.gesture', params)
+  if (result && result.error) {
+    throw new Error(String(result.error))
+  }
+
+  return (result && result.gesture) || {}
+}
+
 export async function getUiState(deviceId: string): Promise<{
   available: boolean
   error: string

@@ -3,7 +3,10 @@ package io.liriliri.aya
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import org.json.JSONObject
@@ -180,6 +183,105 @@ object Ui {
             setInfo.invoke(instance, info)
         } catch (e: Throwable) {
             Log.w(TAG, "fail to enable view ids", e)
+        }
+    }
+
+    /**
+     * 按步骤注入触摸事件：down → (delay) → move ... → up。
+     *
+     * 整段事件流只有一次 ACTION_DOWN，所以能表达「按住不动一段时间再拖动」「多段路径」，
+     * 这是 `input swipe`（一次命令一次触摸、匀速直线插值）做不到的。
+     * 步骤间的 delayMs 用调用线程 sleep，主 looper 保持空闲，因此按住期间还能插入一次
+     * dump（captureAt），拿到「按住中」的界面树。
+     */
+    fun gesture(params: JSONObject): JSONObject {
+        val instance = ensure()
+            ?: throw IllegalStateException("UiAutomation unavailable: $lastError")
+        val steps = params.optJSONArray("steps")
+            ?: throw IllegalArgumentException("steps required")
+        if (steps.length() == 0) {
+            throw IllegalArgumentException("steps is empty")
+        }
+
+        val captureAt = params.optInt("captureAt", -1)
+        val maxNodes = params.optInt("maxNodes", 1500)
+        val maxDepth = params.optInt("maxDepth", 60)
+        val ret = JSONObject()
+        val started = SystemClock.uptimeMillis()
+        var downTime = started
+        var lastX = 0f
+        var lastY = 0f
+
+        try {
+            for (i in 0 until steps.length()) {
+                val step = steps.optJSONObject(i) ?: continue
+                val action = step.optString("action", "move").lowercase()
+                val x = step.optDouble("x", lastX.toDouble()).toFloat()
+                val y = step.optDouble("y", lastY.toDouble()).toFloat()
+                val delay = step.optLong("delayMs", 0L)
+                if (delay > 0) {
+                    Thread.sleep(delay)
+                }
+
+                val now = SystemClock.uptimeMillis()
+                val motionAction = when (action) {
+                    "down" -> {
+                        downTime = now
+                        MotionEvent.ACTION_DOWN
+                    }
+                    "up" -> MotionEvent.ACTION_UP
+                    "cancel" -> MotionEvent.ACTION_CANCEL
+                    else -> MotionEvent.ACTION_MOVE
+                }
+                inject(instance, motionAction, downTime, now, x, y)
+                lastX = x
+                lastY = y
+
+                if (i == captureAt) {
+                    ret.put("xml", dumpXml(maxNodes, maxDepth))
+                }
+            }
+        } catch (e: Throwable) {
+            // 事件流中途出错时必须补一个 CANCEL：否则系统会一直认为手指按在屏幕上，
+            // 后续所有点击都会失效
+            runCatching {
+                inject(
+                    instance,
+                    MotionEvent.ACTION_CANCEL,
+                    downTime,
+                    SystemClock.uptimeMillis(),
+                    lastX,
+                    lastY
+                )
+            }
+            throw e
+        }
+
+        ret.put("ok", true)
+        ret.put("totalMs", SystemClock.uptimeMillis() - started)
+        return ret
+    }
+
+    private fun inject(
+        instance: Any,
+        action: Int,
+        downTime: Long,
+        eventTime: Long,
+        x: Float,
+        y: Float
+    ) {
+        val event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0)
+        try {
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            val method = instance.javaClass.getMethod(
+                "injectInputEvent",
+                android.view.InputEvent::class.java,
+                Boolean::class.javaPrimitiveType
+            )
+            // sync 传 false：不等应用消费完，避免个别 ROM 上阻塞到超时
+            method.invoke(instance, event, false)
+        } finally {
+            event.recycle()
         }
     }
 

@@ -169,7 +169,7 @@ async function screencapBuffer(deviceId: string, displayId?: number) {
 const uiDump: McpTool = {
   name: 'aya_ui_dump',
   description:
-    '获取当前界面的 UI 层级树（紧凑 JSON，每个节点含 bounds 与 center 坐标）。可用 text/id/desc/clickableOnly 过滤，用 depth/maxNodes 限制体积，用 fields 只保留需要的字段，用 cursor 分页。返回的 snapshotId 与节点 i 可用于 aya_tap 的 nodeIndex 精确定位。reuse:true 时不重新 dump、直接复用当前快照（配合 cursor 翻页可反复读取，几乎零耗时）。点击/滑动/按键/输入后快照会被标记过期（对应 nodeIndex 会要求重新 dump）。',
+    '获取当前界面的 UI 层级树（紧凑 JSON，每个节点含 bounds 与 center 坐标，bounds 已与父容器求交，只保留可见区域）。可用 text/id/desc/clickableOnly/visibleOnly 过滤，用 depth/maxNodes 限制体积，用 fields 只保留需要的字段，用 cursor 分页。visibleOnly:true 会剔除屏幕外与被滚动容器裁掉的节点（返回里 invisibleTotal 是它们的总数），长列表场景强烈建议开启。返回的 snapshotId 与节点 i 可用于 aya_tap 的 nodeIndex 精确定位。reuse:true 时不重新 dump、直接复用当前快照（配合 cursor 翻页可反复读取，几乎零耗时）。点击/滑动/按键/输入后快照会被标记过期（对应 nodeIndex 会要求重新 dump）。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -180,6 +180,11 @@ const uiDump: McpTool = {
       clickableOnly: {
         type: 'boolean',
         description: '仅返回可点击节点',
+      },
+      visibleOnly: {
+        type: 'boolean',
+        description:
+          '仅返回当前真正可见的节点（坐标为与父容器求交后的可见区域）。长列表/横向滚动容器里大量屏幕外节点会撑大返回体且坐标点不到，建议开启；默认 false',
       },
       depth: {
         type: 'number',
@@ -273,7 +278,9 @@ function render(
 ) {
   const raw = args.raw === true
   const total = snapshot.flat.length
+  const visibleOnly = args.visibleOnly === true
   const fields = Array.isArray(args.fields) ? args.fields : null
+  const invisibleTotal = snapshot.flat.filter((node: any) => !node.visible).length
 
   const meta = {
     snapshotId: snapshot.id,
@@ -281,6 +288,9 @@ function render(
     source,
     indexable: true,
     total,
+    // 屏幕外/被容器裁掉的节点数：这些节点耗体积但点不到，可用 visibleOnly 过滤
+    invisibleTotal,
+    windows: snapshot.roots ? snapshot.roots.length : 1,
     stale: snapshot.stale,
     expiresAt: snapshot.createdAt + SNAPSHOT_TTL_MS,
     dumpMs: cost.dumpMs,
@@ -323,6 +333,7 @@ function render(
       id: args.id,
       desc: args.desc,
       clickableOnly: !!args.clickableOnly,
+      visibleOnly,
       exact: false,
     })
     const cursor = Math.min(
@@ -362,13 +373,16 @@ function render(
     )
   }
 
-  const tree = compactTree(snapshot.root, depth, maxNodes, fields)
+  const tree = compactTree(snapshot.root, depth, maxNodes, fields, {
+    visibleOnly,
+  })
 
   return jsonResult({
     ok: true,
     deviceId,
     ...meta,
     returned: tree.count,
+    hidden: tree.hidden,
     truncated: tree.truncated,
     diff,
     nodes: tree.nodes,

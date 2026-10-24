@@ -89,6 +89,15 @@ class Connection(private val client: LocalSocket) : Thread() {
                 result.put("state", Ui.state())
             }
 
+            "ui.gesture" -> {
+                try {
+                    result.put("gesture", Ui.gesture(JSONObject(params)))
+                } catch (e: Throwable) {
+                    Log.e(TAG, "ui.gesture failed", e)
+                    result.put("error", e.toString())
+                }
+            }
+
             else -> {
                 Log.e(TAG, "Unknown method: $method")
             }

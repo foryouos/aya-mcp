@@ -17,6 +17,8 @@ export interface ITarget {
   matchedCount: number
   clickedIndex: number
   candidates: any[]
+  // 能定位但坐标可能不可用时的提示（例如节点已滚出容器），不阻断执行
+  warning?: string
 }
 
 // 按文本/资源 id 定位时只允许复用极新的快照，
@@ -62,6 +64,71 @@ function lookupIndex(snapshot: ISnapshot, index: number) {
   return node
 }
 
+function shortOf(value: string) {
+  const slash = value.lastIndexOf('/')
+
+  return slash >= 0 ? value.slice(slash + 1) : value
+}
+
+/**
+ * 定位失败时的诊断：找出「差不多」的控件。
+ * 之前只回一句"没找到"，无法区分「id 写错」「控件存在但被滚动容器裁掉」「控件还没渲染」，
+ * 每次都要多花两三轮 dump 去猜，这里直接把候选和可见性回给调用方。
+ */
+function diagnoseMiss(
+  flat: IUiNode[],
+  query: { text?: unknown; id?: unknown; desc?: unknown }
+) {
+  const wantId = query.id ? shortOf(String(query.id)).toLowerCase() : ''
+  const wantText = query.text ? String(query.text).trim().toLowerCase() : ''
+  const wantDesc = query.desc ? String(query.desc).trim().toLowerCase() : ''
+  const scored: { score: number; node: IUiNode }[] = []
+
+  for (let i = 0; i < flat.length; i++) {
+    const node = flat[i]
+    let score = 0
+    if (wantId && node.id) {
+      const short = shortOf(node.id).toLowerCase()
+      if (short === wantId) {
+        score = 3
+      } else if (short.includes(wantId) || wantId.includes(short)) {
+        score = 2
+      }
+    }
+    if (!score && wantText && node.text) {
+      const text = node.text.trim().toLowerCase()
+      if (text === wantText) {
+        score = 3
+      } else if (text.includes(wantText) || wantText.includes(text)) {
+        score = 2
+      }
+    }
+    if (!score && wantDesc && node.desc) {
+      const desc = node.desc.trim().toLowerCase()
+      if (desc === wantDesc) {
+        score = 3
+      } else if (desc.includes(wantDesc) || wantDesc.includes(desc)) {
+        score = 2
+      }
+    }
+    if (score) {
+      // 可见的候选优先，避免把屏幕外的同名节点推荐给调用方
+      scored.push({ score: score + (node.visible ? 0.5 : 0), node })
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score || a.node.i - b.node.i)
+  const near = scored.slice(0, 5)
+  const invisibleNear = near.filter((item) => !item.node.visible).length
+
+  return {
+    nearMatches: near.map((item) => brief(item.node)),
+    invisibleNear,
+    invisibleTotal: flat.filter((node) => !node.visible).length,
+    visibleTotal: flat.filter((node) => node.visible).length,
+  }
+}
+
 export async function resolveTarget(args: any): Promise<ITarget> {
   const deviceId = await resolveDeviceId(args.deviceId)
 
@@ -84,6 +151,9 @@ export async function resolveTarget(args: any): Promise<ITarget> {
       matchedCount: 1,
       clickedIndex: 0,
       candidates: [],
+      warning: node.visible
+        ? undefined
+        : `节点 ${node.i} 当前不可见（被滚动容器裁掉或在屏幕外），center 落在容器之外，操作可能无效；先滑动到可见区域再试`,
     }
   }
 
@@ -111,23 +181,42 @@ export async function resolveTarget(args: any): Promise<ITarget> {
       ? args.resolve
       : 'auto'
   const snapshot = await ensureSnapshot(deviceId, mode)
+  const query = { text: args.text, id: args.id, desc: args.desc }
+  // 默认只认可见节点：屏幕外节点的 center 点在容器外面，点了也没有效果
+  const includeInvisible = args.includeInvisible === true
   const matched = findMatches(snapshot.flat, {
     text: args.text,
     id: args.id,
     desc: args.desc,
     exact: args.exact !== false,
+    visibleOnly: !includeInvisible,
   })
 
   if (!matched.length) {
-    throw new McpError(
-      'NO_MATCH',
-      '没有找到匹配的控件，可尝试 exact:false 做模糊匹配，或先用 aya_ui_dump 查看节点',
-      {
-        snapshotId: snapshot.id,
-        deviceId: snapshot.deviceId,
-        query: { text: args.text, id: args.id, desc: args.desc },
-      }
-    )
+    const diagnosis = diagnoseMiss(snapshot.flat, query)
+    const ageMs = Date.now() - snapshot.createdAt
+    let hint = ''
+    if (diagnosis.invisibleNear) {
+      hint = `匹配到的控件当前不可见（被滚动容器裁掉或在屏幕外），先滑动到可见区域，或传 includeInvisible:true 强制按越界坐标点击`
+    } else if (diagnosis.nearMatches.length) {
+      hint = `没有精确匹配，nearMatches 是相近的控件：可改用完整的 text/id，或传 exact:false 做子串匹配`
+    } else {
+      hint = `界面里没有任何相近控件，可能还没渲染完成：先 aya_wait_for 等一下，或 aya_ui_dump 看当前界面`
+    }
+    if (ageMs > 2000) {
+      hint += `；另外快照已产生 ${ageMs}ms，界面可能已经变化`
+    }
+
+    throw new McpError('NO_MATCH', hint, {
+      snapshotId: snapshot.id,
+      deviceId: snapshot.deviceId,
+      snapshotAgeMs: ageMs,
+      query,
+      total: snapshot.flat.length,
+      visibleTotal: diagnosis.visibleTotal,
+      invisibleTotal: diagnosis.invisibleTotal,
+      nearMatches: diagnosis.nearMatches,
+    })
   }
 
   const index = typeof args.index === 'number' && args.index >= 0 ? args.index : 0

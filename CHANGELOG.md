@@ -3,6 +3,14 @@
 * feat: unify mcp tool results with timing/cost/retryable/snapshot/suggestedNextCall
 * feat: aya_cast_window accepts deviceId and pins the mirror window to that device
 * perf: lower default node budget of aya_ui_dump (300 to 100) and aya_wait_for (40 to 20)
+* fix: match short resource ids so aya_tap accepts "btnLock" for "com.foo:id/btnLock"
+* fix: clip node bounds to the parent container, scrolling list children no longer report inverted coordinates
+* fix: merge nodes from every window so status bar and ime controls are reachable
+* feat: aya_ui_dump visibleOnly filters off screen nodes, reports invisibleTotal and hidden
+* feat: aya_long_press for long press by coordinates or resource id
+* feat: aya_gesture injects a full down/move/up event stream through UiAutomation, supports holding before dragging and dumping the tree while held
+* feat: locate failures report nearMatches, visibility and snapshot age instead of a bare NO_MATCH
+* perf: aya_wait_for ignores invisible nodes by default, waiting for a loading overlay to disappear is more reliable
 
 ## v2.2.1 (23 Oct 2026)
 

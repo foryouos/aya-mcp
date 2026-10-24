@@ -106,7 +106,7 @@ export async function handleMessage(msg: any): Promise<any | null> {
         },
         serverInfo: SERVER_INFO,
         instructions:
-          'AYA 提供 Android 设备控制。先用 aya_list_devices 确认设备，用 aya_ui_dump 获取带坐标的界面节点树，再调用 aya_tap / aya_swipe 操作。所有工具返回统一附带 timing（totalMs/dumpMs/captureMs 分解）、cost（low/medium/high，越高越费时）、retryable（失败是否值得原样重试）、snapshot（id/expiresAt/stale）与 suggestedNextCall（失败时的下一步建议调用）；dumpMs 占比高时优先复用 snapshotId 或改用 aya_webview_* 通道。',
+          'AYA 提供 Android 设备控制。先用 aya_list_devices 确认设备，用 aya_ui_dump 获取带坐标的界面节点树，再调用 aya_tap / aya_swipe 操作；长按用 aya_long_press，需要按住一段时间再拖动、多段路径拖动、或按住过程中观察界面时用 aya_gesture（steps 事件流 + captureAt）。dump 长列表时传 visibleOnly:true 过滤屏幕外节点，屏幕外节点会带 visible:false 且坐标不可点。aya_ui_dump 之外的定位失败会返回 nearMatches 与快照年龄，先看这些再决定重试还是重新 dump。所有工具返回统一附带 timing（totalMs/dumpMs/captureMs 分解）、cost（low/medium/high，越高越费时）、retryable（失败是否值得原样重试）、snapshot（id/expiresAt/stale）与 suggestedNextCall（失败时的下一步建议调用）；dumpMs 占比高时优先复用 snapshotId 或改用 aya_webview_* 通道。',
       })
     case 'notifications/initialized':
     case 'notifications/cancelled':

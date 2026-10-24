@@ -36,6 +36,11 @@ const waitFor: McpTool = {
         type: 'boolean',
         description: 'true 时等待控件消失，默认 false（等它出现）',
       },
+      includeInvisible: {
+        type: 'boolean',
+        description:
+          '是否把屏幕外/被滚动容器裁掉的节点也算作"存在"，默认 false。等待加载遮罩消失、弹窗关闭时应保持 false',
+      },
       timeout: {
         type: 'number',
         description: '最长等待毫秒数，默认 5000，上限 15000',
@@ -123,6 +128,7 @@ const waitFor: McpTool = {
           id,
           desc,
           exact: false,
+          visibleOnly: args.includeInvisible !== true,
         })
 
         const hit = gone ? hits.length === 0 : hits.length > 0

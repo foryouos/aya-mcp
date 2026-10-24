@@ -350,3 +350,19 @@ export async function afterInput(deviceId, settle = 300) {
 | `aya_cast_window` deviceId | ✅ | `showWin(deviceId)` + 渲染端 `pinnedDeviceId` 固定设备 | 传 deviceId 打开窗口后切换主窗口设备，投屏目标不变 |
 
 > 说明：`aya_webview_run`（脚本批量执行）与 `aya_webview_watch`（事件流）暂未实现，前者可用 `aya_batch` + `aya_webview_eval` 组合替代，后者建议等 P2-1 无障碍事件方案一起做。
+
+## 11. 第二轮真机测试（2026-10-24）暴露问题的修复
+
+| 问题 | 现象 | 修复 | 落点 |
+| --- | --- | --- | --- |
+| 短 id 匹配不到 | `aya_tap {id:"btnLock"}` 恒 `NO_MATCH`，因为设备返回的是 `com.foo:id/btnLock` | 精确匹配同时认 `/` 之后的短名 | `lib/ui.ts#matchId` |
+| 滚动子项坐标越界 | `tvChip bounds=[1924,458][1900,490]`（左 > 右），点击落空 | 解析时与父容器求交，新增 `visible` / `rawBounds` | `lib/snapshot.ts#intersect` |
+| 只解析第一个窗口 | 状态栏、导航栏、输入法窗口的节点全部丢失 | 收集全部窗口根 `roots[]`，`flat` 合并所有节点 | `lib/snapshot.ts#parseSnapshot` |
+| dump 夹带屏幕外节点 | 265 个节点里 75+ 是滚出屏幕的列表项 | 新增 `visibleOnly`，返回 `invisibleTotal` / `hidden` | `tools/screen.ts`、`lib/ui.ts#compactTree` |
+| 长按能力缺失 | 只能用 `adb shell input swipe x y x y ms` 绕过 | 新增 `aya_long_press`，支持坐标或 id/text 定位 | `tools/gesture.ts` |
+| 按住后拖动/多段路径无解 | `input swipe` 一次命令一次触摸，且只能走直线 | 新增 `aya_gesture`：服务端 `UiAutomation.injectInputEvent` 注入 down/move/up 事件流，按住期间可用 `captureAt` 抓树；异常时补 `ACTION_CANCEL` 防止触摸卡住 | `Ui.kt#gesture`、`adb/server.ts#injectGesture` |
+| 定位失败无诊断 | 只回 `NO_MATCH`，瞬态消失与 id 写错无法区分 | 返回 `nearMatches` / `invisibleTotal` / `snapshotAgeMs`，`suggestedNextCall` 直接给出相近控件 | `lib/target.ts#diagnoseMiss`、`lib/envelope.ts` |
+| wait 把不可见当存在 | 等加载遮罩消失时误判 | 默认忽略不可见节点，`includeInvisible:true` 可放宽 | `tools/wait.ts` |
+| nodeIndex 点到不可见节点 | 静默点空，无任何提示 | 返回 `warning` 提示先滚动到可见区域 | `lib/target.ts` |
+
+验收：`parseSnapshot` 逻辑校验 9 项全过（多窗口合并、越界裁剪、部分可见裁剪、短 id 匹配、`visibleOnly` 过滤、`compactTree` 丢弃不可见）；`tsc --noEmit` 与 `eslint` 在 MCP 目录无新增问题；`gradlew :server:assembleRelease` 构建通过，`resources/aya.dex` 已同步。

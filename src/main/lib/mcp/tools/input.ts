@@ -47,6 +47,11 @@ const targetProps = {
     description:
       '按 nodeIndex 点击时是否允许使用已过期的快照坐标，默认 false（过期会要求重新 dump）',
   },
+  includeInvisible: {
+    type: 'boolean',
+    description:
+      '按 text/id/desc 定位时是否允许匹配屏幕外（被滚动容器裁掉）的节点，默认 false。屏幕外节点的 center 在容器之外，点击通常无效',
+  },
 }
 
 async function tapHandler(args: any) {
@@ -65,6 +70,9 @@ async function tapHandler(args: any) {
     node: target.node ? brief(target.node) : null,
     candidates: target.candidates,
     settledMs,
+  }
+  if (target.warning) {
+    payload.warning = target.warning
   }
 
   if (withUi) {

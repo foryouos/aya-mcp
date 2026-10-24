@@ -124,12 +124,24 @@ function readSnapshot(data: Record<string, any>): ISnapshotRef | null {
 
 function suggest(code: string, data: Record<string, any>): ISuggestedCall | null {
   switch (code) {
-    case 'NO_MATCH':
+    case 'NO_MATCH': {
+      const near = Array.isArray(data.nearMatches) ? data.nearMatches : []
+      const names = near
+        .slice(0, 3)
+        .map((item: any) => item.id || item.text || item.desc)
+        .filter(Boolean)
+      const invisible = Number(data.invisibleTotal) || 0
+
       return {
         tool: 'aya_ui_dump',
-        args: { clickableOnly: true },
-        reason: '当前界面没匹配到控件：先看可点击节点，再用 text/id/desc 定位',
+        args: { clickableOnly: true, visibleOnly: true },
+        reason: names.length
+          ? `没匹配到控件，相近的有 ${names.join(' / ')}，可直接用其 id 或 text 重试`
+          : invisible > 0
+            ? `没匹配到控件，界面里有 ${invisible} 个节点在屏幕外，先滑到可见区域再定位`
+            : '当前界面没匹配到控件：先看可点击节点，再用 text/id/desc 定位',
       }
+    }
     case 'AMBIGUOUS_MATCH':
       return {
         tool: 'aya_ui_dump',

@@ -16,8 +16,13 @@ export interface IUiNode {
   checked: boolean
   selected: boolean
   enabled: boolean
+  // bounds 是裁剪到父容器/窗口后的可见区域；完全不可见时为原始值，配合 visible:false 判断
   bounds: number[]
   center: number[]
+  // 与父容器求交后是否还有可见像素。false 表示被滚动容器裁掉或容器本身尺寸为 0
+  visible: boolean
+  // 原始 bounds，仅在裁剪后与 bounds 不一致时保留，便于诊断越界节点
+  rawBounds?: number[]
   depth: number
   children: IUiNode[]
 }
@@ -27,6 +32,9 @@ export interface ISnapshot {
   deviceId: string
   xml: string
   root: IUiNode | null
+  // 状态栏、导航栏、输入法各自是独立窗口，服务端会返回多个根；
+  // root 只用于树渲染，flat 包含全部窗口的节点，否则其它窗口的控件永远定位不到
+  roots: IUiNode[]
   flat: IUiNode[]
   compressed: boolean
   createdAt: number
@@ -73,8 +81,47 @@ function toBool(val: string) {
   return val === 'true'
 }
 
-function parseNode(el: Element, counter: { value: number }, depth: number) {
-  const bounds = parseBounds(el)
+function hasArea(rect: number[]) {
+  return rect[2] > rect[0] && rect[3] > rect[1]
+}
+
+/**
+ * 求两个矩形的交集。uiautomator 对横向/纵向滚动容器的子节点会给出越界 bounds
+ * （典型是 left > right，如 [1924,458][1900,490]），直接拿 center 点击会点到容器外，
+ * 所以这里与父容器（窗口）求交，只保留真正可见的部分。
+ */
+function intersect(rect: number[], container: number[]) {
+  const left = Math.max(rect[0], container[0])
+  const top = Math.max(rect[1], container[1])
+  const right = Math.min(rect[2], container[2])
+  const bottom = Math.min(rect[3], container[3])
+  if (right <= left || bottom <= top) {
+    return null
+  }
+
+  return [left, top, right, bottom]
+}
+
+function centerOf(rect: number[]): number[] {
+  return [
+    Math.round((rect[0] + rect[2]) / 2),
+    Math.round((rect[1] + rect[3]) / 2),
+  ]
+}
+
+function parseNode(
+  el: Element,
+  counter: { value: number },
+  depth: number,
+  container: number[] | null
+) {
+  const raw = parseBounds(el)
+  const rawValid = hasArea(raw)
+  // 父容器尺寸为 0（未布局、被压缩合并）时不参与裁剪，否则会把整棵子树误判成不可见
+  const clipped =
+    rawValid && container && hasArea(container) ? intersect(raw, container) : null
+  const visible = rawValid && (!container || !hasArea(container) || !!clipped)
+  const bounds = visible ? (clipped || raw) : raw
   const node: IUiNode = {
     i: counter.value++,
     text: attr(el, 'text'),
@@ -90,13 +137,23 @@ function parseNode(el: Element, counter: { value: number }, depth: number) {
     selected: toBool(attr(el, 'selected')),
     enabled: attr(el, 'enabled') !== 'false',
     bounds,
-    center: [
-      Math.round((bounds[0] + bounds[2]) / 2),
-      Math.round((bounds[1] + bounds[3]) / 2),
-    ],
+    center: centerOf(bounds),
+    visible,
     depth,
     children: [],
   }
+  if (
+    visible &&
+    (bounds[0] !== raw[0] ||
+      bounds[1] !== raw[1] ||
+      bounds[2] !== raw[2] ||
+      bounds[3] !== raw[3])
+  ) {
+    node.rawBounds = raw
+  }
+
+  // 子节点的裁剪容器：父容器可见时用父的可见区域，父容器无尺寸时继续沿用祖父
+  const childContainer = rawValid && visible ? bounds : container
 
   for (
     let child = el.firstChild;
@@ -106,7 +163,9 @@ function parseNode(el: Element, counter: { value: number }, depth: number) {
     if (child.nodeType === 1) {
       const childEl = child as Element
       if (childEl.tagName === 'node') {
-        node.children.push(parseNode(childEl, counter, depth + 1))
+        node.children.push(
+          parseNode(childEl, counter, depth + 1, childContainer)
+        )
       }
     }
   }
@@ -156,7 +215,7 @@ export function parseSnapshot(
   }
 
   const hierarchies = doc.getElementsByTagName('hierarchy')
-  let root: IUiNode | null = null
+  const roots: IUiNode[] = []
 
   if (hierarchies.length) {
     const counter = { value: 0 }
@@ -166,10 +225,7 @@ export function parseSnapshot(
       child = child.nextSibling
     ) {
       if (child.nodeType === 1 && (child as Element).tagName === 'node') {
-        const parsed = parseNode(child as Element, counter, 0)
-        if (!root) {
-          root = parsed
-        }
+        roots.push(parseNode(child as Element, counter, 0, null))
       }
     }
   }
@@ -178,8 +234,9 @@ export function parseSnapshot(
     id: randomBytes(8).toString('hex'),
     deviceId,
     xml,
-    root,
-    flat: root ? flatten([root]) : [],
+    root: roots[0] || null,
+    roots,
+    flat: flatten(roots),
     compressed,
     createdAt: Date.now(),
     fingerprint: snapshotFingerprint(xml),
