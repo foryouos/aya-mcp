@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>AYA MCP 工具清单 · 72 个 aya_* 接口完整参考</title>
+    <meta
+      name="description"
+      content="AYA MCP 全部 72 个 aya_* 工具完整清单：28 个只读工具默认开放，44 个写工具需授权。覆盖设备与屏幕、交互手势、应用管理、文件、日志与 adb shell、串口调试、性能统计、端口映射、WebView 调试、屏幕适配、录屏投屏。"
+    />
+    <meta
+      name="keywords"
+      content="AYA,MCP,aya 工具清单,Android 自动化,UI 自动化,adb,webview 调试,串口日志,录屏,投屏"
+    />
+    <meta name="theme-color" content="#0f1712" />
+    <link rel="canonical" href="https://aya-mcp.foryouos.cn/tools.html" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234fb155'/%3E%3Cpath d='M20 44 32 18l12 26' stroke='%23fff' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M25 36h14' stroke='%23fff' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+
+    <style>
+      :root {
+        --primary: #4fb155;
+        --primary-dark: #3d9146;
+        --primary-soft: rgba(79, 177, 85, 0.12);
+        --bg: #ffffff;
+        --bg-soft: #f7f8fa;
+        --ink: #1a1d21;
+        --ink-2: #4a5058;
+        --ink-3: #7b828c;
+        --border: #e4e7ec;
+        --dark: #0f1712;
+        --radius: 14px;
+        --max: 1140px;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 140px;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+          "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.75;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a {
+        color: var(--primary-dark);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 13px;
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        padding: 1px 6px;
+        border-radius: 5px;
+        white-space: nowrap;
+      }
+
+      .wrap {
+        width: 100%;
+        max-width: var(--max);
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      /* ---------- Nav ---------- */
+      header.nav {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: saturate(180%) blur(12px);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .nav-inner {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        height: 64px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--ink);
+        letter-spacing: 0.2px;
+        white-space: nowrap;
+      }
+
+      .brand:hover {
+        text-decoration: none;
+      }
+
+      .brand svg {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+      }
+
+      .brand small {
+        font-weight: 500;
+        font-size: 12px;
+        color: var(--ink-3);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1px 8px;
+      }
+
+      nav.links {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        font-size: 14.5px;
+      }
+
+      nav.links a {
+        color: var(--ink-2);
+        white-space: nowrap;
+      }
+
+      nav.links a:hover {
+        color: var(--primary-dark);
+        text-decoration: none;
+      }
+
+      .nav-cta {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 14px;
+        color: var(--ink);
+        font-size: 14px;
+        line-height: 1;
+      }
+
+      .nav-cta-primary {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+
+      .nav-cta-primary:hover {
+        background: var(--primary-dark);
+        color: #fff;
+      }
+
+      @media (max-width: 900px) {
+        nav.links a:not(.nav-cta) {
+          display: none;
+        }
+      }
+
+      /* ---------- Hero ---------- */
+      .hero {
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(1200px 460px at 12% -10%, #1d3a26 0%, transparent 60%),
+          radial-gradient(900px 400px at 88% 0%, #14432a 0%, transparent 55%), var(--dark);
+        color: #fff;
+        padding: 64px 0 56px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(79, 177, 85, 0.16);
+        border: 1px solid rgba(79, 177, 85, 0.42);
+        color: #9be3a2;
+        border-radius: 999px;
+        padding: 5px 14px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #63d66d;
+        box-shadow: 0 0 0 4px rgba(99, 214, 109, 0.18);
+      }
+
+      h1 {
+        font-size: clamp(28px, 4.4vw, 44px);
+        line-height: 1.2;
+        margin: 18px 0 14px;
+        letter-spacing: -0.5px;
+      }
+
+      .sub {
+        max-width: 720px;
+        font-size: clamp(15px, 1.5vw, 17.5px);
+        color: #c2ccc6;
+        margin: 0;
+      }
+
+      .sub code {
+        background: rgba(79, 177, 85, 0.16);
+        color: #9be3a2;
+      }
+
+      .hero-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 38px;
+        margin-top: 34px;
+        padding-top: 26px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .stat b {
+        display: block;
+        font-size: 26px;
+        line-height: 1.2;
+        color: #fff;
+      }
+
+      .stat span {
+        font-size: 13px;
+        color: #93a29a;
+      }
+
+      /* ---------- Filter ---------- */
+      .filterbar {
+        position: sticky;
+        top: 64px;
+        z-index: 20;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 0;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .search {
+        flex: 1 1 280px;
+        min-width: 200px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font: inherit;
+        font-size: 14.5px;
+        color: var(--ink);
+        background: #fff;
+      }
+
+      .search:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-soft);
+      }
+
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .seg button {
+        border: 0;
+        background: transparent;
+        font: inherit;
+        font-size: 13.5px;
+        padding: 9px 14px;
+        color: var(--ink-2);
+        cursor: pointer;
+      }
+
+      .seg button.active {
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        font-weight: 600;
+      }
+
+      .hit {
+        font-size: 13.5px;
+        color: var(--ink-3);
+        margin-left: auto;
+        white-space: nowrap;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 18px 0 6px;
+      }
+
+      .chip {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 13.5px;
+        color: var(--ink-2);
+        background: #fff;
+        white-space: nowrap;
+      }
+
+      .chip:hover {
+        border-color: var(--primary);
+        color: var(--primary-dark);
+        text-decoration: none;
+      }
+
+      .chip b {
+        font-weight: 500;
+        color: var(--ink-3);
+      }
+
+      /* ---------- Toolbox ---------- */
+      section.list {
+        padding: 0 0 72px;
+      }
+
+      .toolbox {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: #fff;
+        overflow: hidden;
+        margin-top: 18px;
+      }
+
+      .toolbox[hidden] {
+        display: none;
+      }
+
+      .tool-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px 20px;
+        background: var(--bg-soft);
+        border-bottom: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 15px;
+      }
+
+      .gdot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary);
+        box-shadow: 0 0 0 4px var(--primary-soft);
+      }
+
+      .tool-head .count {
+        margin-left: auto;
+        font-weight: 500;
+        font-size: 13px;
+        color: var(--ink-3);
+        white-space: nowrap;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14.5px;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 11px 20px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+
+      th {
+        font-size: 13px;
+        color: var(--ink-3);
+        font-weight: 600;
+        background: #fcfcfd;
+        white-space: nowrap;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      tbody tr[hidden] {
+        display: none;
+      }
+
+      tbody tr:hover td {
+        background: #fbfdfb;
+      }
+
+      td:first-child {
+        white-space: nowrap;
+      }
+
+      td:last-child {
+        color: var(--ink-2);
+      }
+
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--ink-3);
+        white-space: nowrap;
+      }
+
+      .tag.w {
+        border-color: #f0c98a;
+        background: #fdf5e7;
+        color: #96601a;
+      }
+
+      .tag.r {
+        border-color: #bfe0c2;
+        background: #f0f9f1;
+        color: #2f7a37;
+      }
+
+      .empty {
+        display: none;
+        padding: 48px 20px;
+        text-align: center;
+        color: var(--ink-3);
+        font-size: 15px;
+      }
+
+      .empty.show {
+        display: block;
+      }
+
+      .note {
+        margin-top: 22px;
+        padding: 14px 18px;
+        border-left: 3px solid var(--primary);
+        background: var(--primary-soft);
+        border-radius: 0 10px 10px 0;
+        font-size: 14.5px;
+        color: var(--ink-2);
+      }
+
+      footer {
+        background: var(--dark);
+        color: #9aa8a1;
+        padding: 34px 0;
+        font-size: 13.5px;
+      }
+
+      footer .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-between;
+      }
+
+      footer a {
+        color: #9aa8a1;
+      }
+
+      footer a:hover {
+        color: #7fe08a;
+        text-decoration: none;
+      }
+
+      @media (max-width: 720px) {
+        .toolbox {
+          overflow-x: auto;
+        }
+
+        table {
+          min-width: 620px;
+        }
+
+        .hit {
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="index.html">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <rect width="64" height="64" rx="14" fill="#4fb155" />
+            <path
+              d="M20 44 32 18l12 26"
+              stroke="#fff"
+              stroke-width="6"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M25 36h14" stroke="#fff" stroke-width="5" stroke-linecap="round" />
+          </svg>
+          AYA&nbsp;MCP <small>工具清单</small>
+        </a>
+        <nav class="links" aria-label="主导航">
+          <a href="index.html">首页</a>
+          <a href="#group-device">设备</a>
+          <a href="#group-input">交互</a>
+          <a href="#group-app">应用</a>
+          <a href="#group-webview">WebView</a>
+          <a href="#group-serial">串口</a>
+          <a class="nav-cta" href="https://github.com/foryouos/aya-mcp" target="_blank" rel="noopener">GitHub</a>
+          <a class="nav-cta nav-cta-primary" href="index.html#quickstart">接入到 AI</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap">
+          <span class="badge"><span class="dot"></span>72 个 <code>aya_*</code> 工具 · 11 个分类</span>
+          <h1>完整工具清单</h1>
+          <p class="sub">
+            工具名统一以 <code>aya_</code> 开头。<strong>28 个只读工具</strong>默认开放；<strong>44 个写工具</strong>需在
+            设置 → MCP 中勾选「允许写操作」后才会出现在客户端。下面可按名称搜索，或只看只读 / 写工具。
+          </p>
+          <div class="hero-stats">
+            <div class="stat"><b>72</b><span>工具总数</span></div>
+            <div class="stat"><b>28</b><span>只读 · 默认开放</span></div>
+            <div class="stat"><b>44</b><span>写 · 需显式授权</span></div>
+            <div class="stat"><b>11</b><span>功能分类</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="list">
+        <div class="wrap">
+          <div class="filterbar">
+            <input
+              id="q"
+              class="search"
+              type="search"
+              autocomplete="off"
+              placeholder="搜索工具名或说明，如 tap / webview / 串口 / 录屏"
+              aria-label="搜索工具"
+            />
+            <div class="seg" role="group" aria-label="权限筛选">
+              <button type="button" data-perm="all" class="active">全部</button>
+              <button type="button" data-perm="r">只读</button>
+              <button type="button" data-perm="w">写</button>
+            </div>
+            <span class="hit" id="hit">显示 72 / 72 个工具</span>
+          </div>
+
+          <div class="chips">
+            <a class="chip" href="#group-device">设备与屏幕 <b>5</b></a>
+            <a class="chip" href="#group-input">交互 <b>9</b></a>
+            <a class="chip" href="#group-app">应用管理 <b>8</b></a>
+            <a class="chip" href="#group-file">文件 <b>7</b></a>
+            <a class="chip" href="#group-log">日志与命令 <b>4</b></a>
+            <a class="chip" href="#group-serial">串口 <b>11</b></a>
+            <a class="chip" href="#group-perf">性能与统计 <b>3</b></a>
+            <a class="chip" href="#group-port">端口映射 <b>3</b></a>
+            <a class="chip" href="#group-webview">WebView <b>9</b></a>
+            <a class="chip" href="#group-adapt">屏幕适配 <b>8</b></a>
+            <a class="chip" href="#group-cast">录屏与投屏 <b>5</b></a>
+          </div>
+
+          <!-- 设备与屏幕 -->
+          <div class="toolbox" id="group-device">
+            <div class="tool-head"><span class="gdot"></span>设备与屏幕<span class="count">5 个 · 全部只读</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="r"><td><code>aya_list_devices</code></td><td><span class="tag r">只读</span></td><td>列出已连接的设备与状态，标注 AYA 当前选中设备；调用其他工具前先确认 deviceId。</td></tr>
+                <tr data-perm="r"><td><code>aya_device_info</code></td><td><span class="tag r">只读</span></td><td>型号、品牌、Android 版本、分辨率与密度、内存存储、CPU 核心数、续航摘要。</td></tr>
+                <tr data-perm="r"><td><code>aya_screencap</code></td><td><span class="tag r">只读</span></td><td>截图并直接返回图片，默认缩放到 900px 宽、JPEG 质量 72，体积比原始 PNG 小 5–10 倍。</td></tr>
+                <tr data-perm="r"><td><code>aya_ui_dump</code></td><td><span class="tag r">只读</span></td><td>UI 层级树，节点含 bounds / center；支持过滤、字段裁剪、分页与快照复用，返回 snapshotId 与节点索引。</td></tr>
+                <tr data-perm="r"><td><code>aya_current_app</code></td><td><span class="tag r">只读</span></td><td>当前前台应用的包名与进程 pid。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 交互 -->
+          <div class="toolbox" id="group-input">
+            <div class="tool-head"><span class="gdot"></span>交互<span class="count">9 个 · 1 只读 / 8 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="w"><td><code>aya_tap</code></td><td><span class="tag w">写</span></td><td>点击屏幕：坐标、nodeIndex+snapshotId，或 text·id·desc 定位；默认点完立刻回传新界面。</td></tr>
+                <tr data-perm="w"><td><code>aya_tap_text</code></td><td><span class="tag w">写</span></td><td>按控件文本点击，等价 aya_tap + text；exact:false 子串匹配，index 选第 N 个同名控件。</td></tr>
+                <tr data-perm="w"><td><code>aya_swipe</code></td><td><span class="tag w">写</span></td><td>从 (x1,y1) 滑到 (x2,y2)，duration 默认 300ms，可开 withUi 观察结果。</td></tr>
+                <tr data-perm="w"><td><code>aya_long_press</code></td><td><span class="tag w">写</span></td><td>长按坐标或控件，触发控制条、自定义长按菜单与拖拽起点。</td></tr>
+                <tr data-perm="w"><td><code>aya_gesture</code></td><td><span class="tag w">写</span></td><td>注入一段可含多组 down/move/up 的事件流：长按拖拽、多段折线拖动、轻点唤醒后立即操作。</td></tr>
+                <tr data-perm="w"><td><code>aya_key</code></td><td><span class="tag w">写</span></td><td>发送按键：back / home / enter / recent / volume_up / power / dpad_* 等，也可传 keycode 数字。</td></tr>
+                <tr data-perm="w"><td><code>aya_text</code></td><td><span class="tag w">写</span></td><td>向焦点输入框输入 ASCII 文本，自动清空并临时切换到无联想输入法；中文请走 aya_shell。</td></tr>
+                <tr data-perm="w"><td><code>aya_batch</code></td><td><span class="tag w">写</span></td><td>一次调用串行执行最多 20 个动作，最后统一回传界面，专治 1–3 秒消失的瞬时控件。</td></tr>
+                <tr data-perm="r"><td><code>aya_wait_for</code></td><td><span class="tag r">只读</span></td><td>轮询等待控件出现或消失，命中即返回，超时也回传当前界面。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 应用管理 -->
+          <div class="toolbox" id="group-app">
+            <div class="tool-head"><span class="gdot"></span>应用管理<span class="count">8 个 · 2 只读 / 6 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="r"><td><code>aya_list_packages</code></td><td><span class="tag r">只读</span></td><td>包名列表（apk 路径、是否系统应用），支持关键字过滤与仅看第三方应用。</td></tr>
+                <tr data-perm="r"><td><code>aya_app_info</code></td><td><span class="tag r">只读</span></td><td>版本号、sdk、安装/更新时间、启用状态、运行状态与 pid。</td></tr>
+                <tr data-perm="w"><td><code>aya_start_app</code></td><td><span class="tag w">写</span></td><td>启动 Launcher Activity，默认等前台切换，也可等指定控件出现；未安装返回 NOT_FOUND。</td></tr>
+                <tr data-perm="w"><td><code>aya_stop_app</code></td><td><span class="tag w">写</span></td><td>am force-stop 强制停止应用，进程立即被杀死。</td></tr>
+                <tr data-perm="w"><td><code>aya_clear_app_data</code></td><td><span class="tag w">写</span></td><td>pm clear 清空应用数据与缓存，等价系统「清除数据」，不可撤销。</td></tr>
+                <tr data-perm="w"><td><code>aya_set_app_enabled</code></td><td><span class="tag w">写</span></td><td>pm enable / pm disable-user 启用或禁用应用，禁用后桌面入口消失。</td></tr>
+                <tr data-perm="w"><td><code>aya_install_app</code></td><td><span class="tag w">写</span></td><td>安装 apk（本机路径会自动 push），默认 -r 覆盖并保留数据，支持 downgrade / grant。</td></tr>
+                <tr data-perm="w"><td><code>aya_uninstall_app</code></td><td><span class="tag w">写</span></td><td>卸载应用；keepData:true 时只删 apk 保留数据，卸载后回查确认结果。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 文件 -->
+          <div class="toolbox" id="group-file">
+            <div class="tool-head"><span class="gdot"></span>文件<span class="count">7 个 · 2 只读 / 5 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="r"><td><code>aya_list_dir</code></td><td><span class="tag r">只读</span></td><td>列出设备目录内容：名称、类型、大小、修改时间。</td></tr>
+                <tr data-perm="r"><td><code>aya_stat_path</code></td><td><span class="tag r">只读</span></td><td>查询路径属性：是否存在、文件或目录、大小、权限、修改时间。</td></tr>
+                <tr data-perm="w"><td><code>aya_pull_file</code></td><td><span class="tag w">写</span></td><td>设备 → 本机；省略 localPath 时保存到临时目录 aya-mcp/ 并返回绝对路径。</td></tr>
+                <tr data-perm="w"><td><code>aya_push_file</code></td><td><span class="tag w">写</span></td><td>本机 → 设备；目录目标需以 / 结尾。</td></tr>
+                <tr data-perm="w"><td><code>aya_delete_path</code></td><td><span class="tag w">写</span></td><td>删除文件或目录（不可恢复），删目录必须显式传 recursive: true。</td></tr>
+                <tr data-perm="w"><td><code>aya_make_dir</code></td><td><span class="tag w">写</span></td><td>mkdir -p 创建目录，父目录不存在会自动创建。</td></tr>
+                <tr data-perm="w"><td><code>aya_rename_path</code></td><td><span class="tag w">写</span></td><td>重命名或移动文件/目录，目标已存在时按 mv 行为可能覆盖。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 日志与命令 -->
+          <div class="toolbox" id="group-log">
+            <div class="tool-head"><span class="gdot"></span>日志与命令<span class="count">4 个 · 2 只读 / 2 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="r"><td><code>aya_logcat</code></td><td><span class="tag r">只读</span></td><td>logcat 快照，级别/标签/关键字/pid/since 过滤在设备端完成，附带崩溃摘要。</td></tr>
+                <tr data-perm="r"><td><code>aya_logcat_wait</code></td><td><span class="tag r">只读</span></td><td>短轮询等待某条日志命中即返回，比「清空 → 操作 → 再查」少一次往返。</td></tr>
+                <tr data-perm="w"><td><code>aya_clear_logcat</code></td><td><span class="tag w">写</span></td><td>logcat -c 清空日志缓冲区，先清空再复现问题。</td></tr>
+                <tr data-perm="w"><td><code>aya_shell</code></td><td><span class="tag w">写</span></td><td>执行一条 adb shell 命令，30s 超时，输出截断 20000 字符。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 串口 -->
+          <div class="toolbox" id="group-serial">
+            <div class="tool-head"><span class="gdot"></span>串口<span class="count">11 个 · 5 只读 / 6 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="r"><td><code>aya_serial_list_ports</code></td><td><span class="tag r">只读</span></td><td>列出主机串口（COM3 / /dev/ttyUSB0），与 adb 端口转发的 aya_list_ports 无关。</td></tr>
+                <tr data-perm="r"><td><code>aya_serial_status</code></td><td><span class="tag r">只读</span></td><td>连接参数、已收行数与字节数、是否暂停、会话日志文件路径。</td></tr>
+                <tr data-perm="r"><td><code>aya_serial_logs</code></td><td><span class="tag r">只读</span></td><td>按来源、关键字或正则、fromSeq 增量读取串口日志，返回带时间与来源的行。</td></tr>
+                <tr data-perm="r"><td><code>aya_serial_wait</code></td><td><span class="tag r">只读</span></td><td>等待新日志命中关键字（如 boot_completed），只匹配调用之后到达的行。</td></tr>
+                <tr data-perm="r"><td><code>aya_serial_stages</code></td><td><span class="tag r">只读</span></td><td>按 bootloader / kernel / android / other 返回阶段切分与耗时，快速定位卡在哪个阶段。</td></tr>
+                <tr data-perm="w"><td><code>aya_serial_open</code></td><td><span class="tag w">写</span></td><td>打开串口接收启动/内核/Android 日志，8N1，默认 115200。</td></tr>
+                <tr data-perm="w"><td><code>aya_serial_close</code></td><td><span class="tag w">写</span></td><td>关闭串口，已收日志仍保留在缓冲区与日志文件中。</td></tr>
+                <tr data-perm="w"><td><code>aya_serial_write</code></td><td><span class="tag w">写</span></td><td>向串口写入数据（如向 bootloader 发 reboot），默认追加 \r\n。</td></tr>
+                <tr data-perm="w"><td><code>aya_serial_clear</code></td><td><span class="tag w">写</span></td><td>清空缓冲区并新建会话日志文件，串口保持连接。</td></tr>
+                <tr data-perm="w"><td><code>aya_serial_pause</code></td><td><span class="tag w">写</span></td><td>暂停日志推送，设备端仍在接收并落盘，无需关闭串口。</td></tr>
+                <tr data-perm="w"><td><code>aya_serial_resume</code></td><td><span class="tag w">写</span></td><td>恢复日志推送，暂停期间产生的日志仍可从缓冲区读到。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 性能与统计 -->
+          <div class="toolbox" id="group-perf">
+            <div class="tool-head"><span class="gdot"></span>性能与统计<span class="count">3 个 · 全部只读</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="r"><td><code>aya_performance</code></td><td><span class="tag r">只读</span></td><td>CPU 各核负载与温度、内存占用、电量、开机时长、前台应用帧率。</td></tr>
+                <tr data-perm="r"><td><code>aya_list_processes</code></td><td><span class="tag r">只读</span></td><td>运行中的进程名与 pid，可按名称子串过滤。</td></tr>
+                <tr data-perm="r"><td><code>aya_stats</code></td><td><span class="tag r">只读</span></td><td>本次会话调用指标：次数、p50 / p95 / 最大耗时、失败码分布与 dump 复用率；reset:true 清零。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 端口映射 -->
+          <div class="toolbox" id="group-port">
+            <div class="tool-head"><span class="gdot"></span>端口映射<span class="count">3 个 · 1 只读 / 2 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="r"><td><code>aya_list_ports</code></td><td><span class="tag r">只读</span></td><td>列出 adb forward（本机 → 设备）与 reverse（设备 → 本机）的全部映射。</td></tr>
+                <tr data-perm="w"><td><code>aya_add_port</code></td><td><span class="tag w">写</span></td><td>新增映射，direction 选 forward / reverse；已存在返回 existed，冲突需 replace:true。</td></tr>
+                <tr data-perm="w"><td><code>aya_remove_port</code></td><td><span class="tag w">写</span></td><td>按 local / remote 移除映射，direction 可自动推断，all:true 清空该方向。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- WebView -->
+          <div class="toolbox" id="group-webview">
+            <div class="tool-head"><span class="gdot"></span>WebView 调试<span class="count">9 个 · 5 只读 / 4 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="r"><td><code>aya_list_webviews</code></td><td><span class="tag r">只读</span></td><td>列出可调试的 WebView 页面：标题、URL、devtoolsFrontendUrl、webSocketDebuggerUrl。</td></tr>
+                <tr data-perm="w"><td><code>aya_webview_eval</code></td><td><span class="tag w">写</span></td><td>页面内执行 JavaScript 并按值返回，可 awaitPromise；读状态、点元素、填表单都能做。</td></tr>
+                <tr data-perm="r"><td><code>aya_webview_console</code></td><td><span class="tag r">只读</span></td><td>收集时间窗内的 console 输出、未捕获异常与 JS 运行时错误。</td></tr>
+                <tr data-perm="r"><td><code>aya_webview_network</code></td><td><span class="tag r">只读</span></td><td>采集时间窗内的网络请求：URL、方法、状态码、耗时、失败原因、响应类型。</td></tr>
+                <tr data-perm="r"><td><code>aya_webview_snapshot</code></td><td><span class="tag r">只读</span></td><td>导出可见且可交互的元素：文本、id/name、href、是否禁用、视口内坐标。</td></tr>
+                <tr data-perm="r"><td><code>aya_webview_wait</code></td><td><span class="tag r">只读</span></td><td>等待 DOM 元素出现 / 可见 / 消失，state 支持 visible / hidden / attached / detached。</td></tr>
+                <tr data-perm="w"><td><code>aya_webview_click</code></td><td><span class="tag w">写</span></td><td>点击 DOM 元素，默认 element.click()，viaMouse:true 走 CDP 模拟真实鼠标。</td></tr>
+                <tr data-perm="w"><td><code>aya_webview_input</code></td><td><span class="tag w">写</span></td><td>给输入框赋值并派发 input/change 事件，React 受控组件也生效，返回写入前后值。</td></tr>
+                <tr data-perm="w"><td><code>aya_webview_navigate</code></td><td><span class="tag w">写</span></td><td>页面导航：navigate / reload / back / forward，等待 readyState 完成后返回最终 URL 与标题。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 屏幕适配 -->
+          <div class="toolbox" id="group-adapt">
+            <div class="tool-head"><span class="gdot"></span>屏幕适配<span class="count">8 个 · 1 只读 / 7 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="w"><td><code>aya_set_font_scale</code></td><td><span class="tag w">写</span></td><td>设置系统字体缩放（0.5–2.0），返回改动前后值；部分应用需重启 Activity 才刷新。</td></tr>
+                <tr data-perm="w"><td><code>aya_set_rotation</code></td><td><span class="tag w">写</span></td><td>锁定屏幕方向 0 / 90 / 180 / 270，auto:true 恢复重力感应旋转。</td></tr>
+                <tr data-perm="w"><td><code>aya_set_density</code></td><td><span class="tag w">写</span></td><td>wm density 修改屏幕密度，reset:true 恢复设备默认值，返回 previous / current。</td></tr>
+                <tr data-perm="w"><td><code>aya_set_resolution</code></td><td><span class="tag w">写</span></td><td>wm size 修改分辨率（如 1080x2400），reset:true 恢复物理分辨率。</td></tr>
+                <tr data-perm="w"><td><code>aya_set_locale</code></td><td><span class="tag w">写</span></td><td>修改系统语言列表（如 "en-US,zh-CN"），建议配合 stop_app + start_app 刷新文案。</td></tr>
+                <tr data-perm="w"><td><code>aya_set_dark_mode</code></td><td><span class="tag w">写</span></td><td>切换深色 / 浅色 / 自动模式（cmd uimode night），用于深色适配验证。</td></tr>
+                <tr data-perm="w"><td><code>aya_set_animation_scale</code></td><td><span class="tag w">写</span></td><td>设置 window / transition / animator 三项动画缩放，0 可关闭动画让界面更快稳定。</td></tr>
+                <tr data-perm="r"><td><code>aya_list_displays</code></td><td><span class="tag r">只读</span></td><td>列出逻辑显示屏：displayId、名称、分辨率、刷新率、旋转与状态。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 录屏与投屏 -->
+          <div class="toolbox" id="group-cast">
+            <div class="tool-head"><span class="gdot"></span>录屏与投屏<span class="count">5 个 · 1 只读 / 4 写</span></div>
+            <table>
+              <thead>
+                <tr><th>工具</th><th>权限</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr data-perm="w"><td><code>aya_start_recording</code></td><td><span class="tag w">写</span></td><td>设备端 screenrecord 后台开录，立即返回；默认 180 秒上限，可设码率与分辨率。</td></tr>
+                <tr data-perm="w"><td><code>aya_stop_recording</code></td><td><span class="tag w">写</span></td><td>停止录制并拉回本机，返回路径、大小、时长；省略 localPath 存到 aya-mcp/。</td></tr>
+                <tr data-perm="r"><td><code>aya_recording_status</code></td><td><span class="tag r">只读</span></td><td>是否在录制、已录时长、剩余时长、设备端文件大小。</td></tr>
+                <tr data-perm="w"><td><code>aya_cast_window</code></td><td><span class="tag w">写</span></td><td>打开 / 关闭 / 重启 AYA 投屏窗口，可传 deviceId 把窗口固定在指定设备。</td></tr>
+                <tr data-perm="w"><td><code>aya_cast_settings</code></td><td><span class="tag w">写</span></td><td>读取或修改投屏码率与最大边长，restart:true 立即重启窗口生效。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="empty" id="empty">没有匹配的工具，换个关键字或切回「全部」试试。</div>
+
+          <div class="note">
+            <strong>定位与快照：</strong><code>aya_ui_dump</code> 返回的 <code>i</code> 是未过滤完整树的 DFS 前序号，过滤只减少返回节点、不改变
+            <code>i</code>；<code>snapshotId</code> 60s 过期，任何输入类工具执行后立即失效，返回 <code>STALE_SNAPSHOT</code>
+            时重新 dump 即可。<code>aya_stats</code> 可查看每个工具的实际耗时与 dump 复用率。
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <span>© 2026 AYA MCP · Based on AYA by surunzi (liriliri) · AGPL-3.0</span>
+        <span>
+          <a href="index.html">返回首页</a> ·
+          <a href="index.html#quickstart">接入配置</a> ·
+          <a href="https://github.com/foryouos/aya-mcp" target="_blank" rel="noopener">GitHub</a>
+        </span>
+      </div>
+    </footer>
+
+    <script>
+      ;(function () {
+        var TOTAL = 72
+        var q = document.getElementById('q')
+        var hit = document.getElementById('hit')
+        var empty = document.getElementById('empty')
+        var rows = Array.prototype.slice.call(document.querySelectorAll('tbody tr'))
+        var boxes = Array.prototype.slice.call(document.querySelectorAll('.toolbox'))
+        var segBtns = Array.prototype.slice.call(document.querySelectorAll('.seg button'))
+        var initPerm = /[?&]perm=(r|w|all)\b/.exec(location.search)
+        var perm = initPerm ? initPerm[1] : 'all'
+
+        segBtns.forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-perm') === perm)
+        })
+
+        function apply() {
+          var kw = (q.value || '').trim().toLowerCase()
+          var shown = 0
+
+          rows.forEach(function (tr) {
+            var okPerm = perm === 'all' || tr.getAttribute('data-perm') === perm
+            var okKw = !kw || tr.textContent.toLowerCase().indexOf(kw) !== -1
+            var ok = okPerm && okKw
+            tr.hidden = !ok
+            if (ok) shown++
+          })
+
+          boxes.forEach(function (box) {
+            var any = Array.prototype.slice.call(box.querySelectorAll('tbody tr')).some(function (tr) {
+              return !tr.hidden
+            })
+            box.hidden = !any
+          })
+
+          hit.textContent = '显示 ' + shown + ' / ' + TOTAL + ' 个工具'
+          empty.classList.toggle('show', shown === 0)
+        }
+
+        q.addEventListener('input', apply)
+
+        segBtns.forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            perm = btn.getAttribute('data-perm')
+            segBtns.forEach(function (b) {
+              b.classList.toggle('active', b === btn)
+            })
+            apply()
+          })
+        })
+
+        apply()
+      })()
+    </script>
+  </body>
+</html>
