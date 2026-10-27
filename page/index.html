@@ -1921,9 +1921,284 @@ details p {
   animation: wireFlow 1.4s linear infinite;
 }
 
+/* ---------- 手机动效：3D 悬浮 / 视差 / 屏幕内交互 ---------- */
+.phone-stage {
+  perspective: 1200px;
+  transform: rotateY(calc(var(--mx, 0) * 8deg)) rotateX(calc(var(--my, 0) * -6deg));
+  transform-style: preserve-3d;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.phone {
+  animation: phoneFloat 7s ease-in-out infinite;
+}
+
+@keyframes phoneFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+/* 屏幕内数据流 */
+.sc-rain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.sc-rain i {
+  position: absolute;
+  top: -14%;
+  width: 2px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, transparent, rgba(140, 240, 170, 0.9));
+  animation-name: rainFall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes rainFall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(560px);
+    opacity: 0;
+  }
+}
+
+/* 状态栏时钟 */
+.sc-clock {
+  margin-left: auto;
+  font: 10.5px/1 var(--mono);
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.4px;
+}
+
+.sc-status .sc-bar {
+  margin-left: 6px;
+}
+
+/* AI 选框（定位 → 锁定） */
+.ai-box {
+  position: absolute;
+  inset: -7px -9px;
+  border: 1px dashed rgba(140, 240, 170, 0.85);
+  border-radius: 11px;
+  pointer-events: none;
+  animation: aiBox 2.8s ease-in-out infinite;
+}
+
+.ai-box em {
+  position: absolute;
+  left: -1px;
+  top: -17px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(6, 20, 15, 0.92);
+  border: 1px solid rgba(140, 240, 170, 0.4);
+  color: #8fe7ae;
+  font: 9.5px/1.3 var(--mono);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+@keyframes aiBox {
+  0%,
+  50% {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  92%,
+  100% {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+}
+
+/* 触点 */
+.sc-finger {
+  position: absolute;
+  left: 17px;
+  top: 187px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.1));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 6px 16px -8px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  animation: fingerTap 2.8s ease-in-out infinite;
+}
+
+@keyframes fingerTap {
+  0%,
+  52% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  68% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  78%,
+  100% {
+    transform: scale(0.65);
+    opacity: 0;
+  }
+}
+
+/* 内容呼吸：列表条与卡片图标 */
+.sc-row .sc-line {
+  transform-origin: left center;
+  animation: lineBreathe 4.6s ease-in-out infinite;
+}
+
+.sc-row:nth-child(2) .sc-line {
+  animation-delay: 1.5s;
+}
+
+.sc-row:nth-child(3) .sc-line {
+  animation-delay: 3s;
+}
+
+@keyframes lineBreathe {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scaleX(0.62);
+    opacity: 0.55;
+  }
+}
+
+.sc-card svg {
+  animation: cardFloat 3.6s ease-in-out infinite;
+}
+
+@keyframes cardFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* 底部按钮流光 */
+.sc-cta {
+  overflow: hidden;
+}
+
+.sc-cta::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -45%;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: ctaSheen 2.8s ease-in-out infinite;
+}
+
+@keyframes ctaSheen {
+  0% {
+    left: -45%;
+  }
+  55%,
+  100% {
+    left: 105%;
+  }
+}
+
+/* 目标行不再叠脉冲框（交给 ai-box 负责） */
+.sc-row.target::after {
+  content: none;
+}
+
+/* 点击成功对勾 */
+.sc-check {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--brand-600);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  font-weight: 800;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  opacity: 1;
+  pointer-events: none;
+  animation: checkPop 2.8s ease-in-out infinite;
+}
+
+@keyframes checkPop {
+  0%,
+  50% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  70%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes wireFlow {
   to {
     stroke-dashoffset: -24;
+  }
+}
+
+/* 动效降级：系统开启「减少动态效果」时给出静态可读版本 */
+@media (prefers-reduced-motion: reduce) {
+  .sc-finger,
+  .sc-ripple,
+  .sc-rain {
+    display: none;
+  }
+  .sc-check,
+  .ai-box {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -2027,27 +2302,40 @@ details p {
 
             <div class="session-chip"><span class="live"></span>MCP 127.0.0.1:7788 · 73 tools</div>
 
-            <div class="phone">
-              <div class="phone-screen">
-                <div class="sc-status"><i></i><i></i><i></i><span class="sc-bar"></span></div>
-                <div class="sc-appbar">
-                  <span class="sc-ico"><svg viewBox="0 0 24 24"><use href="#android-glyph" /></svg></span>
-                  <span class="sc-line" style="width: 52%"></span>
+            <div class="phone-stage">
+              <div class="phone">
+                <div class="phone-screen">
+                  <div class="sc-rain" id="scRain"></div>
+                  <div class="sc-status">
+                    <i></i><i></i><i></i>
+                    <span class="sc-clock" id="scClock">--:--</span>
+                    <span class="sc-bar"></span>
+                  </div>
+                  <div class="sc-appbar">
+                    <span class="sc-ico"><svg viewBox="0 0 24 24"><use href="#android-glyph" /></svg></span>
+                    <span class="sc-line" style="width: 52%"></span>
+                  </div>
+                  <span class="sc-line" style="width: 92%"></span>
+                  <span class="sc-line" style="width: 64%; margin-top: 8px"></span>
+                  <div class="sc-cards">
+                    <div class="sc-card"><svg viewBox="0 0 24 24"><use href="#android-glyph" /></svg></div>
+                    <div class="sc-card ghost"></div>
+                  </div>
+                  <div class="sc-list">
+                    <div class="sc-row target">
+                      <span class="dot"></span>
+                      <span class="sc-line" style="width: 46%"></span>
+                      <span class="ai-box"><em>aya_tap · 128,96</em></span>
+                      <span class="sc-check">✓</span>
+                    </div>
+                    <div class="sc-row"><span class="dot"></span><span class="sc-line" style="width: 62%"></span></div>
+                    <div class="sc-row"><span class="dot"></span><span class="sc-line" style="width: 38%"></span></div>
+                  </div>
+                  <div class="sc-cta"></div>
+                  <div class="sc-scan"></div>
+                  <div class="sc-finger"></div>
+                  <div class="sc-ripple"></div>
                 </div>
-                <span class="sc-line" style="width: 92%"></span>
-                <span class="sc-line" style="width: 64%; margin-top: 8px"></span>
-                <div class="sc-cards">
-                  <div class="sc-card"><svg viewBox="0 0 24 24"><use href="#android-glyph" /></svg></div>
-                  <div class="sc-card ghost"></div>
-                </div>
-                <div class="sc-list">
-                  <div class="sc-row target"><span class="dot"></span><span class="sc-line" style="width: 46%"></span></div>
-                  <div class="sc-row"><span class="dot"></span><span class="sc-line" style="width: 62%"></span></div>
-                  <div class="sc-row"><span class="dot"></span><span class="sc-line" style="width: 38%"></span></div>
-                </div>
-                <div class="sc-cta"></div>
-                <div class="sc-scan"></div>
-                <div class="sc-ripple"></div>
               </div>
             </div>
 
@@ -2058,13 +2346,13 @@ details p {
             </div>
           </div>
 
-          <div class="hero-stats">
+          <!-- <div class="hero-stats">
             <div class="stat"><b>73</b><span>MCP 工具（29 只读 / 44 写）</span></div>
             <div class="stat"><b>1.7–5×</b><span>同板实测快于 uiautomator2</span></div>
             <div class="stat"><b>&lt; 1 min</b><span>从开启到 AI 接管设备</span></div>
             <div class="stat"><b>127.0.0.1</b><span>仅本机监听，不出网</span></div>
             <div class="stat"><b>Win / mac / Linux</b><span>跨平台 Electron 桌面端</span></div>
-          </div>
+          </div> -->
         </div>
       </section>
 
@@ -2851,6 +3139,60 @@ details p {
         targets.forEach(function (el) {
           io.observe(el)
         })
+      })()
+    </script>
+
+    <script>
+      // 手机动效：鼠标视差、状态栏时钟、屏幕数据流（无依赖）
+      ;(function () {
+        var reduce =
+          window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+        // 鼠标视差：整机随指针轻微转动
+        var stage = document.querySelector('.phone-stage')
+        var hero = document.querySelector('.hero')
+        if (stage && hero && !reduce) {
+          var raf = null
+          hero.addEventListener('pointermove', function (e) {
+            if (raf) return
+            raf = window.requestAnimationFrame(function () {
+              raf = null
+              var r = hero.getBoundingClientRect()
+              var x = (e.clientX - r.left) / r.width - 0.5
+              var y = (e.clientY - r.top) / r.height - 0.5
+              stage.style.setProperty('--mx', x.toFixed(3))
+              stage.style.setProperty('--my', y.toFixed(3))
+            })
+          })
+          hero.addEventListener('pointerleave', function () {
+            stage.style.setProperty('--mx', '0')
+            stage.style.setProperty('--my', '0')
+          })
+        }
+
+        // 状态栏时钟
+        var clock = document.getElementById('scClock')
+        if (clock) {
+          var tick = function () {
+            var d = new Date()
+            clock.textContent =
+              ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)
+          }
+          tick()
+          setInterval(tick, 15000)
+        }
+
+        // 屏幕内数据流
+        var rain = document.getElementById('scRain')
+        if (rain && !reduce) {
+          for (var i = 0; i < 16; i++) {
+            var s = document.createElement('i')
+            s.style.left = (Math.random() * 100).toFixed(1) + '%'
+            s.style.animationDuration = (1.5 + Math.random() * 1.9).toFixed(2) + 's'
+            s.style.animationDelay = (-Math.random() * 3).toFixed(2) + 's'
+            rain.appendChild(s)
+          }
+        }
       })()
     </script>
   </body>
