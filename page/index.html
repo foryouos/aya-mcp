@@ -1130,8 +1130,8 @@
           <p class="kicker">Model Context Protocol</p>
           <h2>MCP 是什么？为什么手机需要它</h2>
           <p class="lead">
-            MCP 是 AI 客户端与工具之间的开放协议。过去 AI 只能"教你怎么操作手机"，现在它能自己调工具、看结果、再决定下一步。
-            AYA MCP 就是把 adb 的几十年积累，翻译成 AI 听得懂、调得动的 73 个标准工具。
+            MCP 是 AI 客户端与工具之间的开放协议。过去 AI 只能"教你怎么操作手机"，现在它能自己调工具、看结果、再决定下一步——AYA MCP
+            把 adb 的几十年积累翻译成 73 个标准工具。
           </p>
           <div class="grid g3">
             <div class="card">
@@ -1141,7 +1141,7 @@
                 </svg>
               </div>
               <h3>会说人话就够了</h3>
-              <p>不用记 <code>adb shell am start -n ...</code>。自然语言描述目标，AI 自己选择并组合工具，失败还会根据返回的错误自我纠正。</p>
+              <p>不用记 <code>adb shell am start -n ...</code>。描述目标，AI 自己选工具、组合调用，失败还会自我纠正。</p>
             </div>
             <div class="card">
               <div class="ico">
@@ -1151,7 +1151,7 @@
                 </svg>
               </div>
               <h3>看得见界面，不只是命令</h3>
-              <p><code>aya_ui_dump</code> 返回带坐标与索引的 UI 层级树，<code>aya_screencap</code> 回传截图。AI 既读结构也看画面，点得准、判得对。</p>
+              <p><code>aya_ui_dump</code> 给带坐标的层级树，<code>aya_screencap</code> 回传截图，AI 既读结构也看画面。</p>
             </div>
             <div class="card">
               <div class="ico">
@@ -1160,17 +1160,8 @@
                 </svg>
               </div>
               <h3>一次调用干完一串动作</h3>
-              <p><code>aya_batch</code> 串行执行最多 20 个动作，中间不经过模型思考，彻底避开播放器控制栏、Toast 这类 1–3 秒就消失的控件。</p>
+              <p><code>aya_batch</code> 串行执行最多 20 个动作，避开播放器控制栏这类 1–3 秒就消失的控件。</p>
             </div>
-          </div>
-
-          <!-- 二次开发备注：本段说明与上游 AYA 的关系 -->
-          <div class="note">
-            <strong>关于二次开发：</strong>本分支基于开源项目
-            <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（
-            <a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">liriliri/aya</a>，作者 surunzi，AGPL-3.0）
-            二次开发，完整保留原版投屏、文件管理、日志、性能、Shell 等桌面能力，<b>仅新增 MCP 服务层</b>：设置 → MCP →
-            启用即可，不影响原有使用习惯。
           </div>
         </div>
       </section>
@@ -1181,9 +1172,8 @@
           <p class="kicker">Tool Reference</p>
           <h2>73 个工具，11 个分类</h2>
           <p class="lead">
-            工具名统一以 <code>aya_</code> 开头：<strong>29 个只读</strong>默认开放，<strong>44 个写</strong>需勾选「允许写操作」。
-            这里只列最常用的 12 个，完整 73 个（按分类、可搜索、可只看只读/写）在
-            <a href="tools.html">完整工具清单</a> 页面。
+            73 个 <code>aya_*</code> 工具：<strong>29 个只读</strong>默认开放，<strong>44 个写</strong>需勾选「允许写操作」。下面是最高频的 10 个，
+            完整清单见 <a href="tools.html">工具清单页</a>。
           </p>
 
           <div class="toolbox">
@@ -1191,26 +1181,24 @@
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
                 <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
               </svg>
-              上手最常用的 12 个
-              <span class="count">12 / 72</span>
+              上手最常用的 10 个
+              <span class="count">10 / 73</span>
             </div>
             <table>
               <thead>
                 <tr><th>工具</th><th>权限</th><th>说明</th></tr>
               </thead>
               <tbody>
-                <tr><td><code>aya_list_devices</code></td><td><span class="tag r">只读</span></td><td>列出已连接设备并标注 AYA 当前选中设备，调用其它工具前先确认 deviceId。</td></tr>
-                <tr><td><code>aya_screencap</code></td><td><span class="tag r">只读</span></td><td>截图并直接返回图片，默认缩放到 900px 宽、JPEG 质量 72。</td></tr>
-                <tr><td><code>aya_ui_dump</code></td><td><span class="tag r">只读</span></td><td>UI 层级树，节点含 bounds / center，支持过滤、分页与快照复用。</td></tr>
-                <tr><td><code>aya_tap</code></td><td><span class="tag w">写</span></td><td>坐标、nodeIndex+snapshotId 或 text·id·desc 定位点击，默认点完立即回传新界面。</td></tr>
-                <tr><td><code>aya_batch</code></td><td><span class="tag w">写</span></td><td>一次串行执行最多 20 个动作，专治 1–3 秒消失的播放器控制栏与 Toast。</td></tr>
-                <tr><td><code>aya_wait_for</code></td><td><span class="tag r">只读</span></td><td>轮询等待控件出现或消失，命中即返回，比反复 dump 省往返。</td></tr>
-                <tr><td><code>aya_start_app</code></td><td><span class="tag w">写</span></td><td>启动 Launcher Activity，可等到前台切换或指定控件出现。</td></tr>
-                <tr><td><code>aya_logcat</code></td><td><span class="tag r">只读</span></td><td>日志快照，级别 / 标签 / 关键字过滤在设备端完成，附崩溃摘要。</td></tr>
-                <tr><td><code>aya_shell</code></td><td><span class="tag w">写</span></td><td>adb shell，30s 超时，输出截断 20000 字符，兜底所有未封装的能力。</td></tr>
-                <tr><td><code>aya_serial_logs</code></td><td><span class="tag r">只读</span></td><td>按来源、关键字或正则、fromSeq 增量读取串口日志。</td></tr>
-                <tr><td><code>aya_webview_eval</code></td><td><span class="tag w">写</span></td><td>在 WebView 页面里执行 JavaScript 并返回值，H5 调试比截图快 1–2 个数量级。</td></tr>
-                <tr><td><code>aya_pull_file</code></td><td><span class="tag w">写</span></td><td>把设备文件拉回本机，省略目标路径时存到临时目录 <code>aya-mcp/</code>。</td></tr>
+                <tr><td><code>aya_ui_dump</code></td><td><span class="tag r">只读</span></td><td>UI 层级树，节点带 bounds / center，可过滤与分页。</td></tr>
+                <tr><td><code>aya_tap</code></td><td><span class="tag w">写</span></td><td>坐标 / nodeIndex / text·id·desc 定位，点完即回传新界面。</td></tr>
+                <tr><td><code>aya_text</code></td><td><span class="tag w">写</span></td><td>向焦点输入框写文本，中文与 emoji 直接写入。</td></tr>
+                <tr><td><code>aya_screencap</code></td><td><span class="tag r">只读</span></td><td>截图并返回图片，设备端压缩，体积比 PNG 小 436 倍。</td></tr>
+                <tr><td><code>aya_batch</code></td><td><span class="tag w">写</span></td><td>一次串行执行最多 20 个动作，专治 1–3 秒消失的控件。</td></tr>
+                <tr><td><code>aya_wait_for</code></td><td><span class="tag r">只读</span></td><td>等控件出现或消失，命中即返回，比反复 dump 省往返。</td></tr>
+                <tr><td><code>aya_ui_watch</code></td><td><span class="tag r">只读</span></td><td>订阅界面事件，等界面自己动起来，不用盲等。</td></tr>
+                <tr><td><code>aya_logcat</code></td><td><span class="tag r">只读</span></td><td>日志快照，过滤在设备端完成，附崩溃摘要。</td></tr>
+                <tr><td><code>aya_shell</code></td><td><span class="tag w">写</span></td><td>adb shell 兜底，30s 超时、输出截断。</td></tr>
+                <tr><td><code>aya_serial_logs</code></td><td><span class="tag r">只读</span></td><td>串口启动日志，支持关键字与增量读取。</td></tr>
               </tbody>
             </table>
           </div>
@@ -1218,47 +1206,47 @@
           <div class="grid g3" style="margin-top: 18px">
             <a class="card" href="tools.html#group-device">
               <h3>设备与屏幕 <span class="cnt">5</span></h3>
-              <p>list_devices、device_info、screencap、ui_dump、current_app —— 先认设备，再截图或取 UI 树。</p>
+              <p>先认设备，再截图或取 UI 树。</p>
             </a>
             <a class="card" href="tools.html#group-input">
               <h3>交互 <span class="cnt">10</span></h3>
-              <p>tap、tap_text、swipe、long_press、gesture、key、text、batch、wait_for、ui_watch —— 点、滑、按、输、等界面变化一步到位。</p>
+              <p>点、滑、按、输、等界面变化。</p>
             </a>
             <a class="card" href="tools.html#group-app">
               <h3>应用管理 <span class="cnt">8</span></h3>
-              <p>列表与详情、启停、清数据、启禁用、安装与卸载，全部走 adb，无需 Root。</p>
+              <p>列表、启停、清数据、装卸，免 Root。</p>
             </a>
             <a class="card" href="tools.html#group-file">
               <h3>文件 <span class="cnt">7</span></h3>
-              <p>列目录、查属性、拉取、推送、删除、建目录、重命名，设备与本机双向传输。</p>
+              <p>列目录、拉取推送、改名删除。</p>
             </a>
             <a class="card" href="tools.html#group-log">
               <h3>日志与命令 <span class="cnt">4</span></h3>
-              <p>logcat 快照与等待、清空缓冲区、adb shell，崩溃与 ANR 排查的主力。</p>
+              <p>logcat 快照与 adb shell。</p>
             </a>
             <a class="card" href="tools.html#group-serial">
               <h3>串口 <span class="cnt">11</span></h3>
-              <p>列串口、开关、读写、暂停恢复、阶段切分与等待关键字，覆盖 bootloader 到 Android 启动全程。</p>
+              <p>启动日志按 bootloader/kernel/android 分段。</p>
             </a>
             <a class="card" href="tools.html#group-perf">
               <h3>性能与统计 <span class="cnt">3</span></h3>
-              <p>CPU / 内存 / 帧率快照、进程列表，以及每个工具的耗时与 dump 复用率。</p>
+              <p>CPU / 内存 / 帧率与工具耗时。</p>
             </a>
             <a class="card" href="tools.html#group-port">
               <h3>端口映射 <span class="cnt">3</span></h3>
-              <p>adb forward / reverse 的列出、新增与移除，调试设备内 HTTP 服务与 WebView。</p>
+              <p>adb forward / reverse 的增删查。</p>
             </a>
             <a class="card" href="tools.html#group-webview">
               <h3>WebView 调试 <span class="cnt">9</span></h3>
-              <p>列页面、执行 JS、console、网络、元素快照、等待、点击、输入、导航，H5 问题直读 DOM。</p>
+              <p>执行 JS、看 console 与 DOM。</p>
             </a>
             <a class="card" href="tools.html#group-adapt">
               <h3>屏幕适配 <span class="cnt">8</span></h3>
-              <p>字体、旋转、密度、分辨率、语言、深色、动画与显示屏列表，批量验证多形态适配。</p>
+              <p>字体、旋转、密度、语言、深色。</p>
             </a>
             <a class="card" href="tools.html#group-cast">
               <h3>录屏与投屏 <span class="cnt">5</span></h3>
-              <p>开录、停录并拉回 mp4、查询录制状态，以及投屏窗口与画质控制。</p>
+              <p>录屏、投屏窗口与画质。</p>
             </a>
           </div>
 
@@ -1268,8 +1256,8 @@
           </div>
 
           <div class="note">
-            <strong>点击定位小贴士：</strong><code>aya_ui_dump</code> 返回的 <code>i</code> 是未过滤完整树的 DFS 前序号，过滤只减少返回节点、不改变
-            <code>i</code>。<code>snapshotId</code> 60s 过期，任何输入类工具执行后立即失效，返回 <code>STALE_SNAPSHOT</code> 时重新 dump 即可。
+            <strong>定位小贴士：</strong><code>i</code> 是完整树的 DFS 序号（过滤不改变它）；<code>snapshotId</code> 60s 过期，
+            输入类操作后立即失效，报 <code>STALE_SNAPSHOT</code> 就重新 dump。
           </div>
         </div>
       </section>
@@ -1280,8 +1268,7 @@
           <p class="kicker">Benchmark</p>
           <h2>同一台设备实测：比 uiautomator2 快 1.7–5 倍</h2>
           <p class="lead">
-            在同一台 RK3576 / Android 14、同一界面（设置首页与搜索页）上交替测量：aya 侧直连 MCP 端点、不经过 AI
-            客户端，u2 侧用 Python uiautomator2。每个用例 10–20 次取中位数，完整方法见仓库
+            同一台 RK3576 / Android 14、同一界面交替测量（aya 走 MCP 端点、u2 走 Python），每个用例 10–20 次取中位数，方法见
             <a href="https://github.com/foryouos/aya-mcp/blob/master/TEST_REPORT.md" target="_blank" rel="noopener">TEST_REPORT 第 8 节</a>。
           </p>
 
@@ -1346,7 +1333,7 @@
                 </svg>
               </div>
               <h3>上下文成本差 24 倍</h3>
-              <p>一次层级读取，aya 回 3.9 KB 紧凑 JSON（约 1.2k tokens），u2 回 93 KB 整棵 XML（约 30k tokens）。长任务里这比毫秒差距更致命。</p>
+              <p>一次层级读取，aya 回 3.9 KB（约 1.2k tokens），u2 回 93 KB（约 30k）。长任务里这比毫秒差距更致命。</p>
             </div>
             <div class="card">
               <div class="ico">
@@ -1355,7 +1342,7 @@
                 </svg>
               </div>
               <h3>少一次模型往返</h3>
-              <p>aya_tap 默认回传点击后的新界面，「点击 + 观察」一次调用完成；u2 要 AI 自己写代码、再解析 XML、再喂回上下文。</p>
+              <p>aya_tap 默认回传点击后的新界面；u2 要 AI 自己写代码、解析 XML，再喂回上下文。</p>
             </div>
             <div class="card">
               <div class="ico">
@@ -1365,49 +1352,42 @@
                 </svg>
               </div>
               <h3>u2 没有的能力</h3>
-              <p>无障碍事件订阅（aya_ui_watch）、事件驱动等待（aya_wait_for）、串口启动日志、录屏与投屏控制、屏幕适配、性能统计，共 73 个工具。</p>
+              <p>事件订阅、事件驱动等待、串口启动日志、录屏投屏、屏幕适配，共 73 个工具。</p>
             </div>
           </div>
 
           <div class="note">
-            <strong>什么时候仍然用 uiautomator2：</strong>上百步的固定回归（写一次 Python 循环跑完，不经过模型往返）、需要断言与 CI
-            报告、或需要 OCR / 图像处理等 Python 生态。
-            <strong>注意：</strong>aya 的常驻 UiAutomation 与 uiautomator2 争抢同一个无障碍连接，同一台设备上不能同时运行——aya
-            在跑时 u2 会报 <code>UiAutomation not connected</code>，停掉 aya 设备端服务后 u2 立即可用。
-          </div>
-
-          <div class="cta" style="margin-top: 26px">
-            <a class="btn btn-primary" href="tools.html">查看全部 73 个工具</a>
-            <a class="btn btn-ghost" style="color: var(--ink); border-color: var(--border)" href="#quickstart">3 步接入 MCP</a>
+            <strong>什么时候仍然用 uiautomator2：</strong>上百步固定回归、需要断言与 CI 报告、或需要 OCR / 图像处理。
+            <strong>注意：</strong>两者争抢同一个设备端无障碍连接，同一台设备上不能同时运行。
           </div>
         </div>
       </section>
 
       <!-- ======================= 打开 MCP 服务 ======================= -->
-      <section id="enable">
+      <section id="enable" class="soft">
         <div class="wrap">
           <p class="kicker">Enable MCP</p>
           <h2>打开 MCP 服务：入口就在设置里</h2>
           <p class="lead">
-            MCP 服务由 AYA 桌面端托管，没有命令行、没有额外进程。按下面四步点开并勾选「启用 MCP 服务」就算打开了；关掉这个开关，AYA 就回到原版状态。
+            服务由 AYA 桌面端托管，没有命令行、没有额外进程。关掉这个开关，AYA 就回到原版状态。
           </p>
 
           <ol class="path">
             <li>
               <b>打开「设置」</b>
-              点主界面右上角的<strong>齿轮图标</strong>，或走菜单 <kbd>工具</kbd> → <kbd>设置</kbd>。
+              主界面右上角的<strong>齿轮图标</strong>，或菜单 <kbd>工具</kbd> → <kbd>设置</kbd>。
             </li>
             <li>
               <b>切到 MCP 分组</b>
-              弹窗左侧只有「外观 / ADB / MCP」三项，点最下面的 <kbd>MCP</kbd>。
+              弹窗左侧「外观 / ADB / MCP」，点最下面的 <kbd>MCP</kbd>。
             </li>
             <li>
               <b>勾选「启用 MCP 服务」</b>
-              勾上后服务立即在本机启动，默认端口 <code>7788</code>，并自动生成访问令牌。
+              立即在本机启动，默认端口 <code>7788</code>，并自动生成访问令牌。
             </li>
             <li>
               <b>按需放开能力</b>
-              需要点击、输入、shell 就勾「允许写操作」；要跨设备连接再勾「允许局域网访问」。
+              要点击、输入、shell 就勾「允许写操作」；要跨机连接再勾「允许局域网访问」。
             </li>
           </ol>
 
@@ -1419,13 +1399,13 @@
                 height="644"
                 loading="lazy"
                 decoding="async"
-                alt="AYA 设置 → MCP 面板：勾选启用 MCP 服务、允许写操作、允许局域网访问，端口 7788，状态显示 http://198.18.0.1:7788/mcp 运行中 · 72 个工具"
+                alt="AYA 设置 → MCP 面板：勾选启用 MCP 服务、允许写操作、允许局域网访问，端口 7788，状态显示 http://198.18.0.1:7788/mcp 运行中"
               />
             </a>
             <figcaption>
               <b>设置 → MCP</b>：三项开关 + 端口 + 实时状态。图中已勾选局域网访问，所以地址显示为
-              <code>http://198.18.0.1:7788/mcp</code>；只用本机时这里是 <code>127.0.0.1</code>。截图拍摄时为 72 个工具，当前版本为 73 个，数量会随版本与写操作开关变化。
-              </figcaption>
+              <code>http://198.18.0.1:7788/mcp</code>；只用本机时这里是 <code>127.0.0.1</code>。
+            </figcaption>
           </figure>
 
           <div class="toolbox">
@@ -1442,20 +1422,12 @@
                 <tr><th>控件</th><th>默认</th><th>作用</th></tr>
               </thead>
               <tbody>
-                <tr><td><code>启用 MCP 服务</code></td><td><span class="tag r">打开</span></td><td>总开关。开启即监听本机端口并提供 <code>aya_*</code> 工具；首次开启会自动弹出配置片段弹窗。</td></tr>
-                <tr><td><code>允许写操作</code></td><td><span class="tag w">按需</span></td><td>暴露点击、滑动、输入、按键、shell、安装卸载等写工具。不勾时客户端只能读屏、抓日志、传文件。</td></tr>
-                <tr><td><code>允许局域网访问</code></td><td><span class="tag r">关闭</span></td><td>勾选后监听地址从 <code>127.0.0.1</code> 变为 <code>0.0.0.0</code>，同网段的其它机器可按状态行给出的 IP 连接。</td></tr>
-                <tr><td><code>端口</code></td><td><code>7788</code></td><td>取值范围 1024–65535。被占用时改一个数字，地址会随之更新。</td></tr>
-                <tr><td>状态行</td><td>—</td><td>绿点即「运行中」，后面依次是完整端点地址与当前暴露的工具数量，改开关后会实时刷新。</td></tr>
-                <tr><td><code>查看 MCP 配置</code></td><td>—</td><td>弹出 stdio（推荐）/ stdio（无 env）/ HTTP 三种片段，令牌已填好，点「复制」即可粘到客户端。</td></tr>
-                <tr><td><code>重置访问令牌</code></td><td>—</td><td>令牌泄露或换机器时点它，旧令牌立即失效，记得同步更新客户端配置。</td></tr>
+                <tr><td><code>启用 MCP 服务</code></td><td><span class="tag r">打开</span></td><td>总开关，开启即监听本机端口并提供 <code>aya_*</code> 工具。</td></tr>
+                <tr><td><code>允许写操作</code></td><td><span class="tag w">按需</span></td><td>暴露点击、输入、shell 等 44 个写工具；不勾只有只读工具。</td></tr>
+                <tr><td><code>允许局域网访问</code></td><td><span class="tag r">关闭</span></td><td>监听地址从 <code>127.0.0.1</code> 变为 <code>0.0.0.0</code>，同网段可连。</td></tr>
+                <tr><td>端口 / 令牌</td><td><code>7788</code></td><td>端口可改；「查看 MCP 配置」复制片段，「重置访问令牌」作废旧令牌。</td></tr>
               </tbody>
             </table>
-          </div>
-
-          <div class="note">
-            <strong>路径速记：</strong>工具栏齿轮（或菜单 <b>工具 → 设置</b>）→ 左侧 <b>MCP</b> → 勾选 <b>启用 MCP 服务</b> → 点
-            <b>查看 MCP 配置</b> 复制片段。状态行显示的工具数会随「允许写操作」变化，客户端没刷新时重连一次即可。
           </div>
         </div>
       </section>
@@ -1471,21 +1443,18 @@
             <div class="step">
               <h3>开启 MCP 服务</h3>
               <p>
-                设置 → MCP → 勾选「启用 MCP 服务」。服务随应用启动自动拉起，默认端口
-                <code>7788</code>，同时生成访问令牌。需要点击、安装、shell 等能力时，再勾选「允许写入操作」。
-                具体入口与面板截图见<a href="#enable">上一节</a>。
+                设置 → MCP → 勾选「启用 MCP 服务」，默认端口 <code>7788</code>。需要点击、安装、shell 时再勾「允许写入操作」
+                （<a href="#enable">面板截图</a>）。
               </p>
             </div>
             <div class="step">
               <h3>复制配置片段</h3>
-              <p>
-                弹窗里直接给出三种写好的配置：<strong>stdio（推荐）</strong>、stdio（无 env）、HTTP。点「复制」，片段里已带好端口与令牌。
-              </p>
+              <p>弹窗给出三种写好的配置：<strong>stdio（推荐）</strong>、stdio（无 env）、HTTP。点「复制」，端口与令牌已填好。</p>
             </div>
             <div class="step">
               <h3>粘贴到 AI 客户端</h3>
               <p>
-                CodeBuddy：设置 → MCP → 添加 MCP，粘贴到 <code>~/.codebuddy/mcp.json</code>。其他支持 MCP 的客户端同理，重连后即可看到
+                CodeBuddy 粘贴到 <code>~/.codebuddy/mcp.json</code>；其他 MCP 客户端同理，重连后即可看到
                 <code>aya_*</code> 工具列表。
               </p>
             </div>
@@ -1547,8 +1516,7 @@
           </div>
 
           <div class="note">
-            桥接脚本通过 SSE 收到 <code>notifications/tools/list_changed</code> 后会通知客户端热刷新；客户端不支持热更新时重连一次即可。
-            端口被占用可在设置里改（1024–65535），令牌泄露可点「重置访问令牌」。
+            桥接脚本收到 <code>tools/list_changed</code> 会通知客户端热刷新；客户端不支持热更新时重连一次即可。
           </div>
         </div>
       </section>
@@ -1569,7 +1537,7 @@
               </div>
               <div>
                 <h3>自动化回归与冒烟</h3>
-                <p>"装上新构建，依次走完登录 → 下单 → 支付，每步截图，失败就把 logcat 的 E 级日志带回来。"——<code>aya_install_app</code> → <code>aya_batch</code> → <code>aya_screencap</code> → <code>aya_logcat</code>。</p>
+                <p>"装上新构建，走完登录 → 下单 → 支付，每步截图，失败把 E 级日志带回来。"——<code>aya_install_app</code> → <code>aya_batch</code> → <code>aya_screencap</code>。</p>
               </div>
             </div>
             <div class="card">
@@ -1580,7 +1548,7 @@
               </div>
               <div>
                 <h3>UI 走查与适配检查</h3>
-                <p>"把字体缩放到 2.0，逐个页面截图，列出文字被截断的控件。"——<code>aya_set_font_scale</code> + <code>aya_ui_dump</code> + <code>aya_screencap</code>。</p>
+                <p>"把字体缩放到 2.0，逐个页面截图，列出文字被截断的控件。"——<code>aya_set_font_scale</code> + <code>aya_screencap</code>。</p>
               </div>
             </div>
             <div class="card">
@@ -1591,7 +1559,7 @@
               </div>
               <div>
                 <h3>崩溃与 ANR 排查</h3>
-                <p>"清一下日志，复现这个操作，把 E 级日志和 /sdcard 下的 tombstone 拉回本机。"——<code>aya_clear_logcat</code> → 操作 → <code>aya_logcat{level:'E'}</code> → <code>aya_pull_file</code>。</p>
+                <p>"清一下日志，复现这个操作，把 E 级日志和 tombstone 拉回本机。"——<code>aya_clear_logcat</code> → <code>aya_logcat</code> → <code>aya_pull_file</code>。</p>
               </div>
             </div>
             <div class="card">
@@ -1602,7 +1570,7 @@
               </div>
               <div>
                 <h3>复现视频与缺陷留证</h3>
-                <p>"开始录屏，执行刚才那串操作，停录，把 mp4 存到桌面。"——开录 → <code>aya_batch</code> → <code>aya_stop_recording</code>，全程不碰鼠标。</p>
+                <p>"开始录屏，执行刚才那串操作，停录，把 mp4 存到桌面。"——开录 → <code>aya_batch</code> → <code>aya_stop_recording</code>。</p>
               </div>
             </div>
             <div class="card">
@@ -1613,7 +1581,7 @@
               </div>
               <div>
                 <h3>性能体检</h3>
-                <p>"滚动首页 30 秒，采样帧率和内存，告诉我掉帧的时段。"——<code>aya_performance</code> + <code>aya_swipe</code> + <code>aya_list_processes</code>。</p>
+                <p>"滚动首页 30 秒，采样帧率和内存，告诉我掉帧的时段。"——<code>aya_performance</code> + <code>aya_swipe</code>。</p>
               </div>
             </div>
             <div class="card">
@@ -1624,7 +1592,7 @@
               </div>
               <div>
                 <h3>H5 / 混合应用调试</h3>
-                <p>"列出前台应用的 WebView，把 devtools 调试地址给我。"——<code>aya_list_webviews</code> 自动 <code>adb forward</code> 并访问 <code>/json</code>；配合 <code>aya_add_port</code> 可把手机端口映射到本机。</p>
+                <p>"列出前台应用的 WebView，把 devtools 调试地址给我。"——<code>aya_list_webviews</code> 自动 forward 端口并读 <code>/json</code>。</p>
               </div>
             </div>
           </div>
@@ -1640,32 +1608,25 @@
           <ul class="sec-list">
             <li>
               <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
-              <div><strong>只监听 本机或内网</strong>：外部网络无法访问，端口范围 1024–65535，默认 7788。</div>
+              <div><strong>只监听 本机或内网</strong>：外部网络无法访问，端口 1024–65535，默认 7788。</div>
             </li>
             <li>
               <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
-              <div><strong>Bearer Token 鉴权</strong>：令牌首次开启时生成并持久化，可随时「重置访问令牌」。</div>
+              <div><strong>Bearer Token 鉴权</strong>：首次开启时生成并持久化，可随时「重置访问令牌」。</div>
             </li>
             <li>
               <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
-              <div><strong>写操作默认隐藏</strong>：44 个写工具需勾选「允许写入操作」才暴露，29 个只读工具始终可用。</div>
+              <div><strong>写操作默认隐藏</strong>：44 个写工具需勾选才暴露，29 个只读工具始终可用。</div>
             </li>
             <li>
               <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
-              <div><strong>Origin 校验 + 2MB 请求体限制</strong>：防止网页跨站调用与超大 payload 打爆服务。</div>
+              <div><strong>Origin 校验 + 2MB 请求体限制</strong>：防跨站调用与超大 payload。</div>
             </li>
             <li>
               <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6 9 17l-5-5" /></svg>
-              <div><strong>shell 有兜底</strong>：<code>aya_shell</code> 30s 超时、输出截断 20000 字符，破坏性命令仍由客户端按 <code>readOnlyHint</code> 弹确认框。</div>
+              <div><strong>shell 有兜底</strong>：<code>aya_shell</code> 30s 超时、输出截断 20000 字符。</div>
             </li>
           </ul>
-
-          <div class="note">
-            <strong>关于局域网 / 远程访问：</strong>MCP 服务默认只监听本机回环地址
-            <code>127.0.0.1</code>，局域网内其它设备、以及公网都无法直接连上，这是有意的安全设计——设备数据始终留在你的电脑上。
-            如果你确实需要「手机接在 A 机器、AI 客户端跑在 B 机器」这类跨机/远程场景，可以自行用 SSH 隧道、frp、ngrok
-            等工具把本机的 <code>127.0.0.1:7788</code> 映射出去；但在开放端口前，请务必确认已开启 Bearer Token，并只允许可信网络访问，不要直接把端口暴露到公网。
-          </div>
         </div>
       </section>
 
@@ -1678,55 +1639,50 @@
             <details open>
               <summary>AYA MCP 和原版 AYA 是什么关系？</summary>
               <p>
-                本分支基于开源项目 <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（liriliri/aya，作者 surunzi，AGPL-3.0）
-                二次开发，完整保留原版投屏、文件管理、日志、性能、Shell、应用管理等桌面能力，<strong>只新增了 MCP 服务层</strong>。
-                关闭 MCP 开关时，它就是原版 AYA。
+                基于开源项目 <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（AGPL-3.0）二次开发，
+                完整保留原版投屏、文件管理、日志、性能、Shell 等桌面能力，<strong>只新增了 MCP 服务层</strong>；关掉 MCP 开关就是原版 AYA。
               </p>
             </details>
             <details>
               <summary>需要 Root 或在手机上安装 App 吗？</summary>
-              <p>都不需要。AYA 通过 adb 与设备通信，只需在手机上开启 USB 调试（或无线调试）并授权本机调试。</p>
+              <p>都不需要。AYA 走 adb，只需在手机上开启 USB（或无线）调试并授权本机。</p>
             </details>
             <details>
               <summary>客户端只看到 29 个只读工具怎么办？</summary>
               <p>
-                说明未勾选「允许写入操作」。勾选后重连 MCP 服务，或等待 <code>tools/list_changed</code> 热刷新，即可看到全部 73 个工具；
-                也可以先在 <a href="tools.html">完整工具清单</a> 里确认目标工具是只读还是写。
+                说明未勾选「允许写入操作」。勾选后重连或等 <code>tools/list_changed</code> 热刷新，即可看到全部 73 个；
+                目标工具是只读还是写可在 <a href="tools.html">工具清单</a> 里查。
               </p>
             </details>
             <details>
               <summary>aya_tap 返回 STALE_SNAPSHOT？</summary>
-              <p>UI 快照 60s 过期，且任何输入类工具执行后会立即失效。重新 <code>aya_ui_dump</code> 拿到新的 <code>snapshotId</code> 和 <code>nodeIndex</code> 再点。</p>
+              <p>快照 60s 过期，输入类操作后立即失效。重新 <code>aya_ui_dump</code> 拿新的 <code>snapshotId</code> 与 <code>nodeIndex</code> 再点。</p>
             </details>
             <details>
               <summary>点开播放器控制栏后读不到控件？</summary>
-              <p>这类控件只停留 1–3 秒。用 <code>aya_tap</code> 默认的 <code>withUi</code>（点完立刻抓一帧）、或把「点击 → 等待 → 再点击」合成一次 <code>aya_batch</code>，就能避开模型思考延迟。</p>
+              <p>这类控件只停留 1–3 秒。用 <code>aya_tap</code> 默认的 <code>withUi</code>（点完立刻抓一帧），或把「点击 → 等待 → 再点击」合成一次 <code>aya_batch</code>。</p>
             </details>
             <details>
               <summary>MCP 开关打不开，提示端口被占用？</summary>
-              <p>默认 7788 被其他进程占了。在设置里换一个 1024–65535 的端口重试，设置项会直接显示错误原因。</p>
+              <p>默认 7788 被占。在设置里换一个 1024–65535 的端口重试，设置项会直接显示错误原因。</p>
             </details>
             <details>
               <summary>支持哪些 AI 客户端？</summary>
-              <p>任何支持 MCP 的客户端都可以，包括 CodeBuddy、WorkBuddy、Claude Desktop、Cursor、Cline 等。配置片段在 AYA 设置里一键复制。</p>
+              <p>任何支持 MCP 的客户端都可以：CodeBuddy、WorkBuddy、Claude Desktop、Cursor、Cline 等。配置片段在 AYA 设置里一键复制。</p>
             </details>
             <details>
               <summary>MCP 支持局域网或远程访问吗？</summary>
               <p>
-                默认不支持。服务只监听 <code>127.0.0.1</code>（本机回环），局域网内其它设备和公网都连不上，设备数据不出本机。这是默认的安全设定。
-                若有跨机需求（例如手机接在一台机器、AI 客户端在另一台），可用 SSH 隧道、frp、ngrok 等把本机 <code>127.0.0.1:7788</code>
-                端口转发出去；开放前请务必开启 Bearer Token，并只暴露给可信网络，切勿直接面向公网。
+                默认不支持：服务只监听 <code>127.0.0.1</code>，局域网与公网都连不上。确有跨机需求时，用 SSH 隧道 / frp / ngrok
+                转发本机端口，开放前务必开启 Bearer Token，且只暴露给可信网络。
               </p>
             </details>
             <details>
               <summary>AYA MCP 和 Python uiautomator2 有什么区别？该用哪个？</summary>
               <p>
-                同一台 RK3576 / Android 14 上交替实测：读取界面层级 <strong>131 ms vs 309 ms</strong>，点击
-                <strong>91 ms vs 180 ms</strong>，滑动 <strong>390 ms vs 1160 ms</strong>，写入文本
-                <strong>93 ms vs 253–476 ms</strong>，截图回传 <strong>14 KB vs 6.2 MB</strong>。aya 走常驻 UiAutomation
-                注入、并把界面压成紧凑 JSON（一次层级读取约 1.2k tokens，u2 约 30k），u2 走 atx-agent jsonrpc 并返回整棵 XML。
-                模型即席操作选 aya；上百步固定回归、需要断言与 CI 报告、或需要 OCR / 图像处理选 u2。注意两者争抢同一个设备端
-                无障碍连接，同一设备上不能同时运行。
+                同一台 RK3576 / Android 14 上交替实测：层级 <strong>131 ms vs 309 ms</strong>、点击 <strong>91 vs 180 ms</strong>、滑动
+                <strong>390 vs 1160 ms</strong>、写文本 <strong>93 vs 253–476 ms</strong>、截图 <strong>14 KB vs 6.2 MB</strong>。模型即席操作选
+                aya；上百步固定回归、要断言与 CI、或要 OCR / 图像处理选 u2。两者争抢同一个设备端无障碍连接，不能同时运行。
               </p>
             </details>
           </div>
@@ -1734,11 +1690,14 @@
       </section>
 
       <!-- ======================= 最近更新 ======================= -->
-      <section id="changelog" class="soft">
+      <section id="changelog">
         <div class="wrap">
           <p class="kicker">What's New</p>
           <h2>最近更新</h2>
-          <p class="lead">本分支在持续同步上游 AYA 的基础上，围绕「AI 可控 + 桌面体验」持续增强。</p>
+          <p class="lead">
+            本分支在同步上游 AYA 的基础上，围绕「AI 可控 + 桌面体验」持续增强；完整历史见
+            <a href="https://github.com/foryouos/aya-mcp/releases" target="_blank" rel="noopener">GitHub Releases</a>。
+          </p>
           <div class="toolbox">
             <div class="tool-head">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
@@ -1754,25 +1713,22 @@
               <tbody>
                 <tr>
                   <td><code>v2.1.2</code></td>
-                  <td>修复安装版「检查更新」报错：更新检查改为直接读取 GitHub Releases API，不再依赖 Release 里的 <code>latest.yml</code>；按版本号挑选最新正式版，忽略 <code>x.y.z.Test</code> 这类测试 tag。工具总数扩展到 73 个：<code>aya_gesture</code>、<code>aya_long_press</code>、<code>aya_webview_*</code> 系列、屏幕适配、<code>aya_stats</code>，以及订阅无障碍事件的 <code>aya_ui_watch</code>；同时 tap / swipe / key / text / screencap 改走常驻 UiAutomation 通道。</td>
+                  <td>修复安装版「检查更新」报错（改读 GitHub Releases API）；工具扩到 73 个，新增 <code>aya_gesture</code>、<code>aya_long_press</code>、<code>aya_webview_*</code>、屏幕适配、<code>aya_stats</code>、<code>aya_ui_watch</code>；tap / swipe / key / text / screencap 改走常驻 UiAutomation。</td>
                 </tr>
                 <tr>
                   <td><code>v2.1.0</code></td>
-                  <td>新增串口调试面板（bootloader / kernel / android 分段识别、关键字与阶段过滤、暂停、保存会话、波特率自动探测）与 8 个 <code>aya_serial_*</code> 工具，工具总数 50；发送框不再记录历史输入；版本号独立于上游，改为 <code>2.1.0</code>。</td>
+                  <td>新增串口调试面板（bootloader / kernel / android 分段识别、过滤、暂停、波特率探测）与 8 个 <code>aya_serial_*</code> 工具，工具总数 50。</td>
                 </tr>
                 <tr>
                   <td><code>v1.14.3+mcp</code></td>
-                  <td>同步上游至 AYA v1.14.3；Windows 下关闭主窗口改为最小化到系统托盘（托盘右键菜单退出）；更新检查接入 GitHub Releases；优化一键编译脚本与资源准备流程。</td>
+                  <td>同步上游至 AYA v1.14.3；Windows 下关闭主窗口改为最小化到托盘；更新检查接入 GitHub Releases。</td>
                 </tr>
                 <tr>
                   <td><code>v1.14.2+mcp</code></td>
-                  <td>首个 MCP 分支：内置只监听 <code>127.0.0.1</code> 的 MCP 服务，暴露 42 个 <code>aya_*</code> 工具（16 只读 / 26 写），支持 stdio 与 HTTP 两种接入方式。</td>
+                  <td>首个 MCP 分支：内置只监听 <code>127.0.0.1</code> 的 MCP 服务，暴露 42 个 <code>aya_*</code> 工具，支持 stdio 与 HTTP。</td>
                 </tr>
               </tbody>
             </table>
-          </div>
-          <div class="note">
-            完整更新历史见仓库 <a href="https://github.com/foryouos/aya-mcp/releases" target="_blank" rel="noopener">GitHub Releases</a>。
           </div>
         </div>
       </section>
@@ -1782,7 +1738,7 @@
         <div class="wrap" style="text-align: center">
           <h2>现在就让 AI 帮你操作手机</h2>
           <p class="lead" style="margin-inline: auto">
-            下载 AYA（含 MCP 分支），设置 → MCP → 启用，复制配置粘贴进你的 AI 客户端。整个过程不到一分钟。
+            下载 AYA，设置 → MCP → 启用，复制配置粘贴进 AI 客户端，全程不到一分钟。
           </p>
           <div class="cta" style="justify-content: center">
             <a class="btn btn-primary" href="https://github.com/foryouos/aya-mcp/releases" rel="noopener">下载 AYA</a>
