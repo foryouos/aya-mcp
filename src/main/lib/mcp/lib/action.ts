@@ -172,19 +172,24 @@ function checkShellOutput(value: unknown, label: string) {
 
 export async function performTap(args: any, settle: number) {
   const target = await resolveTarget(args)
+  // 按压时长：默认 20ms 保持既有行为，0 可省掉这段等待
+  const pressMs =
+    typeof args.pressMs === 'number' && args.pressMs >= 0
+      ? Math.min(Math.round(args.pressMs), 1000)
+      : 20
   // 常驻 UiAutomation 注入优先，失败自动熔断并降级到 `input tap`
   const outcome = await withDeviceQueue(target.deviceId, () =>
     injectOrFallback(
       target.deviceId,
       'aya_tap',
-      () => injectTap(target.deviceId, target.point[0], target.point[1]),
+      () => injectTap(target.deviceId, target.point[0], target.point[1], pressMs),
       () => adb.inputTap(target.deviceId, target.point[0], target.point[1])
     )
   )
   checkShellOutput(outcome.value, 'aya_tap')
   const settledMs = await afterInput(target.deviceId, settle)
 
-  return { target, settledMs, via: outcome.via }
+  return { target, settledMs, via: outcome.via, pressMs }
 }
 
 export async function performSwipe(

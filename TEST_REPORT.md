@@ -223,6 +223,80 @@
 - 已知限制：事件唤醒依赖界面真的产生无障碍事件，SurfaceView / 视频画面不会产生，仍走超时逻辑。
 - 测试期间出现过一次「两个 AYA 主进程并存导致端口占用、旧进程代码回应请求」的环境问题，清理后复测通过，与代码无关。
 
+## 8. 同板对比：AYA MCP vs uiautomator2（2026-10-27）
+
+设备：RK3576 / Android 14（`4a7de4f19facc740`），两者在**同一台设备、同一界面（设置首页 / 搜索页）**上交替测量。
+
+- u2 侧：Python 3.12 + `uiautomator2`（atx-agent + uiautomator stub），脚本 `script/bench/bench_u2.py`
+- aya 侧：直连 MCP HTTP 端点（`POST /mcp` + Bearer Token），不经过 AI 客户端，脚本 `script/bench/bench_aya.mjs`
+- 每个用例 10–20 次取 avg / p50 / p95；aya 的 dump 采样间隔 1.1 s（避开 1 s 缓存，保证每次都是真实 dump）
+
+### 8.1 前置结论：两者互斥，不能同时占用设备
+
+aya 的常驻 UiAutomation 与 uiautomator2 的 UiAutomation 争抢同一个无障碍连接槽位：
+
+| 现象 | 证据 |
+| --- | --- |
+| aya 设备端服务在跑时，u2 启动 stub 失败 | `java.lang.IllegalStateException: UiAutomation not connected` |
+| 停掉 aya 设备端服务后 u2 立即可用 | `pkill -f io.liriliri.aya.Server` → `dump_hierarchy` 155 ms 成功 |
+| 反向同理 | u2 的 atx-agent 存活时 aya 注入会回退到 shell |
+
+因此基准必须轮流跑，工程上二者只能择一使用。
+
+### 8.2 实测对比
+
+| 用例 | uiautomator2 | AYA MCP | 差异 |
+| --- | --- | --- | --- |
+| UI 层级（各自默认口径） | 309.2 ms / 93,484 B（compressed XML） | **131.5 ms / 3,936 B**（紧凑 JSON） | 2.35× 快 / 23.7× 小 |
+| UI 层级（原始 XML 同口径） | 309.2 ms / 93,484 B | **179.5 ms / 83,678 B** | 1.72× 快 / 10% 小 |
+| 点击（坐标） | 180.2 ms | **90.8 ms** | 1.98× 快 |
+| 滑动（300 ms 动作时长） | 1160.2 ms | **390.0 ms** | 2.98× 快 |
+| 文本写入 | 252.8 ms（send_keys）/ 475.7 ms（set_text） | **92.6 ms**（ACTION_SET_TEXT） | 2.7–5.1× 快 |
+| 截图 | **145.3 ms / 6,220,800 B**（PNG） | 161.5 ms / **14,256 B**（JPEG 900px） | 耗时相当，体积 436× 小 |
+| 按控件定位点击 | 937.3 ms（resourceId） | **338.2 ms** | 2.77× 快 |
+| 按文本定位点击（中文） | 匹配失败（Windows 版 u2 请求编码问题） | **62.4 ms** | — |
+
+### 8.3 差异来源
+
+1. **注入路径**：aya 走常驻 UiAutomation 的 `injectInputEvent`（一次 binder）；u2 的 click/swipe 经 atx-agent jsonrpc，swipe 默认 10 步插值、每步一次 HTTP 往返，300 ms 的滑动因此花了 1160 ms。
+2. **定位方式**：u2 每次 `d(...)` 都是一次 jsonrpc 节点查找 + 隐式等待；aya 在主机侧一次 dump 解析出紧凑节点表并缓存快照（`snapshotId` 60 s），命中缓存时不再 dump。
+3. **传输与解析**：u2 返回整棵 XML（93 KB），aya 默认返回裁剪后的紧凑 JSON（3.9 KB），省掉一次 XML 解析与大量 token。
+4. **截图**：u2 拿到原始 PNG（6.2 MB）后自行处理；aya 在设备端缩放 + JPEG 压缩，只回 14 KB。
+5. **文本**：aya 的 `ACTION_SET_TEXT` 一次 binder 写入并绕过 IME；u2 的 `send_keys` 走输入法、`set_text` 需要先定位节点。
+
+### 8.4 可提升区间（aya 侧）
+
+| 用例 | 当前 | 剩余主要开销 | 理论下限 | 可提升 |
+| --- | --- | --- | --- | --- |
+| UI 层级 | 131.5 ms | AccessibilityNodeInfo 遍历 + 序列化（213 节点裁到 100） | ~80 ms | 20–40% |
+| 点击 | 90.8 ms | RPC + 注入 + settle | ~40 ms | 30–50% |
+| 滑动 | 390 ms | 其中 300 ms 是动作时长本身 | ~320 ms | <10%（已接近下界） |
+| 文本写入 | 92.6 ms | 一次 ACTION_SET_TEXT + 焦点查找 | ~60 ms | 20–30% |
+| 截图 | 161.5 ms | `takeScreenshot` + 缩放 + JPEG（设备端 172 ms） | 30–80 ms（minicap / 复用投屏视频流截帧） | 2–4× |
+| 按控件定位点击 | 338.2 ms | 定位需要一次 dump（~130 ms） | 50–80 ms（用 nodeIndex 复用快照） | 3–4× |
+
+另外，aya 侧「点击 + 观察」可一次调用完成（`aya_tap` 默认回传新界面），在 agent 场景等于省掉一次「点击 → dump → 解析」往返；u2 需要 AI 自己写代码再解析 XML。**上下文成本差距比毫秒差距更大**：一次层级读取，aya ≈1.2k tokens，u2 ≈30k tokens。
+
+### 8.5 结论
+
+- 同板实测，AYA MCP 在注入、定位、文本、层级四项快 1.7–5 倍；截图耗时持平但回传体积小 436 倍。
+- u2 的优势在脚本化：一次 Python 循环能跑上百步且不经过模型往返，适合固定回归；AYA 的优势在模型即席操作：无需生成代码、无需安装依赖，结果直接可被模型消费。
+- 两者不能同时占用设备端无障碍连接，同一时刻只能选一个。
+- u2 在 Windows 上还有中文 selector 编码问题（`text='搜索'` 匹配不到），aya 侧无此问题。
+
+### 8.6 低风险优化项落地（同日）
+
+基于 8.4 的可提升区间先做两项低风险改动，并复测：
+
+| 项 | 改动 | 结果 |
+| --- | --- | --- |
+| 截图不再二次编码 | 设备端已按目标宽度缩放并压成 JPEG，主机直接透传字节（原实现又解码 + 重编码一次，1080p 约 20–30 ms） | 平均 **161.5 → 140 ms**（p50 148 → 137），18.5 KB，meta 正确（1920×1080 / 900×506 / scale 0.46875 / `source:"uiAutomation"`） |
+| tap 按压时长可配 | 新增 `pressMs`（默认 20），`Ui.kt` 用它决定 up 事件的 eventTime 偏移 | **无性能差异**（pressMs=0 为 91.5 ms，pressMs=20 为 89.1 ms）：`injectInputEvent(sync=false)` 不等待应用消费，那 20 ms 只是事件时间戳偏移而非真实等待。参数保留，供个别对 down/up 间隔敏感的应用使用 |
+
+其余分支复测正常：`crop` 205 ms、`format:"png"` 163 ms、adb 降级路径 meta 与裁剪语义均未变。
+
+**第 2 项「设备端裁剪后再传输」经复核后推迟**：aya 的 `snapshot` 同时是「对外输出」和「内部节点匹配源」——`target.ts` 的定位、`captureUi` 的差异比较、`pickActionable` 的可点击节点都基于同一棵 `flat`。若在设备端裁剪节点或属性，主机侧 `flat` 会变稀疏，定位会漏掉被裁掉的控件；而为了对外与内部各取一份又得多一次 dump，反而更慢。该优化需与「设备端按选择器直查」配套推进（定位不再依赖整棵树之后，dump 才退化为纯对外输出）。
+
 **BUG-16 修复实现**（`src/main/lib/mcp/tools/gesture.ts`）：`aya_gesture` 描述改为“一段事件流内可包含多组 down/up”，并给出“轻点唤醒 + 拖动进度条”的 5 步示例；`steps` 字段描述同步说明每组独立成对。
 
 > 未遗留建议项：两条缺陷均已随 v2.2.1 之后的本地构建落地（`tools=72`，`aya_batch` 枚举含 `gesture`）；重建重启后 `tools/list` 实测 `aya_gesture.description` 已含“一段事件流内可包含多组 down/up”与 5 步示例、`steps` 字段说明同步更新，真机复验快进落点仍为 1:18:18。

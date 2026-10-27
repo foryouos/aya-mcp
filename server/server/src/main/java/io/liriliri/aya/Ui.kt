@@ -338,11 +338,15 @@ object Ui {
         }
 
         val started = SystemClock.uptimeMillis()
+        // 按压时长：多数应用对 tap 时长不敏感，可以调到 0 少等 20ms；
+        // 默认保持 20ms，个别应用依赖短暂按压才触发点击
+        val pressMs = params.optLong("pressMs", 20L).coerceIn(0L, 1000L)
         inject(instance, MotionEvent.ACTION_DOWN, started, started, x, y)
-        inject(instance, MotionEvent.ACTION_UP, started, started + 20, x, y)
+        inject(instance, MotionEvent.ACTION_UP, started, started + pressMs, x, y)
 
         return JSONObject()
             .put("ok", true)
+            .put("pressMs", pressMs)
             .put("totalMs", SystemClock.uptimeMillis() - started)
     }
 

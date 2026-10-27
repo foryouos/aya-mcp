@@ -612,7 +612,7 @@
                 <tr><th>工具</th><th>权限</th><th>说明</th></tr>
               </thead>
               <tbody>
-                <tr data-perm="w"><td><code>aya_tap</code></td><td><span class="tag w">写</span></td><td>点击屏幕：坐标、nodeIndex+snapshotId，或 text·id·desc 定位；默认点完立刻回传新界面。</td></tr>
+                <tr data-perm="w"><td><code>aya_tap</code></td><td><span class="tag w">写</span></td><td>点击屏幕：坐标、nodeIndex+snapshotId，或 text·id·desc 定位；默认点完立刻回传新界面；pressMs 可调按压时长（默认 20ms）。</td></tr>
                 <tr data-perm="w"><td><code>aya_tap_text</code></td><td><span class="tag w">写</span></td><td>按控件文本点击，等价 aya_tap + text；exact:false 子串匹配，index 选第 N 个同名控件。</td></tr>
                 <tr data-perm="w"><td><code>aya_swipe</code></td><td><span class="tag w">写</span></td><td>从 (x1,y1) 滑到 (x2,y2)，duration 默认 300ms，可开 withUi 观察结果。</td></tr>
                 <tr data-perm="w"><td><code>aya_long_press</code></td><td><span class="tag w">写</span></td><td>长按坐标或控件，触发控制条、自定义长按菜单与拖拽起点。</td></tr>

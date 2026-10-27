@@ -94,6 +94,8 @@ const screencap: McpTool = {
     let raw: Buffer | null = null
     // 设备端截图可能已在设备上缩放，meta 里的宽高必须是原始设备像素
     let deviceSize: { width: number; height: number } | null = null
+    // 设备端回传的图片尺寸（已按 maxWidth 缩放）
+    let shotSize: { width: number; height: number } | null = null
     if (typeof args.displayId !== 'number' && !isShotBlocked(deviceId)) {
       try {
         const shot = await uiScreenshot(deviceId, {
@@ -108,6 +110,9 @@ const screencap: McpTool = {
         if (shot.sourceWidth && shot.sourceHeight) {
           deviceSize = { width: shot.sourceWidth, height: shot.sourceHeight }
         }
+        if (shot.width && shot.height) {
+          shotSize = { width: shot.width, height: shot.height }
+        }
       } catch {
         blockShot(deviceId)
       }
@@ -116,41 +121,57 @@ const screencap: McpTool = {
       raw = await screencapBuffer(deviceId, args.displayId)
     }
 
-    const image = nativeImage.createFromBuffer(raw)
-    const size = image.getSize()
-
-    let output = image
-    let scale = 1
+    let buffer: Buffer
+    let imageWidth = 0
+    let imageHeight = 0
     let cropped: any = null
+    let sourceWidth = 0
 
-    if (hasCrop && crop) {
-      const rect = {
-        x: Math.max(Math.floor(crop.x), 0),
-        y: Math.max(Math.floor(crop.y), 0),
-        width: Math.max(Math.floor(crop.width), 1),
-        height: Math.max(Math.floor(crop.height), 1),
+    // 设备端已经按目标宽度缩放并压成 JPEG 时，主机直接透传字节：
+    // 省掉一次「解码 + 重编码」（1080p JPEG 重编码约 20-30ms）。
+    // 需要 png 或需要裁剪时仍走主机侧处理。
+    if (via === 'uiAutomation' && !hasCrop && !asPng && shotSize) {
+      buffer = raw
+      imageWidth = shotSize.width
+      imageHeight = shotSize.height
+      sourceWidth = deviceSize?.width || imageWidth
+    } else {
+      const image = nativeImage.createFromBuffer(raw)
+      const size = image.getSize()
+      let output = image
+
+      if (hasCrop && crop) {
+        const rect = {
+          x: Math.max(Math.floor(crop.x), 0),
+          y: Math.max(Math.floor(crop.y), 0),
+          width: Math.max(Math.floor(crop.width), 1),
+          height: Math.max(Math.floor(crop.height), 1),
+        }
+        output = image.crop(rect)
+        cropped = rect
       }
-      output = image.crop(rect)
-      cropped = rect
-    }
 
-    // 缩放比例相对「裁剪后」的尺寸计算，否则 crop 场景下点击坐标换算会偏
-    const sourceWidth = cropped ? cropped.width : deviceSize?.width || size.width
-    if (maxWidth > 0 && output.getSize().width > maxWidth) {
-      output = output.resize({ width: Math.round(maxWidth), quality: 'good' })
+      // 缩放比例相对「裁剪后」的尺寸计算，否则 crop 场景下点击坐标换算会偏
+      sourceWidth = cropped ? cropped.width : deviceSize?.width || size.width
+      if (maxWidth > 0 && output.getSize().width > maxWidth) {
+        output = output.resize({ width: Math.round(maxWidth), quality: 'good' })
+      }
+      buffer = asPng ? output.toPNG() : output.toJPEG(quality)
+      imageWidth = output.getSize().width
+      imageHeight = output.getSize().height
+      if (!deviceSize) {
+        deviceSize = { width: size.width, height: size.height }
+      }
     }
-    scale = output.getSize().width / sourceWidth
-
-    const buffer = asPng ? output.toPNG() : output.toJPEG(quality)
-    const scaled = output.getSize()
+    const scale = imageWidth / sourceWidth
 
     const meta = {
       ok: true,
       deviceId,
-      width: deviceSize?.width || size.width,
-      height: deviceSize?.height || size.height,
-      imageWidth: scaled.width,
-      imageHeight: scaled.height,
+      width: deviceSize?.width || imageWidth,
+      height: deviceSize?.height || imageHeight,
+      imageWidth,
+      imageHeight,
       format: asPng ? 'png' : 'jpeg',
       quality: asPng ? null : quality,
       bytes: buffer.length,

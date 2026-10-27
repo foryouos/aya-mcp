@@ -220,8 +220,13 @@ async function sendInject(
   return unwrap<IInjectResult>(await client.sendMessage(method, params), key)
 }
 
-export async function injectTap(deviceId: string, x: number, y: number) {
-  return sendInject(deviceId, 'ui.tap', { x, y }, 'tap')
+export async function injectTap(
+  deviceId: string,
+  x: number,
+  y: number,
+  pressMs = 20
+) {
+  return sendInject(deviceId, 'ui.tap', { x, y, pressMs }, 'tap')
 }
 
 export async function injectSwipe(

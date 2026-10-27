@@ -33,6 +33,11 @@ const targetProps = {
     type: 'number',
     description: '点击后到抓取界面的等待毫秒数，默认 120（withUi:false 时 300）',
   },
+  pressMs: {
+    type: 'number',
+    description:
+      '按压时长（毫秒），默认 20。多数应用对 tap 时长不敏感，可传 0 省掉这段等待；个别应用依赖短暂按压才触发点击时保持默认',
+  },
   withUi: {
     type: ['boolean', 'string'],
     description:
@@ -58,13 +63,14 @@ async function tapHandler(args: any) {
   const withUi = resolveWithUi(args.withUi, true)
   const settle = resolveSettle(args, withUi ? 120 : 300)
   const started = Date.now()
-  const { target, settledMs, via } = await performTap(args, settle)
+  const { target, settledMs, via, pressMs } = await performTap(args, settle)
 
   const payload: any = {
     ok: true,
     deviceId: target.deviceId,
     clicked: true,
     via,
+    pressMs,
     point: target.point,
     matchedCount: target.matchedCount,
     clickedIndex: target.clickedIndex,
