@@ -314,15 +314,15 @@ nav.links a.active {
 .hero {
   position: relative;
   overflow: hidden;
-  color: #fff;
+  color: var(--ink);
   padding: 92px 0 100px;
   background:
-    radial-gradient(1100px 520px at 8% -10%, rgba(62, 194, 118, 0.4), transparent 58%),
-    radial-gradient(900px 460px at 92% 4%, rgba(20, 102, 64, 0.55), transparent 56%),
-    radial-gradient(620px 320px at 62% 116%, rgba(56, 189, 248, 0.14), transparent 62%),
-    linear-gradient(180deg, #071310 0%, #0a1a14 52%, #0b1d16 100%);
+    radial-gradient(920px 440px at 84% -12%, rgba(34, 163, 95, 0.16), transparent 60%),
+    radial-gradient(780px 400px at 4% 2%, rgba(59, 130, 246, 0.14), transparent 62%),
+    radial-gradient(640px 340px at 72% 108%, rgba(217, 70, 145, 0.09), transparent 64%),
+    linear-gradient(180deg, #fcfdfd 0%, #f5f8fa 58%, #eef2f5 100%);
   border-radius: 0 0 34px 34px;
-  box-shadow: 0 28px 64px -34px rgba(7, 20, 16, 0.6);
+  box-shadow: 0 26px 60px -38px rgba(13, 17, 23, 0.28);
 }
 
 /* 网格层 */
@@ -331,8 +331,8 @@ nav.links a.active {
   position: absolute;
   inset: -60px;
   z-index: 1;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(13, 17, 23, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(13, 17, 23, 0.045) 1px, transparent 1px);
   background-size: 52px 52px;
   -webkit-mask-image: radial-gradient(1100px 560px at 62% 26%, #000 0%, transparent 76%);
   mask-image: radial-gradient(1100px 560px at 62% 26%, #000 0%, transparent 76%);
@@ -355,8 +355,8 @@ nav.links a.active {
   position: absolute;
   inset: 0;
   z-index: 0;
-  opacity: 0.4;
-  mix-blend-mode: overlay;
+  opacity: 0.16;
+  mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
   pointer-events: none;
   animation: noiseShift 9s steps(3) infinite;
@@ -382,7 +382,7 @@ nav.links a.active {
   z-index: 3;
 }
 
-/* 呼吸光斑 */
+/* 呼吸光斑（浅色底：低饱和多色） */
 .orb {
   position: absolute;
   z-index: 2;
@@ -396,7 +396,7 @@ nav.links a.active {
   height: 460px;
   right: -90px;
   top: -140px;
-  background: radial-gradient(circle, rgba(62, 194, 118, 0.5), transparent 70%);
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.3), transparent 70%);
   animation: orbA 17s ease-in-out infinite;
 }
 
@@ -405,19 +405,28 @@ nav.links a.active {
   height: 360px;
   left: -110px;
   bottom: -150px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.32), transparent 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.24), transparent 70%);
   animation: orbB 21s ease-in-out infinite;
+}
+
+.orb-c {
+  width: 320px;
+  height: 320px;
+  right: 18%;
+  bottom: -180px;
+  background: radial-gradient(circle, rgba(217, 70, 145, 0.16), transparent 70%);
+  animation: orbB 25s ease-in-out infinite reverse;
 }
 
 @keyframes orbA {
   0%,
   100% {
     transform: scale(1) translate(0, 0);
-    opacity: 0.4;
+    opacity: 0.55;
   }
   50% {
     transform: scale(1.16) translate(-26px, 20px);
-    opacity: 0.62;
+    opacity: 0.85;
   }
 }
 
@@ -425,11 +434,11 @@ nav.links a.active {
   0%,
   100% {
     transform: scale(1.06) translate(0, 0);
-    opacity: 0.26;
+    opacity: 0.5;
   }
   50% {
     transform: scale(0.92) translate(32px, -18px);
-    opacity: 0.44;
+    opacity: 0.78;
   }
 }
 
@@ -442,8 +451,8 @@ nav.links a.active {
   width: 34%;
   height: 170%;
   transform: rotate(16deg);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
-  filter: blur(14px);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  filter: blur(16px);
   pointer-events: none;
   animation: beamMove 15s ease-in-out infinite;
 }
@@ -469,9 +478,9 @@ nav.links a.active {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(62, 194, 118, 0.14);
-  border: 1px solid rgba(113, 215, 150, 0.4);
-  color: #a7f0c0;
+  background: rgba(34, 163, 95, 0.12);
+  border: 1px solid rgba(34, 163, 95, 0.26);
+  color: var(--brand-700);
   border-radius: 999px;
   padding: 5px 14px;
   font-size: 13px;
@@ -483,18 +492,18 @@ nav.links a.active {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #63d66d;
-  box-shadow: 0 0 0 4px rgba(99, 214, 109, 0.18);
+  background: #34c759;
+  box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.16);
   animation: pulse 2.6s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 3px rgba(99, 214, 109, 0.16);
+    box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.16);
   }
   50% {
-    box-shadow: 0 0 0 7px rgba(99, 214, 109, 0.05);
+    box-shadow: 0 0 0 7px rgba(52, 199, 89, 0.05);
   }
 }
 
@@ -507,7 +516,7 @@ h1 {
 
 h1 em {
   font-style: normal;
-  background: linear-gradient(100deg, #b7f7d0 0%, #5fdc8f 45%, #22a35f 100%);
+  background: linear-gradient(100deg, #0d5c33 0%, #1f9d5c 52%, #45c184 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -516,7 +525,7 @@ h1 em {
 .sub {
   max-width: 680px;
   font-size: clamp(16px, 1.6vw, 19px);
-  color: #b9c9c1;
+  color: var(--ink-2);
   margin: 0 0 32px;
 }
 
@@ -558,15 +567,16 @@ h1 em {
 }
 
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e7f0ea;
-  border-color: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  border-color: rgba(13, 17, 23, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.32);
+  background: #fff;
+  border-color: rgba(34, 163, 95, 0.4);
+  box-shadow: var(--shadow-sm);
 }
 
 /* 玻璃数据块 */
@@ -579,17 +589,19 @@ h1 em {
 
 .stat {
   min-width: 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(13, 17, 23, 0.07);
   border-radius: 14px;
   padding: 16px 18px;
-  backdrop-filter: blur(8px);
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 2px rgba(13, 17, 23, 0.03);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .stat:hover {
-  background: rgba(255, 255, 255, 0.085);
-  border-color: rgba(113, 215, 150, 0.32);
+  background: #fff;
+  border-color: rgba(34, 163, 95, 0.28);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
@@ -598,7 +610,7 @@ h1 em {
   font-size: clamp(18px, 2.2vw, 26px);
   line-height: 1.28;
   word-break: break-word;
-  background: linear-gradient(180deg, #ffffff, #b6e6cb);
+  background: linear-gradient(180deg, #0d1117 0%, #2b7a4d 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -607,7 +619,7 @@ h1 em {
 .stat span {
   font-size: 13px;
   line-height: 1.55;
-  color: #9db0a7;
+  color: var(--ink-3);
 }
 
 @media (max-width: 980px) {
@@ -922,7 +934,11 @@ pre[hidden] {
   display: none;
 }
 
-.hero code,
+.hero code {
+  background: rgba(34, 163, 95, 0.13);
+  color: var(--brand-700);
+}
+
 footer code {
   background: rgba(62, 194, 118, 0.16);
   color: #a7f0c0;
@@ -1126,6 +1142,82 @@ footer a:hover {
 /* ===== page-specific: tools ===== */
 /* ===== page-specific: tools ===== */
 
+/* ---------- Hero：分类矩阵 ---------- */
+.tools-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 44px;
+  align-items: center;
+}
+
+.tools-hero .hero-stats {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 980px) {
+  .tools-hero {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+.matrix {
+  padding: 26px 24px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(13, 17, 23, 0.07);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-sm);
+}
+
+.matrix-glyph {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background: linear-gradient(135deg, var(--brand-300), var(--brand-500));
+  color: #04150c;
+  box-shadow: 0 16px 30px -16px rgba(34, 163, 95, 0.9);
+}
+
+.matrix-glyph svg {
+  width: 38px;
+  height: 38px;
+}
+
+.matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.matrix-grid i {
+  display: block;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(34, 163, 95, 0.16);
+  border: 1px solid rgba(34, 163, 95, 0.3);
+}
+
+.matrix-grid i:nth-child(2n) {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.26);
+}
+
+.matrix-grid i:nth-child(3n) {
+  background: rgba(217, 70, 145, 0.1);
+  border-color: rgba(217, 70, 145, 0.24);
+}
+
+.matrix-cap {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
 /* 空状态 */
 .empty {
   display: none;
@@ -1285,7 +1377,15 @@ td:first-child {
     </style>
   </head>
 
-  <body>
+    <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="android-glyph" viewBox="0 0 24 24">
+        <path
+          fill="currentColor"
+          d="M17.6 9.48l1.84-3.18c.16-.27.06-.61-.21-.77-.27-.16-.61-.06-.77.21l-1.88 3.24c-2.86-1.21-6.08-1.21-8.94 0L5.74 5.74c-.16-.27-.5-.38-.78-.22-.27.16-.38.5-.22.78l1.84 3.18c-2.89 1.15-5.15 3.1-6.78 5.49C0 15.19 0 15.19 0 15.19s.71 2.7 6.85 4.93c-.1.76-.15 1.53-.15 2.32 0 4.28 3.46 7.56 8 7.56s8-3.28 8-7.56c0-.79-.05-1.57-.15-2.32C27.29 17.89 28 15.19 28 15.19S27.29 15.19 26.4 13.98C24.76 11.59 22.5 9.64 17.6 9.48z"
+        />
+      </symbol>
+    </svg>
     <header class="nav">
       <div class="progress" id="progress"></div>
       <div class="wrap nav-inner">
@@ -1319,13 +1419,26 @@ td:first-child {
 
     <main>
       <section class="hero">
-        <div class="wrap">
-          <span class="badge"><span class="dot"></span>73 个 <code>aya_*</code> 工具 · 11 个分类</span>
-          <h1>完整工具清单</h1>
-          <p class="sub">
-            工具名统一以 <code>aya_</code> 开头。<strong>29 个只读工具</strong>默认开放；<strong>44 个写工具</strong>需在
-            设置 → MCP 中勾选「允许写操作」后才会出现在客户端。下面可按名称搜索，或只看只读 / 写工具。
-          </p>
+        <div class="wrap tools-hero">
+          <div class="tools-hero-copy">
+            <span class="badge"><span class="dot"></span>73 个 <code>aya_*</code> 工具 · 11 个分类</span>
+            <h1>完整工具清单</h1>
+            <p class="sub">
+              工具名统一以 <code>aya_</code> 开头。<strong>29 个只读工具</strong>默认开放；<strong>44 个写工具</strong>需在
+              设置 → MCP 中勾选「允许写操作」后才会出现在客户端。下面可按名称搜索，或只看只读 / 写工具。
+            </p>
+          </div>
+
+          <div class="matrix" aria-hidden="true">
+            <div class="matrix-glyph">
+              <svg viewBox="0 0 24 24"><use href="#android-glyph" /></svg>
+            </div>
+            <div class="matrix-grid">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="matrix-cap">11 个功能分类</div>
+          </div>
+
           <div class="hero-stats">
             <div class="stat"><b>73</b><span>工具总数</span></div>
             <div class="stat"><b>29</b><span>只读 · 默认开放</span></div>
