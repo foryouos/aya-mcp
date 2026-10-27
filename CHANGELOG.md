@@ -1,4 +1,4 @@
-## Unreleased
+## v2.1.3 (27 Oct 2026)
 
 * perf: aya_tap / aya_swipe / aya_key inject through the resident UiAutomation instead of `adb shell input`, cutting a single action from 200-400ms to tens of milliseconds (falls back to shell input automatically)
 * feat: aya_text uses ACTION_SET_TEXT, so Chinese and emoji are written verbatim and no longer rewritten by Gboard/Sogou IMEs
@@ -7,6 +7,7 @@
 * feat: aya_tap accepts pressMs (default 20) to control the down/up interval
 * feat: aya_ui_dump accepts an experimental deviceCrop option to push node cropping to the device (~10% faster, ~30% smaller payload); the cropped tree is sparse and must not be used for follow-up locating
 * feat: aya_ui_watch subscribes to accessibility events (merged in an 80ms window); aya_wait_for is event-driven and reports mode/eventsSeen
+* docs: website rebuilt with a new design system, a light glass hero and an animated Android device visual
 * chore: aya.dex rebuilt, tool count 72 -> 73
 
 ## v2.2.1 (23 Oct 2026)

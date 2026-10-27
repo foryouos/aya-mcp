@@ -55,7 +55,7 @@
             "applicationSubCategory": "Android 设备控制 / MCP 服务",
             "operatingSystem": "Windows, macOS, Linux",
             "url": "https://aya-mcp.foryouos.cn/",
-            "softwareVersion": "2.1.2",
+            "softwareVersion": "2.1.3",
             "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 73 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏；同板实测比 Python uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。",
             "featureList": [
               "73 个 MCP 工具（29 只读 / 44 写）",
@@ -2944,20 +2944,23 @@ details p {
               </thead>
               <tbody>
                 <tr>
+                  <td><code>v2.1.3</code></td>
+                  <td>
+                    注入通道提速：tap / swipe / key / text / screencap 改走常驻 UiAutomation，单次动作从 200–400ms 降到几十毫秒；文本改用
+                    ACTION_SET_TEXT，中文与 emoji 原样写入；截图在设备端压缩透传；新增 <code>aya_ui_watch</code> 无障碍事件订阅，
+                    <code>aya_wait_for</code> 改为事件驱动；官网改版。
+                  </td>
+                </tr>
+                <tr>
                   <td><code>v2.1.2</code></td>
-                  <td>修复安装版「检查更新」报错（改读 GitHub Releases API）；工具扩到 73 个，新增 <code>aya_gesture</code>、<code>aya_long_press</code>、<code>aya_webview_*</code>、屏幕适配、<code>aya_stats</code>、<code>aya_ui_watch</code>；tap / swipe / key / text / screencap 改走常驻 UiAutomation。</td>
+                  <td>
+                    新增 <code>aya_long_press</code> 与手势注入，<code>aya_batch</code> 支持 gesture 步骤；定位失败返回 nearMatches 与可见性诊断；
+                    短 resource-id 可直接匹配；多窗口节点合并与 <code>visibleOnly</code> 过滤；工具总数 72。
+                  </td>
                 </tr>
                 <tr>
                   <td><code>v2.1.0</code></td>
                   <td>新增串口调试面板（bootloader / kernel / android 分段识别、过滤、暂停、波特率探测）与 8 个 <code>aya_serial_*</code> 工具，工具总数 50。</td>
-                </tr>
-                <tr>
-                  <td><code>v1.14.3+mcp</code></td>
-                  <td>同步上游至 AYA v1.14.3；Windows 下关闭主窗口改为最小化到托盘；更新检查接入 GitHub Releases。</td>
-                </tr>
-                <tr>
-                  <td><code>v1.14.2+mcp</code></td>
-                  <td>首个 MCP 分支：内置只监听 <code>127.0.0.1</code> 的 MCP 服务，暴露 42 个 <code>aya_*</code> 工具，支持 stdio 与 HTTP。</td>
                 </tr>
               </tbody>
             </table>
@@ -3017,7 +3020,7 @@ details p {
           <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（
           <a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">github.com/liriliri/aya</a>，作者
           <b>surunzi / liriliri</b>）二次开发，遵循原项目 <b>AGPL-3.0</b> 许可证；桌面端基础能力（投屏、文件管理、日志、性能、Shell
-          等）均来自上游，。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.2</b>。
+          等）均来自上游，。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.3</b>。
         </div>
 
         <div class="copy-bar">

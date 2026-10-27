@@ -11,7 +11,7 @@ AYA 是一款跨平台（Windows / macOS / Linux）的 Android `adb` 桌面工�
 - **MCP 服务**：把 Android 设备能力封装为 73 个 `aya_*` 工具（29 只读 / 44 写），让 CodeBuddy、WorkBuddy、Claude 等 AI 客户端直接用自然语言操控已连接的设备。工具清单与接入方式由 [`page/index.html`](page/index.html) 详细介绍。
 - **串口调试面板**：直接接收主板启动日志，自动划分 bootloader / kernel / android 阶段，支持阶段与关键字过滤、暂停、保存会话、波特率自动探测。
 
-当前版本 **v2.1.2**（版本号独立于上游 AYA）。
+当前版本 **v2.1.3**（版本号独立于上游 AYA）。
 
 > 关闭设置中的 MCP 开关时，它就是原版 AYA，使用方式完全不变。
 
