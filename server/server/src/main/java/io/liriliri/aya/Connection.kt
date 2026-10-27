@@ -98,6 +98,61 @@ class Connection(private val client: LocalSocket) : Thread() {
                 }
             }
 
+            "ui.tap" -> {
+                try {
+                    result.put("tap", Ui.tap(JSONObject(params)))
+                } catch (e: Throwable) {
+                    Log.e(TAG, "ui.tap failed", e)
+                    result.put("error", e.toString())
+                }
+            }
+
+            "ui.swipe" -> {
+                try {
+                    result.put("swipe", Ui.swipe(JSONObject(params)))
+                } catch (e: Throwable) {
+                    Log.e(TAG, "ui.swipe failed", e)
+                    result.put("error", e.toString())
+                }
+            }
+
+            "ui.key" -> {
+                try {
+                    result.put("key", Ui.key(JSONObject(params)))
+                } catch (e: Throwable) {
+                    Log.e(TAG, "ui.key failed", e)
+                    result.put("error", e.toString())
+                }
+            }
+
+            "ui.text" -> {
+                try {
+                    result.put("text", Ui.setText(JSONObject(params)))
+                } catch (e: Throwable) {
+                    Log.e(TAG, "ui.text failed", e)
+                    result.put("error", e.toString())
+                }
+            }
+
+            "ui.screenshot" -> {
+                try {
+                    result.put("shot", Ui.screenshot(JSONObject(params)))
+                } catch (e: Throwable) {
+                    Log.e(TAG, "ui.screenshot failed", e)
+                    result.put("error", e.toString())
+                }
+            }
+
+            // 阻塞调用（最长 timeoutMs）：主机端必须用独立连接发起
+            "ui.watch" -> {
+                try {
+                    result.put("watch", Ui.watch(JSONObject(params)))
+                } catch (e: Throwable) {
+                    Log.e(TAG, "ui.watch failed", e)
+                    result.put("error", e.toString())
+                }
+            }
+
             else -> {
                 Log.e(TAG, "Unknown method: $method")
             }

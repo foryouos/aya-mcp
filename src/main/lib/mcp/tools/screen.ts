@@ -4,6 +4,8 @@ import { nativeImage } from 'electron'
 import * as adb from '../../adb'
 import * as base from '../../adb/base'
 import * as adbFile from '../../adb/file'
+import { uiScreenshot } from '../../adb/server'
+import { blockShot, isShotBlocked } from '../lib/inject'
 import { resolveDeviceId } from '../lib/device'
 import { dumpFast, withDeviceQueue } from '../lib/dump'
 import {
@@ -24,7 +26,7 @@ const deviceIdProperty = {
 const screencap: McpTool = {
   name: 'aya_screencap',
   description:
-    '截取设备当前屏幕并直接返回图片。默认缩放到宽 900 并编码为 JPEG（quality 72），相比原始 PNG 体积通常小 5-10 倍：只在 uiautomator 读不到内容（视频、游戏、Canvas、相机）时才需要它。',
+    '截取设备当前屏幕并直接返回图片。默认在设备端完成缩放与 JPEG 编码（宽 900、quality 72），只回传几十~几百 KB，比整张 PNG 过 adb 小 5-10 倍、也更快；设备端截图不可用时自动降级为 adb screencap（返回里的 source 会标明 uiAutomation 还是 adb）。只在 uiautomator 读不到内容（视频、游戏、Canvas、相机）时才需要它。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -71,23 +73,57 @@ const screencap: McpTool = {
   annotations: { readOnlyHint: true },
   handler: async (args) => {
     const deviceId = await resolveDeviceId(args.deviceId)
-    const image = nativeImage.createFromBuffer(
-      await screencapBuffer(deviceId, args.displayId)
-    )
-    const size = image.getSize()
     const maxWidth = typeof args.maxWidth === 'number' ? args.maxWidth : 900
+    const asPng = args.format === 'png'
+    const quality = Math.min(
+      Math.max(Math.floor(Number(args.quality) || 72), 1),
+      100
+    )
+
+    const crop = args.crop
+    const hasCrop =
+      !!crop &&
+      [crop.x, crop.y, crop.width, crop.height].every(
+        (value) => typeof value === 'number' && Number.isFinite(value)
+      )
+
+    // 设备端截图优先：在 Shell 进程里 takeScreenshot → 缩放 → JPEG 压缩，
+    // 只回传几百 KB，省掉整张 PNG 过 adb 的带宽（1080p 约 1.5MB）
+    let via: 'uiAutomation' | 'adb' = 'adb'
+    let shotMs = 0
+    let raw: Buffer | null = null
+    // 设备端截图可能已在设备上缩放，meta 里的宽高必须是原始设备像素
+    let deviceSize: { width: number; height: number } | null = null
+    if (typeof args.displayId !== 'number' && !isShotBlocked(deviceId)) {
+      try {
+        const shot = await uiScreenshot(deviceId, {
+          // crop 需要原始像素做裁剪，所以设备端不缩放，只做高质量压缩
+          maxWidth: hasCrop ? 0 : maxWidth,
+          quality: hasCrop ? Math.max(quality, 95) : quality,
+          format: asPng ? 'png' : 'jpeg',
+        })
+        raw = Buffer.from(shot.data, 'base64')
+        via = 'uiAutomation'
+        shotMs = shot.totalMs || 0
+        if (shot.sourceWidth && shot.sourceHeight) {
+          deviceSize = { width: shot.sourceWidth, height: shot.sourceHeight }
+        }
+      } catch {
+        blockShot(deviceId)
+      }
+    }
+    if (!raw) {
+      raw = await screencapBuffer(deviceId, args.displayId)
+    }
+
+    const image = nativeImage.createFromBuffer(raw)
+    const size = image.getSize()
 
     let output = image
     let scale = 1
     let cropped: any = null
 
-    const crop = args.crop
-    if (
-      crop &&
-      [crop.x, crop.y, crop.width, crop.height].every(
-        (value) => typeof value === 'number' && Number.isFinite(value)
-      )
-    ) {
+    if (hasCrop && crop) {
       const rect = {
         x: Math.max(Math.floor(crop.x), 0),
         y: Math.max(Math.floor(crop.y), 0),
@@ -99,25 +135,20 @@ const screencap: McpTool = {
     }
 
     // 缩放比例相对「裁剪后」的尺寸计算，否则 crop 场景下点击坐标换算会偏
-    const sourceWidth = cropped ? cropped.width : size.width
+    const sourceWidth = cropped ? cropped.width : deviceSize?.width || size.width
     if (maxWidth > 0 && output.getSize().width > maxWidth) {
       output = output.resize({ width: Math.round(maxWidth), quality: 'good' })
     }
     scale = output.getSize().width / sourceWidth
 
-    const asPng = args.format === 'png'
-    const quality = Math.min(
-      Math.max(Math.floor(Number(args.quality) || 72), 1),
-      100
-    )
     const buffer = asPng ? output.toPNG() : output.toJPEG(quality)
     const scaled = output.getSize()
 
     const meta = {
       ok: true,
       deviceId,
-      width: size.width,
-      height: size.height,
+      width: deviceSize?.width || size.width,
+      height: deviceSize?.height || size.height,
       imageWidth: scaled.width,
       imageHeight: scaled.height,
       format: asPng ? 'png' : 'jpeg',
@@ -125,6 +156,8 @@ const screencap: McpTool = {
       bytes: buffer.length,
       cropped,
       scale,
+      source: via,
+      shotMs,
       note: '图片可能被缩放；点击坐标请使用 aya_ui_dump 返回的 center（设备像素）。优先用 aya_ui_dump / aya_webview_snapshot，截屏只在解析不到控件时使用',
     }
 

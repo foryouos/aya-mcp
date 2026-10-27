@@ -57,7 +57,7 @@ async function capture(deviceId: string, args: any) {
 const swipe: McpTool = {
   name: 'aya_swipe',
   description:
-    '在屏幕上滑动，从 (x1,y1) 滑到 (x2,y2)。duration 为滑动时长（毫秒），默认 300。连续滑动时可开 withUi 观察结果。',
+    '在屏幕上滑动，从 (x1,y1) 滑到 (x2,y2)。duration 为滑动时长（毫秒），默认 300。默认走常驻 UiAutomation 注入，失败自动降级 input swipe。连续滑动时可开 withUi 观察结果。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -81,7 +81,7 @@ const swipe: McpTool = {
       typeof args.duration === 'number' && args.duration > 0
         ? args.duration
         : 300
-    const settledMs = await performSwipe(
+    const { settledMs, via } = await performSwipe(
       deviceId,
       { x1: args.x1, y1: args.y1, x2: args.x2, y2: args.y2 },
       duration,
@@ -92,7 +92,7 @@ const swipe: McpTool = {
       ? await capture(deviceId, args)
       : {}
 
-    return jsonResult({ ok: true, deviceId, duration, settledMs, ...extra })
+    return jsonResult({ ok: true, deviceId, duration, via, settledMs, ...extra })
   },
 }
 
@@ -358,7 +358,7 @@ const gesture: McpTool = {
 const key: McpTool = {
   name: 'aya_key',
   description:
-    '发送按键事件。支持名称（back/home/enter/recent/volume_up/volume_down/power/menu/delete/tab/escape/search/dpad_*）或 Android keycode 数字。',
+    '发送按键事件（默认走常驻 UiAutomation 注入，失败自动降级 input keyevent）。支持名称（back/home/enter/recent/volume_up/volume_down/power/menu/delete/tab/escape/search/dpad_*）或 Android keycode 数字。',
   inputSchema: {
     type: 'object',
     properties: {
@@ -377,7 +377,7 @@ const key: McpTool = {
   write: true,
   handler: async (args) => {
     const deviceId = await resolveDeviceId(args.deviceId)
-    const { code, settledMs } = await performKey(
+    const { code, settledMs, via } = await performKey(
       deviceId,
       args.key,
       resolveSettle(args, 300)
@@ -392,6 +392,7 @@ const key: McpTool = {
       deviceId,
       key: args.key,
       keycode: code,
+      via,
       settledMs,
       ...extra,
     })
@@ -401,12 +402,15 @@ const key: McpTool = {
 const text: McpTool = {
   name: 'aya_text',
   description:
-    '向当前焦点输入框输入 ASCII 文本。默认先清空输入框，并在输入前后自动切换到不带联想的输入法（Gboard/搜狗等会改写文本）；输入法切换期间界面可能短暂提示。传入 verify:true 会在输入后回读界面确认内容。非 ASCII 字符（中文等）请改用 aya_shell 配合 ADBKeyboard。',
+    '向当前焦点输入框写入文本。默认走系统 ACTION_SET_TEXT：一次调用完成整体替换，不经过输入法，中文/emoji 可直接写入，也不会被 Gboard/搜狗等联想改写。只有当输入框不支持直接写入时才降级为 input text（此时仅支持可打印 ASCII，并自动临时切换输入法再恢复）。clear:false 表示追加到原内容之后。传入 verify:true 会在输入后回读界面确认实际内容。',
   inputSchema: {
     type: 'object',
     properties: {
       deviceId: deviceIdProperty,
-      text: { type: 'string', description: '要输入的 ASCII 文本' },
+      text: {
+        type: 'string',
+        description: '要输入的文本；优先通道支持中文与 emoji，降级通道仅限可打印 ASCII',
+      },
       clear: {
         type: 'boolean',
         description: '输入前是否清空输入框，默认 true',
@@ -439,8 +443,11 @@ const text: McpTool = {
 
     let verify: any = null
     if (args.verify === true) {
-      verify = await verifyFocusedText(deviceId, value).catch((err) => ({
+      // 追加模式下输入框最终内容是「原文本 + 新文本」，回读要按最终内容比对
+      const expected = String(result.expectedText ?? value)
+      verify = await verifyFocusedText(deviceId, expected).catch((err) => ({
         matched: false,
+        expected,
         error: err instanceof Error ? err.message : String(err),
       }))
     }
@@ -453,8 +460,10 @@ const text: McpTool = {
       ok: true,
       deviceId,
       text: value,
+      via: result.via,
       settledMs: result.settledMs,
       cleared: result.cleared,
+      previousText: result.previousText,
       ime: result.ime,
       verify,
       ...extra,

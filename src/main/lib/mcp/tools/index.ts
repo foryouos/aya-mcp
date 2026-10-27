@@ -13,6 +13,7 @@ import logcatTools from './logcat'
 import serialTools from './serial'
 import batchTools from './batch'
 import waitTools from './wait'
+import watchTools from './watch'
 import portTools from './port'
 import webviewTools from './webview'
 import recordTools from './record'
@@ -29,6 +30,7 @@ const toolGroups: McpTool[][] = [
   gestureTools,
   batchTools,
   waitTools,
+  watchTools,
   appTools,
   shellTools,
   packageTools,

@@ -49,6 +49,19 @@ class AyaClient {
       this.resolves.set(id, resolve)
     })
   }
+  close() {
+    const socket = this.socket
+    this.socket = null
+    try {
+      if (socket && typeof socket.end === 'function') {
+        socket.end()
+      }
+    } catch {
+      // ignore
+    }
+    this.resolves.forEach((resolve) => resolve(undefined))
+    this.resolves.clear()
+  }
   private async connect(tryStart = true) {
     logger.info('connect')
     try {
@@ -79,15 +92,18 @@ class AyaClient {
       if (tryStart) {
         await this.push()
         await this.start()
-        await waitUntil(this.isRunning, 10000, 100)
+        await waitUntil(() => this.isRunning(), 10000, 100)
         await this.connect(false)
       }
     }
   }
-  private isRunning = singleton(async () => {
+  // 不能用 singleton：设备端服务刚拉起时第一次查询往往还是 false，
+  // 结果被缓存后 waitUntil 会一直拿到 false 直到 10s 超时。
+  // 这里每次真实查询，只在「连接已失败、准备重启设备端服务」的路径上调用，开销可忽略。
+  private async isRunning() {
     const result: string = await shell(this.deviceId, `cat /proc/net/unix`)
     return contain(result, '@aya')
-  })
+  }
   private async push() {
     logger.info('push')
     const device = client.getDevice(this.deviceId)
@@ -169,6 +185,168 @@ export async function getUiState(deviceId: string): Promise<{
   const result = await ayaClient.sendMessage('ui.state')
 
   return (result && result.state) || { available: false, error: '', mainLoop: false }
+}
+
+/**
+ * 注入类 RPC：调用常驻 UiAutomation 完成点击/滑动/按键/文本，
+ * 省掉 `adb shell input` 每次新起进程的开销（实测 200-400ms → 几十毫秒）。
+ */
+export interface IInjectResult {
+  ok?: boolean
+  totalMs?: number
+  steps?: number
+  keycode?: number
+  applied?: boolean
+  previousText?: string
+  length?: number
+}
+
+function unwrap<T>(result: any, key: string): T {
+  if (result && result.error) {
+    throw new Error(String(result.error))
+  }
+
+  return (result && result[key]) || ({} as T)
+}
+
+async function sendInject(
+  deviceId: string,
+  method: string,
+  params: Record<string, unknown>,
+  key: string
+) {
+  const client = await getAyaClient(deviceId)
+
+  return unwrap<IInjectResult>(await client.sendMessage(method, params), key)
+}
+
+export async function injectTap(deviceId: string, x: number, y: number) {
+  return sendInject(deviceId, 'ui.tap', { x, y }, 'tap')
+}
+
+export async function injectSwipe(
+  deviceId: string,
+  coords: { x1: number; y1: number; x2: number; y2: number },
+  durationMs = 300
+) {
+  return sendInject(
+    deviceId,
+    'ui.swipe',
+    { ...coords, durationMs },
+    'swipe'
+  )
+}
+
+export async function injectKey(deviceId: string, keycode: number) {
+  return sendInject(deviceId, 'ui.key', { keycode }, 'key')
+}
+
+export async function injectText(
+  deviceId: string,
+  text: string,
+  append = false
+) {
+  return sendInject(deviceId, 'ui.text', { text, append }, 'text')
+}
+
+export interface IUiScreenshot {
+  data: string
+  format: 'jpeg' | 'png'
+  quality: number | null
+  width: number
+  height: number
+  sourceWidth: number
+  sourceHeight: number
+  bytes: number
+  totalMs: number
+}
+
+export async function uiScreenshot(
+  deviceId: string,
+  options: { maxWidth?: number; quality?: number; format?: 'jpeg' | 'png' } = {}
+): Promise<IUiScreenshot> {
+  const client = await getAyaClient(deviceId)
+  const result = await client.sendMessage('ui.screenshot', {
+    maxWidth: options.maxWidth === undefined ? 900 : options.maxWidth,
+    quality: options.quality === undefined ? 72 : options.quality,
+    format: options.format || 'jpeg',
+  })
+
+  return unwrap<IUiScreenshot>(result, 'shot')
+}
+
+export interface IUiWatchEvent {
+  type: string
+  pkg: string
+  cls: string
+  text: string
+  at: number
+  count: number
+}
+
+export interface IUiWatchResult {
+  ok?: boolean
+  matched?: boolean
+  waitedMs?: number
+  timeoutMs?: number
+  settleMs?: number
+  events?: IUiWatchEvent[]
+  matchedEvent?: IUiWatchEvent | null
+  eventTotal?: number
+}
+
+// ui.watch 是阻塞 RPC（最长 15s），必须走独立连接，
+// 否则会堵住同一 socket 上排队的其它工具调用（服务端按连接串行处理请求）
+const watchClients: { [deviceId: string]: AyaClient } = {}
+
+function getWatchClient(deviceId: string) {
+  let client = watchClients[deviceId]
+  if (!client) {
+    client = new AyaClient(deviceId)
+    watchClients[deviceId] = client
+  }
+
+  return client
+}
+
+export async function watchUi(
+  deviceId: string,
+  params: Record<string, unknown>,
+  timeoutMs: number
+): Promise<IUiWatchResult> {
+  const client = getWatchClient(deviceId)
+  let timer: NodeJS.Timeout | undefined
+
+  try {
+    const result = await Promise.race([
+      client.sendMessage('ui.watch', params),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('ui.watch timeout')),
+          Math.max(timeoutMs, 1000) + 2000
+        )
+      }),
+    ])
+
+    return unwrap<IUiWatchResult>(result, 'watch')
+  } catch (err) {
+    // 设备端 watch 线程可能还阻塞在自己的 timeout 里，
+    // 关掉连接让服务端读循环感知断开；下次调用重新建连
+    client.close()
+    delete watchClients[deviceId]
+    throw err
+  } finally {
+    if (timer) {
+      clearTimeout(timer)
+    }
+  }
+}
+
+export async function getUiCapabilities(deviceId: string) {
+  const client = await getAyaClient(deviceId)
+  const result = await client.sendMessage('ui.state')
+
+  return (result && result.state) || { available: false, error: '', mainLoop: false, events: false }
 }
 
 const getPackageInfos: IpcGetPackageInfos = singleton(async function (

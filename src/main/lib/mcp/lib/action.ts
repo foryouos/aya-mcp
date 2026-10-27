@@ -1,5 +1,7 @@
 import * as adb from '../../adb'
 import * as base from '../../adb/base'
+import { injectKey, injectSwipe, injectTap, injectText } from '../../adb/server'
+import { blockInject, injectOrFallback, isInjectBlocked } from './inject'
 import { dumpFast, invalidateDump, withDeviceQueue } from './dump'
 import {
   diffFrame,
@@ -162,15 +164,27 @@ export async function captureUi(
   }
 }
 
+function checkShellOutput(value: unknown, label: string) {
+  if (typeof value === 'string' && value) {
+    assertShellOk(value, label)
+  }
+}
+
 export async function performTap(args: any, settle: number) {
   const target = await resolveTarget(args)
-  const output = await withDeviceQueue(target.deviceId, () =>
-    adb.inputTap(target.deviceId, target.point[0], target.point[1])
+  // 常驻 UiAutomation 注入优先，失败自动熔断并降级到 `input tap`
+  const outcome = await withDeviceQueue(target.deviceId, () =>
+    injectOrFallback(
+      target.deviceId,
+      'aya_tap',
+      () => injectTap(target.deviceId, target.point[0], target.point[1]),
+      () => adb.inputTap(target.deviceId, target.point[0], target.point[1])
+    )
   )
-  assertShellOk(output, 'aya_tap')
+  checkShellOutput(outcome.value, 'aya_tap')
   const settledMs = await afterInput(target.deviceId, settle)
 
-  return { target, settledMs }
+  return { target, settledMs, via: outcome.via }
 }
 
 export async function performSwipe(
@@ -179,19 +193,26 @@ export async function performSwipe(
   duration: number,
   settle: number
 ) {
-  const output = await withDeviceQueue(deviceId, () =>
-    adb.inputSwipe(
+  const outcome = await withDeviceQueue(deviceId, () =>
+    injectOrFallback(
       deviceId,
-      coords.x1,
-      coords.y1,
-      coords.x2,
-      coords.y2,
-      duration
+      'aya_swipe',
+      () => injectSwipe(deviceId, coords, duration),
+      () =>
+        adb.inputSwipe(
+          deviceId,
+          coords.x1,
+          coords.y1,
+          coords.x2,
+          coords.y2,
+          duration
+        )
     )
   )
-  assertShellOk(output, 'aya_swipe')
+  checkShellOutput(outcome.value, 'aya_swipe')
+  const settledMs = await afterInput(deviceId, settle)
 
-  return afterInput(deviceId, settle)
+  return { settledMs, via: outcome.via }
 }
 
 export async function performKey(
@@ -207,10 +228,18 @@ export async function performKey(
     )
   }
 
-  await withDeviceQueue(deviceId, () => adb.inputKey(deviceId, code))
+  const outcome = await withDeviceQueue(deviceId, () =>
+    injectOrFallback(
+      deviceId,
+      'aya_key',
+      () => injectKey(deviceId, code),
+      () => adb.inputKey(deviceId, code)
+    )
+  )
+  checkShellOutput(outcome.value, 'aya_key')
   const settledMs = await afterInput(deviceId, settle)
 
-  return { code, settledMs }
+  return { code, settledMs, via: outcome.via }
 }
 
 // 会改写输入的输入法：Gboard/搜狗/百度/讯飞等在 input text 时会做联想、大小写纠正、
@@ -294,16 +323,63 @@ export interface ITextOptions {
   ime?: 'auto' | 'keep'
 }
 
+async function tryDirectText(
+  deviceId: string,
+  value: string,
+  options: ITextOptions
+) {
+  if (isInjectBlocked(deviceId)) {
+    return null
+  }
+
+  try {
+    return await withDeviceQueue(deviceId, () =>
+      injectText(deviceId, value, options.clear === false)
+    )
+  } catch {
+    blockInject(deviceId)
+
+    return null
+  }
+}
+
 export async function performText(
   deviceId: string,
   value: string,
   settle: number,
   options: ITextOptions = {}
 ) {
+  // 路径 1：ACTION_SET_TEXT，一次 binder 完成替换，不经过 IME，中文/emoji 原样写入
+  const direct = await tryDirectText(deviceId, value, options)
+  if (direct) {
+    const settledMs = await afterInput(deviceId, settle)
+
+    return {
+      settledMs,
+      via: 'setText' as const,
+      cleared: options.clear === false ? 'appended' : 'replaced',
+      previousText: direct.previousText || '',
+      // 追加模式下输入框的最终内容，供 verify 与调用方比对
+      expectedText:
+        options.clear === false
+          ? `${direct.previousText || ''}${value}`
+          : value,
+      ime: {
+        mode: 'bypass',
+        current: null,
+        used: null,
+        switched: false,
+        restored: false,
+        risk: false,
+      },
+    }
+  }
+
+  // 路径 2：降级到 input text，只能输入可打印 ASCII
   if (!/^[\x20-\x7E]+$/.test(value)) {
     throw new McpError(
       'INVALID_ARGS',
-      '输入仅支持可打印 ASCII 字符；中文等非 ASCII 文本请用 aya_shell 配合设备输入法'
+      '当前输入框不接受直接写入（ACTION_SET_TEXT），降级通道只能输入可打印 ASCII；中文请用 aya_webview_input（H5）或 aya_shell 配合设备输入法'
     )
   }
 
@@ -341,7 +417,9 @@ export async function performText(
 
   return {
     settledMs,
+    via: 'input' as const,
     cleared: cleared || 'none',
+    expectedText: value,
     ime: {
       mode: useSafeIme ? 'auto' : 'keep',
       current: ime.current || null,

@@ -186,6 +186,43 @@
 - `case 'gesture'`：`normalizeSteps(step.steps)` 复用同一套校验 → `withDeviceQueue` → `injectGesture(captureAt:-1)` → `settle` → `invalidateDump`，保证后续步骤读到手势后的界面树；
 - 复用了 `tools/gesture.ts` 中导出的 `normalizeSteps`，两个工具的手势校验口径一致。
 
+## 7. 第三轮回归：常驻注入 / ACTION_SET_TEXT / 设备端截图 / 无障碍事件（2026-10-27）
+
+设备：RK3576 / Android 14（`4a7de4f19facc740`），AYA dev 模式（`electron .`），主进程与 `aya.dex` 均为本轮构建。
+
+### 7.1 实测数据
+
+| 项 | 结果 | 说明 |
+| --- | --- | --- |
+| UI dump | 平均 176 ms（6 次，47–319 ms） | `source:"accessibility"`；上一版 `uiautomator dump` 为 2.4–4.9 s |
+| `aya_tap` | 699 ms（含 id 定位 dump + settle 300 ms） | `via:"uiAutomation"` |
+| `aya_batch` 4 步 | 857 ms；单步 tap 227/233 ms、key 156/171 ms | 注入本身约 100 ms / 40 ms |
+| `aya_text`（中文 + emoji） | 638 ms | `via:"setText"`、`previousText:"搜索…"`、`verify.matched:true` |
+| `aya_text`（`clear:false` 追加） | 520 ms | `cleared:"appended"`、`verify.matched:true`，最终内容「你好 AYA 中文测试 🚀 追加123」 |
+| `aya_swipe` | 515 ms（含 300 ms 滑动时长） | `via:"uiAutomation"` |
+| `aya_screencap` | 333 ms / 15,128 B（900×506 JPEG） | `source:"uiAutomation"`、`shotMs:172`；`width/height` 仍为 1920×1080、`scale:0.46875` |
+| `aya_ui_watch` | 命中 `content` 事件（`count:3`），等待 11.7 s 后被设备侧动作唤醒 | 事件合并生效 |
+| `aya_wait_for`（超时） | `mode:"events"`、`eventsSeen:0`、`attempts:1`、dump 47 ms | 上一版同场景 attempts 7、dump 627 ms |
+| `aya_wait_for`（事件唤醒） | `eventsSeen:1`、`attempts:2`（事件后仅复核一次） | 界面不含目标文本，未命中，但唤醒链路正常 |
+| `aya_stats` | 10 次调用、0 错误 | dump 平均 176 ms |
+
+### 7.2 本轮修复
+
+| 问题 | 现象 | 修复 |
+| --- | --- | --- |
+| 冷启动首次注入降级 | 设备端服务刚重启时 `via:"shell"`、耗时 10.5 s | `AyaClient.isRunning` 去掉 `singleton`（首次 false 被缓存会让 `waitUntil` 必然超时）；`injectOrFallback` 失败后 400 ms 重试一次再熔断 |
+| `via` 未透出 | 返回里没有 `via`，无法判断走注入还是 shell | `input.ts` / `gesture.ts` 的 tap、swipe、key、text 全部透出 `via` |
+| 截图 meta 语义错误 | `width/height` 变成缩放后尺寸、`scale` 恒为 1 | 用设备端返回的 `sourceWidth/Height` 作为设备像素，`scale` 据此计算 |
+| 追加输入 verify 误报 | `clear:false` 后 `verify.matched:false` | `performText` 返回 `expectedText`，verify 按最终内容比对 |
+| 等待期间空 dump | 事件模式下每次 watch 超时仍 dump 一次（attempts 17） | 无事件时跳过 dump 直接继续等（attempts 1） |
+
+### 7.3 结论
+
+- 注入 / 文本 / 截图三条常驻通道全部生效，失败可降级且用 `via` / `source` 标明实际路径。
+- 无障碍事件通道可用，`aya_ui_watch` 与 `aya_wait_for` 的事件唤醒实测通过；界面静止时不再空转 dump。
+- 已知限制：事件唤醒依赖界面真的产生无障碍事件，SurfaceView / 视频画面不会产生，仍走超时逻辑。
+- 测试期间出现过一次「两个 AYA 主进程并存导致端口占用、旧进程代码回应请求」的环境问题，清理后复测通过，与代码无关。
+
 **BUG-16 修复实现**（`src/main/lib/mcp/tools/gesture.ts`）：`aya_gesture` 描述改为“一段事件流内可包含多组 down/up”，并给出“轻点唤醒 + 拖动进度条”的 5 步示例；`steps` 字段描述同步说明每组独立成对。
 
 > 未遗留建议项：两条缺陷均已随 v2.2.1 之后的本地构建落地（`tools=72`，`aya_batch` 枚举含 `gesture`）；重建重启后 `tools/list` 实测 `aya_gesture.description` 已含“一段事件流内可包含多组 down/up”与 5 步示例、`steps` 字段说明同步更新，真机复验快进落点仍为 1:18:18。

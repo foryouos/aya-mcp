@@ -345,11 +345,11 @@ export async function afterInput(deviceId, settle = 300) {
 | P1-6 适配工具 | ✅ | `adapt.ts`：rotation/density/resolution/locale/dark_mode/animation_scale/list_displays | 全部返回 `previous → current → applied` |
 | P2-2 指纹与 LRU | ✅ | `snapshot.ts` 的 `fingerprint/history/diffSnapshot` | `aya_ui_dump diffFrom` 输出增删节点 |
 | P2-4 可观测性 | ✅ | `lib/stats.ts` + `protocol.ts` 埋点 + `aya_stats` | `aya_stats` 输出 p50/p95、dump 复用率 |
-| P2-1 无障碍事件 | ⬜ | 需扩展 `aya.dex`，留待后续 | — |
-| P2-3 结果协议 v2 | ✅ | `lib/envelope.ts` + `protocol.ts` 统一注入 `timing/cost/retryable/snapshot/suggestedNextCall`（覆盖全部 70 个工具，无需逐工具适配） | 任意工具返回都带这 5 个字段；失败时 `suggestedNextCall` 给出下一步 |
+| P2-1 无障碍事件 | ✅ | `Ui.kt` 事件订阅（eventTypes + Proxy 监听 + 80ms 合并）与 `ui.watch`；`tools/watch.ts` 的 `aya_ui_watch`、`wait.ts` 事件唤醒 | `aya_wait_for` 返回 `mode:"events"` / `eventsSeen`；滚动风暴下事件被合并、响应不膨胀 |
+| P2-3 结果协议 v2 | ✅ | `lib/envelope.ts` + `protocol.ts` 统一注入 `timing/cost/retryable/snapshot/suggestedNextCall`（覆盖全部 73 个工具，无需逐工具适配） | 任意工具返回都带这 5 个字段；失败时 `suggestedNextCall` 给出下一步 |
 | `aya_cast_window` deviceId | ✅ | `showWin(deviceId)` + 渲染端 `pinnedDeviceId` 固定设备 | 传 deviceId 打开窗口后切换主窗口设备，投屏目标不变 |
 
-> 说明：`aya_webview_run`（脚本批量执行）与 `aya_webview_watch`（事件流）暂未实现，前者可用 `aya_batch` + `aya_webview_eval` 组合替代，后者建议等 P2-1 无障碍事件方案一起做。
+> 说明：`aya_webview_run`（脚本批量执行）与 `aya_webview_watch`（事件流）暂未实现，前者可用 `aya_batch` + `aya_webview_eval` 组合替代；无障碍事件通道已在第 12 节落地，WebView 事件流可在此基础上后续补充。
 
 ## 11. 第二轮真机测试（2026-10-24）暴露问题的修复
 
@@ -366,3 +366,25 @@ export async function afterInput(deviceId, settle = 300) {
 | nodeIndex 点到不可见节点 | 静默点空，无任何提示 | 返回 `warning` 提示先滚动到可见区域 | `lib/target.ts` |
 
 验收：`parseSnapshot` 逻辑校验 9 项全过（多窗口合并、越界裁剪、部分可见裁剪、短 id 匹配、`visibleOnly` 过滤、`compactTree` 丢弃不可见）；`tsc --noEmit` 与 `eslint` 在 MCP 目录无新增问题；`gradlew :server:assembleRelease` 构建通过，`resources/aya.dex` 已同步。
+
+## 12. 第三轮：注入通道、文本直写、设备端截图与事件驱动（2026-10-27）
+
+目标是压掉「每条命令新起进程」的开销，把单动作延迟拉到与常驻 instrumentation 方案同量级，同时落地 P2-1。
+
+| 项 | 实现 | 落点 | 回退 |
+| --- | --- | --- | --- |
+| 点击/滑动/按键走常驻注入 | 新增 `ui.tap` / `ui.swipe` / `ui.key`，一次 binder 完成；滑动按 ~16ms 帧插值 | `Ui.kt`、`Connection.kt`、`adb/server.ts#injectTap/injectSwipe/injectKey`、`lib/action.ts` | 失败熔断 5 分钟后降级 `input tap/swipe/keyevent`，返回 `via:"shell"` |
+| 文本直写 | `ui.text` 用 `ACTION_SET_TEXT`，支持中文/emoji；`clear:false` 为追加 | `Ui.kt#setText`、`adb/server.ts#injectText`、`action.ts#performText` | 无焦点可编辑节点/控件不支持时降级 IME 路径（限 ASCII） |
+| 设备端截图 | `ui.screenshot`：`takeScreenshot` → 缩放 → JPEG，回传体积降 5-10 倍 | `Ui.kt#screenshot`、`adb/server.ts#uiScreenshot`、`tools/screen.ts` | 独立熔断后降级 `adb screencap`，返回 `source:"adb"` |
+| 无障碍事件 | `eventTypes` + `OnAccessibilityEventListener`（Proxy 实现），80ms 合并、队列上限 200 | `Ui.kt#installEventListener/onEvent/watch`、`Connection.kt` | `ui.watch` 不可用即回退轮询 |
+| 事件驱动等待 | 新增 `aya_ui_watch`；`aya_wait_for` 把固定 sleep 换成「等事件最多一个 interval」 | `tools/watch.ts`、`tools/wait.ts` | `mode:"selector"` |
+| 双连接 | watch 是阻塞 RPC，主机用独立 LocalSocket，超时废弃重建 | `adb/server.ts#watchUi` | 超时后回退轮询 |
+
+验收口径：
+
+- `aya_tap` 的 `timing.actionMs` 从 200-400ms 降到 <80ms（`aya_stats` p50 对比）
+- `aya_text` 中文用例通过，ASCII 不再被 IME 改写
+- `aya_screencap` 1080p ≤400KB，`source:"uiAutomation"`
+- 冷启动等首帧控件：`aya_wait_for` 返回 `mode:"events"`，`attempts`（dump 次数）低于纯轮询
+- 快速滚动长列表时 `aya_ui_watch` 响应不膨胀、不超时
+- 全通道禁用时行为与上一版一致（`via:"shell"` / `source:"adb"` / `mode:"selector"`）

@@ -1,3 +1,11 @@
+## Unreleased
+
+* perf: aya_tap / aya_swipe / aya_key inject through the resident UiAutomation instead of `adb shell input`, cutting a single action from 200-400ms to tens of milliseconds (falls back to shell input automatically)
+* feat: aya_text uses ACTION_SET_TEXT, so Chinese and emoji are written verbatim and no longer rewritten by Gboard/Sogou IMEs
+* perf: aya_screencap scales and JPEG-encodes on the device, returning 1/5-1/10 of the previous PNG payload
+* feat: aya_ui_watch subscribes to accessibility events (merged in an 80ms window); aya_wait_for is event-driven and reports mode/eventsSeen
+* chore: aya.dex rebuilt, tool count 72 -> 73
+
 ## v2.2.1 (23 Oct 2026)
 
 * fix: check update failed on packaged build, read releases from github api instead of latest.yml

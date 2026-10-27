@@ -1,15 +1,24 @@
 package io.liriliri.aya
 
+import android.graphics.Bitmap
 import android.graphics.Rect
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Base64
 import android.util.Log
 import android.view.InputDevice
+import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.lang.reflect.Proxy
+import java.util.ArrayDeque
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -46,6 +55,7 @@ object Ui {
         ret.put("available", automation != null)
         ret.put("error", lastError)
         ret.put("mainLoop", mainLoopStarted)
+        ret.put("events", eventsInstalled)
         return ret
     }
 
@@ -155,14 +165,20 @@ object Ui {
             instance,
             FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES or FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         )
-        enableViewIds(cls, instance)
+        configureServiceInfo(cls, instance)
+        try {
+            installEventListener(instance)
+        } catch (e: Throwable) {
+            Log.w(TAG, "fail to install accessibility listener", e)
+        }
         Log.i(TAG, "UiAutomation connected")
 
         return instance
     }
 
-    // 不开这个 flag 时 resource-id 恒为 null，id/text 定位会全部失效
-    private fun enableViewIds(cls: Class<*>, instance: Any) {
+    // 不开这些 flag 时 resource-id 恒为 null、状态栏/输入法窗口取不到；
+    // eventTypes 不声明的话 onAccessibilityEvent 永远不回调
+    private fun configureServiceInfo(cls: Class<*>, instance: Any) {
         try {
             val getInfo = cls.declaredMethods.firstOrNull {
                 it.name == "getServiceInfo" && it.parameterTypes.isEmpty()
@@ -180,9 +196,30 @@ object Ui {
                     FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
                     FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             )
+
+            try {
+                val eventTypesField = info.javaClass.getField("eventTypes")
+                eventTypesField.setInt(
+                    info,
+                    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+                        AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+                        AccessibilityEvent.TYPE_WINDOWS_CHANGED or
+                        AccessibilityEvent.TYPE_VIEW_SCROLLED
+                )
+            } catch (e: Throwable) {
+                Log.w(TAG, "fail to set event types", e)
+            }
+
+            // 关闭反馈音/震动：注入大量事件时不希望设备一直响
+            try {
+                info.javaClass.getField("feedbackType").setInt(info, 0)
+            } catch (e: Throwable) {
+                // 部分 ROM 没有这个字段，忽略
+            }
+
             setInfo.invoke(instance, info)
         } catch (e: Throwable) {
-            Log.w(TAG, "fail to enable view ids", e)
+            Log.w(TAG, "fail to configure service info", e)
         }
     }
 
@@ -283,6 +320,309 @@ object Ui {
         } finally {
             event.recycle()
         }
+    }
+
+    // ---------------- 基础注入（替代 adb shell input） ----------------
+
+    /**
+     * 单击：一次 down + up 事件。相比 `input tap` 省掉一个进程的启动与 adb 往返，
+     * 实测从 200-400ms 降到几十毫秒。
+     */
+    fun tap(params: JSONObject): JSONObject {
+        val instance = ensure()
+            ?: throw IllegalStateException("UiAutomation unavailable: $lastError")
+        val x = params.optDouble("x", Double.NaN).toFloat()
+        val y = params.optDouble("y", Double.NaN).toFloat()
+        if (x.isNaN() || y.isNaN()) {
+            throw IllegalArgumentException("x and y required")
+        }
+
+        val started = SystemClock.uptimeMillis()
+        inject(instance, MotionEvent.ACTION_DOWN, started, started, x, y)
+        inject(instance, MotionEvent.ACTION_UP, started, started + 20, x, y)
+
+        return JSONObject()
+            .put("ok", true)
+            .put("totalMs", SystemClock.uptimeMillis() - started)
+    }
+
+    /**
+     * 滑动：按 ~16ms 一帧插值 move 事件，节奏对齐 `input swipe` 的匀速直线。
+     * 与 gesture 的区别是这里只做一条直线，参数与 aya_swipe 一一对应。
+     */
+    fun swipe(params: JSONObject): JSONObject {
+        val instance = ensure()
+            ?: throw IllegalStateException("UiAutomation unavailable: $lastError")
+        val x1 = params.optDouble("x1", Double.NaN).toFloat()
+        val y1 = params.optDouble("y1", Double.NaN).toFloat()
+        val x2 = params.optDouble("x2", Double.NaN).toFloat()
+        val y2 = params.optDouble("y2", Double.NaN).toFloat()
+        if (x1.isNaN() || y1.isNaN() || x2.isNaN() || y2.isNaN()) {
+            throw IllegalArgumentException("x1/y1/x2/y2 required")
+        }
+        val duration = params.optLong("durationMs", 300L).coerceIn(20L, 20000L)
+        val steps = Math.max(4, Math.min(60, (duration / 16).toInt()))
+        val started = SystemClock.uptimeMillis()
+
+        try {
+            inject(instance, MotionEvent.ACTION_DOWN, started, started, x1, y1)
+            for (i in 1 until steps) {
+                val t = i.toFloat() / steps
+                val target = started + (duration * t).toLong()
+                val wait = target - SystemClock.uptimeMillis()
+                if (wait > 0) {
+                    Thread.sleep(wait)
+                }
+                inject(
+                    instance,
+                    MotionEvent.ACTION_MOVE,
+                    started,
+                    SystemClock.uptimeMillis(),
+                    x1 + (x2 - x1) * t,
+                    y1 + (y2 - y1) * t
+                )
+            }
+            val tail = started + duration - SystemClock.uptimeMillis()
+            if (tail > 0) {
+                Thread.sleep(tail)
+            }
+            inject(instance, MotionEvent.ACTION_UP, started, SystemClock.uptimeMillis(), x2, y2)
+        } catch (e: Throwable) {
+            // 中途失败必须补 CANCEL，否则系统认为手指还按在屏幕上
+            runCatching {
+                inject(
+                    instance,
+                    MotionEvent.ACTION_CANCEL,
+                    started,
+                    SystemClock.uptimeMillis(),
+                    x2,
+                    y2
+                )
+            }
+            throw e
+        }
+
+        return JSONObject()
+            .put("ok", true)
+            .put("totalMs", SystemClock.uptimeMillis() - started)
+            .put("steps", steps)
+    }
+
+    /** 按键：注入 KeyEvent，避免 `input keyevent` 的进程启动开销。 */
+    fun key(params: JSONObject): JSONObject {
+        val instance = ensure()
+            ?: throw IllegalStateException("UiAutomation unavailable: $lastError")
+        val keyCode = params.optInt("keycode", -1)
+        if (keyCode <= 0) {
+            throw IllegalArgumentException("keycode required")
+        }
+
+        val started = SystemClock.uptimeMillis()
+        injectKey(instance, KeyEvent.ACTION_DOWN, started, started, keyCode)
+        injectKey(instance, KeyEvent.ACTION_UP, started, started + 20, keyCode)
+
+        return JSONObject()
+            .put("ok", true)
+            .put("keycode", keyCode)
+            .put("totalMs", SystemClock.uptimeMillis() - started)
+    }
+
+    /**
+     * 直接在焦点输入框上执行 ACTION_SET_TEXT：
+     * 一次 binder 完成替换，不经过 IME，因此中文/emoji 也能原样写入。
+     * 自定义控件若只监听 KeyEvent 而不响应 ACTION_SET_TEXT，performAction 会返回 false，
+     * 由主进程降级到 `input text`。
+     */
+    fun setText(params: JSONObject): JSONObject {
+        val instance = ensure()
+            ?: throw IllegalStateException("UiAutomation unavailable: $lastError")
+        val text = params.optString("text", "")
+        val append = params.optBoolean("append", false)
+        val started = SystemClock.uptimeMillis()
+        val latch = CountDownLatch(1)
+        var result = false
+        var previous = ""
+        var target = text
+        var failure: Throwable? = null
+
+        Handler(Looper.getMainLooper()).post {
+            try {
+                val node = findFocusedEditable(instance)
+                if (node == null) {
+                    throw IllegalStateException("no focused editable node")
+                }
+                previous = node.text?.toString() ?: ""
+                // ACTION_SET_TEXT 是整体替换：clear:false 时在主机端语义上等价于「追加」
+                target = if (append) previous + text else text
+
+                val args = Bundle()
+                args.putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    target
+                )
+                result = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                if (!result) {
+                    throw IllegalStateException("ACTION_SET_TEXT not supported by focused node")
+                }
+            } catch (e: Throwable) {
+                failure = e
+            } finally {
+                latch.countDown()
+            }
+        }
+
+        if (!latch.await(5000, TimeUnit.MILLISECONDS)) {
+            throw IllegalStateException("setText timeout")
+        }
+        failure?.let { throw it }
+
+        return JSONObject()
+            .put("ok", true)
+            .put("applied", result)
+            .put("previousText", previous)
+            .put("length", target.length)
+            .put("append", append)
+            .put("totalMs", SystemClock.uptimeMillis() - started)
+    }
+
+    /**
+     * 设备端截图：UiAutomation.takeScreenshot + 缩放 + JPEG 压缩。
+     * PNG 走 adb 传输时 1080p 就有 1.5MB，这里在设备上压成 JPEG 再回传，
+     * 带宽通常只有原来的 1/5 - 1/10。
+     */
+    fun screenshot(params: JSONObject): JSONObject {
+        val instance = ensure()
+            ?: throw IllegalStateException("UiAutomation unavailable: $lastError")
+        val maxWidth = params.optInt("maxWidth", 900)
+        val quality = params.optInt("quality", 72).coerceIn(1, 100)
+        val asPng = params.optString("format", "jpeg").lowercase() == "png"
+        val started = SystemClock.uptimeMillis()
+
+        val bitmap = captureBitmap(instance)
+            ?: throw IllegalStateException("takeScreenshot unavailable")
+        val scaled = scaleBitmap(bitmap, maxWidth)
+        val out = ByteArrayOutputStream(256 * 1024)
+        scaled.compress(
+            if (asPng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG,
+            quality,
+            out
+        )
+        val bytes = out.toByteArray()
+
+        return JSONObject()
+            .put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+            .put("format", if (asPng) "png" else "jpeg")
+            .put("quality", if (asPng) JSONObject.NULL else quality)
+            .put("width", scaled.width)
+            .put("height", scaled.height)
+            .put("sourceWidth", bitmap.width)
+            .put("sourceHeight", bitmap.height)
+            .put("bytes", bytes.size)
+            .put("totalMs", SystemClock.uptimeMillis() - started)
+    }
+
+    private fun injectKey(
+        instance: Any,
+        action: Int,
+        downTime: Long,
+        eventTime: Long,
+        keyCode: Int
+    ) {
+        // 直接 new：KeyEvent.obtain 在部分 SDK 上不可见，且这里不走事件池
+        val event = KeyEvent(downTime, eventTime, action, keyCode, 0)
+        val method = instance.javaClass.getMethod(
+            "injectInputEvent",
+            android.view.InputEvent::class.java,
+            Boolean::class.javaPrimitiveType
+        )
+        method.invoke(instance, event, false)
+    }
+
+    private fun findFocusedEditable(instance: Any): AccessibilityNodeInfo? {
+        collectRoots(instance).forEach { root ->
+            try {
+                val focus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                if (focus != null && focus.isEditable) {
+                    return focus
+                }
+            } catch (e: Throwable) {
+                Log.d(TAG, "findFocus failed: $e")
+            }
+        }
+
+        // 兜底：有些 ROM 的 findFocus 返回 null，直接在树里找 focused + editable
+        collectRoots(instance).forEach { root ->
+            findEditableInTree(root, 0, 60)?.let { return it }
+        }
+
+        return null
+    }
+
+    private fun findEditableInTree(
+        node: AccessibilityNodeInfo,
+        depth: Int,
+        maxDepth: Int
+    ): AccessibilityNodeInfo? {
+        if (depth > maxDepth) {
+            return null
+        }
+        try {
+            if (node.isEditable) {
+                return node
+            }
+        } catch (e: Throwable) {
+            // 节点已失效
+        }
+        val count = try {
+            node.childCount
+        } catch (e: Throwable) {
+            0
+        }
+        for (i in 0 until count) {
+            val child = try {
+                node.getChild(i)
+            } catch (e: Throwable) {
+                null
+            } ?: continue
+            findEditableInTree(child, depth + 1, maxDepth)?.let { return it }
+        }
+
+        return null
+    }
+
+    private fun captureBitmap(instance: Any): Bitmap? {
+        val raw = instance.javaClass.getMethod("takeScreenshot").invoke(instance) ?: return null
+        if (raw is Bitmap) {
+            return raw
+        }
+
+        // API 30+ 返回 UiAutomation.Screenshot：取 HardwareBuffer 再包成 Bitmap。
+        // HardwareBuffer / ColorSpace 用反射拿，避免低版本设备类解析失败。
+        return runCatching {
+            val buffer = raw.javaClass.getMethod("getHardwareBuffer").invoke(raw) ?: return@runCatching null
+            val colorSpace = runCatching {
+                raw.javaClass.getMethod("getColorSpace").invoke(raw)
+            }.getOrNull()
+            val wrap = Bitmap::class.java.getMethod(
+                "wrapHardwareBuffer",
+                Class.forName("android.hardware.HardwareBuffer"),
+                Class.forName("android.graphics.ColorSpace")
+            )
+            val wrapped = wrap.invoke(null, buffer, colorSpace) as? Bitmap ?: return@runCatching null
+            wrapped.copy(Bitmap.Config.ARGB_8888, false)
+        }.getOrElse {
+            Log.w(TAG, "takeScreenshot result unsupported", it)
+            null
+        }
+    }
+
+    private fun scaleBitmap(bitmap: Bitmap, maxWidth: Int): Bitmap {
+        if (maxWidth <= 0 || bitmap.width <= maxWidth) {
+            return bitmap
+        }
+        val height = Math.max(1, (bitmap.height.toLong() * maxWidth / bitmap.width).toInt())
+
+        return Bitmap.createScaledBitmap(bitmap, maxWidth, height, true)
     }
 
     fun dumpXml(maxNodes: Int, maxDepth: Int): String {
@@ -458,6 +798,254 @@ object Ui {
         } catch (e: Throwable) {
             -2
         }
+    }
+
+    // ---------------- 无障碍事件（P2-1） ----------------
+
+    private val EVENT_MERGE_MS = 80L
+    private val EVENT_QUEUE_LIMIT = 200
+
+    private val eventLock = Object()
+    private val eventQueue = ArrayDeque<JSONObject>()
+    private val pendingEvents = HashMap<String, JSONObject>()
+    private var flushScheduled = false
+
+    @Volatile
+    private var eventsInstalled = false
+
+    @Volatile
+    private var eventTotal = 0L
+
+    private fun installEventListener(instance: Any) {
+        if (eventsInstalled) {
+            return
+        }
+        val listenerClass = Class.forName("android.app.UiAutomation\$OnAccessibilityEventListener")
+        val proxy = Proxy.newProxyInstance(
+            listenerClass.classLoader,
+            arrayOf(listenerClass)
+        ) { _, method, args ->
+            if (method.name == "onAccessibilityEvent" && args != null && args.isNotEmpty()) {
+                try {
+                    onEvent(args[0] as AccessibilityEvent)
+                } catch (e: Throwable) {
+                    Log.w(TAG, "fail to handle accessibility event", e)
+                }
+            }
+            null
+        }
+        instance.javaClass
+            .getMethod("setOnAccessibilityEventListener", listenerClass)
+            .invoke(instance, proxy)
+        eventsInstalled = true
+        Log.i(TAG, "accessibility listener installed")
+    }
+
+    private fun runOnMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            block()
+
+            return
+        }
+        val latch = CountDownLatch(1)
+        Handler(Looper.getMainLooper()).post {
+            try {
+                block()
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await(5, TimeUnit.SECONDS)
+    }
+
+    private fun onEvent(event: AccessibilityEvent) {
+        val summary = summarize(event) ?: return
+        val key = summary.optString("type") + "|" + summary.optString("pkg")
+
+        // 同一类型同一包名在合并窗口内只留一条并累加计数：
+        // 滚动/动画时 CONTENT_CHANGED 每秒可达上百次，不合并会直接打爆 socket
+        synchronized(eventLock) {
+            val exist = pendingEvents[key]
+            if (exist != null) {
+                exist.put("count", exist.optInt("count", 1) + 1)
+                exist.put("at", summary.optLong("at"))
+                exist.put("text", summary.optString("text"))
+            } else {
+                pendingEvents[key] = summary
+            }
+        }
+        scheduleFlush()
+    }
+
+    private fun scheduleFlush() {
+        if (flushScheduled) {
+            return
+        }
+        flushScheduled = true
+        Handler(Looper.getMainLooper()).postDelayed({
+            flushScheduled = false
+            flushEvents()
+        }, EVENT_MERGE_MS)
+    }
+
+    private fun flushEvents() {
+        synchronized(eventLock) {
+            if (pendingEvents.isEmpty()) {
+                return
+            }
+            pendingEvents.values.forEach {
+                eventTotal++
+                eventQueue.addLast(it)
+            }
+            pendingEvents.clear()
+            while (eventQueue.size > EVENT_QUEUE_LIMIT) {
+                eventQueue.pollFirst()
+            }
+            eventLock.notifyAll()
+        }
+    }
+
+    private fun summarize(event: AccessibilityEvent): JSONObject? {
+        val type = typeName(event.eventType) ?: return null
+        val ret = JSONObject()
+        ret.put("type", type)
+        ret.put("pkg", event.packageName?.toString() ?: "")
+        ret.put("cls", event.className?.toString() ?: "")
+        ret.put("at", event.eventTime)
+        ret.put("count", 1)
+
+        val text = StringBuilder()
+        try {
+            event.text?.forEach {
+                if (text.length < 60) {
+                    if (text.isNotEmpty()) {
+                        text.append(' ')
+                    }
+                    text.append(it.toString())
+                }
+            }
+        } catch (e: Throwable) {
+            // 部分事件没有 text
+        }
+        ret.put("text", text.toString())
+
+        return ret
+    }
+
+    private fun typeName(type: Int): String? = when (type) {
+        AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> "state"
+        AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> "content"
+        AccessibilityEvent.TYPE_WINDOWS_CHANGED -> "windows"
+        AccessibilityEvent.TYPE_VIEW_SCROLLED -> "scroll"
+        else -> null
+    }
+
+    /**
+     * 订阅无障碍事件直到条件命中或超时。
+     *
+     * 这是阻塞调用：主机端必须用独立连接发起，否则会堵住同一连接上的其它请求。
+     * 命中条件在设备端判断，避免每个事件都回传一次。
+     */
+    fun watch(params: JSONObject): JSONObject {
+        val instance = ensure()
+            ?: throw IllegalStateException("UiAutomation unavailable: $lastError")
+        if (!eventsInstalled) {
+            runOnMain { runCatching { installEventListener(instance) } }
+        }
+
+        val timeout = params.optLong("timeoutMs", 5000L).coerceIn(100L, 30000L)
+        val settleMs = params.optLong("settleMs", 0L).coerceIn(0L, 5000L)
+        val pkg = params.optString("package", "")
+        val textContains = params.optString("textContains", "")
+        val wanted = params.optJSONArray("types")
+        val maxEvents = params.optInt("maxEvents", 20).coerceIn(1, 50)
+        val started = SystemClock.uptimeMillis()
+
+        // watch 的语义是「从调用那一刻开始的新事件」，先丢掉历史积压
+        synchronized(eventLock) {
+            eventQueue.clear()
+            pendingEvents.clear()
+        }
+
+        val collected = JSONArray()
+        var matched: JSONObject? = null
+        var matchedAt = 0L
+
+        while (true) {
+            val now = SystemClock.uptimeMillis()
+            val limit = if (matched != null) {
+                matchedAt + settleMs - now
+            } else {
+                started + timeout - now
+            }
+            if (limit <= 0) {
+                break
+            }
+
+            val event = pollEvent(limit) ?: continue
+            if (collected.length() < maxEvents) {
+                collected.put(event)
+            }
+            if (matched == null && matches(event, pkg, textContains, wanted)) {
+                matched = event
+                matchedAt = SystemClock.uptimeMillis()
+            }
+        }
+
+        return JSONObject()
+            .put("ok", true)
+            .put("matched", matched != null)
+            .put("waitedMs", SystemClock.uptimeMillis() - started)
+            .put("timeoutMs", timeout)
+            .put("settleMs", settleMs)
+            .put("events", collected)
+            .put("matchedEvent", matched ?: JSONObject.NULL)
+            .put("eventTotal", eventTotal)
+    }
+
+    private fun pollEvent(timeoutMs: Long): JSONObject? {
+        synchronized(eventLock) {
+            eventQueue.pollFirst()?.let { return it }
+            try {
+                eventLock.wait(timeoutMs)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+
+                return null
+            }
+
+            return eventQueue.pollFirst()
+        }
+    }
+
+    private fun matches(
+        event: JSONObject,
+        pkg: String,
+        textContains: String,
+        types: JSONArray?
+    ): Boolean {
+        if (pkg.isNotEmpty() && !event.optString("pkg").contains(pkg)) {
+            return false
+        }
+        if (textContains.isNotEmpty() &&
+            !event.optString("text").contains(textContains, ignoreCase = true)
+        ) {
+            return false
+        }
+        if (types != null && types.length() > 0) {
+            var hit = false
+            for (i in 0 until types.length()) {
+                if (types.optString(i).equals(event.optString("type"), ignoreCase = true)) {
+                    hit = true
+                    break
+                }
+            }
+            if (!hit) {
+                return false
+            }
+        }
+
+        return true
     }
 
     private fun attr(out: StringBuilder, name: String, value: String) {

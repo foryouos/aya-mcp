@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>AYA MCP 工具清单 · 72 个 aya_* 接口完整参考</title>
+    <title>AYA MCP 工具清单 · 73 个 aya_* 接口完整参考</title>
     <meta
       name="description"
-      content="AYA MCP 全部 72 个 aya_* 工具完整清单：28 个只读工具默认开放，44 个写工具需授权。覆盖设备与屏幕、交互手势、应用管理、文件、日志与 adb shell、串口调试、性能统计、端口映射、WebView 调试、屏幕适配、录屏投屏。"
+      content="AYA MCP 全部 73 个 aya_* 工具完整清单：29 个只读工具默认开放，44 个写工具需授权。覆盖设备与屏幕、交互手势、应用管理、文件、日志与 adb shell、串口调试、性能统计、端口映射、WebView 调试、屏幕适配、录屏投屏。"
     />
     <meta
       name="keywords"
@@ -539,15 +539,15 @@
     <main>
       <section class="hero">
         <div class="wrap">
-          <span class="badge"><span class="dot"></span>72 个 <code>aya_*</code> 工具 · 11 个分类</span>
+          <span class="badge"><span class="dot"></span>73 个 <code>aya_*</code> 工具 · 11 个分类</span>
           <h1>完整工具清单</h1>
           <p class="sub">
-            工具名统一以 <code>aya_</code> 开头。<strong>28 个只读工具</strong>默认开放；<strong>44 个写工具</strong>需在
+            工具名统一以 <code>aya_</code> 开头。<strong>29 个只读工具</strong>默认开放；<strong>44 个写工具</strong>需在
             设置 → MCP 中勾选「允许写操作」后才会出现在客户端。下面可按名称搜索，或只看只读 / 写工具。
           </p>
           <div class="hero-stats">
-            <div class="stat"><b>72</b><span>工具总数</span></div>
-            <div class="stat"><b>28</b><span>只读 · 默认开放</span></div>
+            <div class="stat"><b>73</b><span>工具总数</span></div>
+            <div class="stat"><b>29</b><span>只读 · 默认开放</span></div>
             <div class="stat"><b>44</b><span>写 · 需显式授权</span></div>
             <div class="stat"><b>11</b><span>功能分类</span></div>
           </div>
@@ -570,12 +570,12 @@
               <button type="button" data-perm="r">只读</button>
               <button type="button" data-perm="w">写</button>
             </div>
-            <span class="hit" id="hit">显示 72 / 72 个工具</span>
+            <span class="hit" id="hit">显示 73 / 73 个工具</span>
           </div>
 
           <div class="chips">
             <a class="chip" href="#group-device">设备与屏幕 <b>5</b></a>
-            <a class="chip" href="#group-input">交互 <b>9</b></a>
+            <a class="chip" href="#group-input">交互 <b>10</b></a>
             <a class="chip" href="#group-app">应用管理 <b>8</b></a>
             <a class="chip" href="#group-file">文件 <b>7</b></a>
             <a class="chip" href="#group-log">日志与命令 <b>4</b></a>
@@ -606,7 +606,7 @@
 
           <!-- 交互 -->
           <div class="toolbox" id="group-input">
-            <div class="tool-head"><span class="gdot"></span>交互<span class="count">9 个 · 1 只读 / 8 写</span></div>
+            <div class="tool-head"><span class="gdot"></span>交互<span class="count">10 个 · 2 只读 / 8 写</span></div>
             <table>
               <thead>
                 <tr><th>工具</th><th>权限</th><th>说明</th></tr>
@@ -620,7 +620,8 @@
                 <tr data-perm="w"><td><code>aya_key</code></td><td><span class="tag w">写</span></td><td>发送按键：back / home / enter / recent / volume_up / power / dpad_* 等，也可传 keycode 数字。</td></tr>
                 <tr data-perm="w"><td><code>aya_text</code></td><td><span class="tag w">写</span></td><td>向焦点输入框输入 ASCII 文本，自动清空并临时切换到无联想输入法；中文请走 aya_shell。</td></tr>
                 <tr data-perm="w"><td><code>aya_batch</code></td><td><span class="tag w">写</span></td><td>一次调用串行执行最多 20 个动作，最后统一回传界面，专治 1–3 秒消失的瞬时控件。</td></tr>
-                <tr data-perm="r"><td><code>aya_wait_for</code></td><td><span class="tag r">只读</span></td><td>轮询等待控件出现或消失，命中即返回，超时也回传当前界面。</td></tr>
+                <tr data-perm="r"><td><code>aya_wait_for</code></td><td><span class="tag r">只读</span></td><td>等待控件出现或消失；默认由无障碍事件唤醒（界面一变立刻复核），事件不可用时退回轮询。</td></tr>
+                <tr data-perm="r"><td><code>aya_ui_watch</code></td><td><span class="tag r">只读</span></td><td>订阅窗口/内容/滚动事件直到命中条件，设备端按 80ms 合并；用于「等界面动起来」这类没有固定控件的场景。</td></tr>
               </tbody>
             </table>
           </div>
@@ -815,7 +816,7 @@
 
     <script>
       ;(function () {
-        var TOTAL = 72
+        var TOTAL = 73
         var q = document.getElementById('q')
         var hit = document.getElementById('hit')
         var empty = document.getElementById('empty')

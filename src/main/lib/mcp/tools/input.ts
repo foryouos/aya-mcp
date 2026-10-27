@@ -58,12 +58,13 @@ async function tapHandler(args: any) {
   const withUi = resolveWithUi(args.withUi, true)
   const settle = resolveSettle(args, withUi ? 120 : 300)
   const started = Date.now()
-  const { target, settledMs } = await performTap(args, settle)
+  const { target, settledMs, via } = await performTap(args, settle)
 
   const payload: any = {
     ok: true,
     deviceId: target.deviceId,
     clicked: true,
+    via,
     point: target.point,
     matchedCount: target.matchedCount,
     clickedIndex: target.clickedIndex,
@@ -95,7 +96,7 @@ async function tapHandler(args: any) {
 const tap: McpTool = {
   name: 'aya_tap',
   description:
-    '点击屏幕。可用 {x,y} 指定坐标，用 {nodeIndex,snapshotId} 精确点击快照中的节点，或用 {text,id,desc} 按控件定位。默认点击后立即返回新界面（ui.appeared 是相对点击前新增的控件；ui.nodes 可直接用 nodeIndex+ui.snapshotId 继续点击），适合视频控制栏等会自动隐藏的瞬时控件；只要点击结果可用 withUi:false 关掉。',
+    '点击屏幕。可用 {x,y} 指定坐标，用 {nodeIndex,snapshotId} 精确点击快照中的节点，或用 {text,id,desc} 按控件定位。默认走常驻 UiAutomation 注入（几十毫秒，失败自动降级 input tap，返回里的 via 会标明走了哪条路）。默认点击后立即返回新界面（ui.appeared 是相对点击前新增的控件；ui.nodes 可直接用 nodeIndex+ui.snapshotId 继续点击），适合视频控制栏等会自动隐藏的瞬时控件；只要点击结果可用 withUi:false 关掉。',
   inputSchema: {
     type: 'object',
     properties: targetProps,
