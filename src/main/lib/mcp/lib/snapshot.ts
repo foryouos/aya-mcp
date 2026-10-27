@@ -194,7 +194,10 @@ export function snapshotFingerprint(xml: string) {
 export function parseSnapshot(
   deviceId: string,
   xml: string,
-  compressed: boolean
+  compressed: boolean,
+  // transient=true：只解析不落库。用于「设备端裁剪」的实验路径，
+  // 这种树是稀疏的，不能覆盖内部用于定位的完整快照
+  options: { transient?: boolean } = {}
 ): ISnapshot {
   const existing = getSnapshot(deviceId)
   if (existing && existing.xml === xml && existing.compressed === compressed) {
@@ -244,12 +247,13 @@ export function parseSnapshot(
     staleReason: '',
   }
 
-  snapshots[deviceId] = snapshot
-  rememberSnapshot(snapshot)
+  if (!options.transient) {
+    snapshots[deviceId] = snapshot
+    rememberSnapshot(snapshot)
+  }
 
   return snapshot
 }
-
 function frameOf(snapshot: ISnapshot): IFrame {
   const keys: { [key: string]: true } = {}
   const nodes: { key: string; node: IUiNode }[] = []

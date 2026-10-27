@@ -3,8 +3,9 @@
 * perf: aya_tap / aya_swipe / aya_key inject through the resident UiAutomation instead of `adb shell input`, cutting a single action from 200-400ms to tens of milliseconds (falls back to shell input automatically)
 * feat: aya_text uses ACTION_SET_TEXT, so Chinese and emoji are written verbatim and no longer rewritten by Gboard/Sogou IMEs
 * perf: aya_screencap scales and JPEG-encodes on the device, returning 1/5-1/10 of the previous PNG payload
-* perf: aya_screencap no longer re-encodes the JPEG on the host, saving another ~20ms per screenshot (161ms -> 140ms on RK3576)
+* perf: aya_screencap no longer re-encodes the JPEG on the host (measured net gain ~7ms per screenshot on RK3576)
 * feat: aya_tap accepts pressMs (default 20) to control the down/up interval
+* feat: aya_ui_dump accepts an experimental deviceCrop option to push node cropping to the device (~10% faster, ~30% smaller payload); the cropped tree is sparse and must not be used for follow-up locating
 * feat: aya_ui_watch subscribes to accessibility events (merged in an 80ms window); aya_wait_for is event-driven and reports mode/eventsSeen
 * chore: aya.dex rebuilt, tool count 72 -> 73
 

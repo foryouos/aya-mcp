@@ -272,6 +272,22 @@ const uiDump: McpTool = {
         type: 'boolean',
         description: '使用 uiautomator --compressed（默认 true，节点更少更快）',
       },
+      deviceCrop: {
+        type: 'object',
+        description:
+          '实验性：把节点裁剪下推到设备端，减少设备端生成、传输与主机解析量。注意返回的树是稀疏的（按 i 编号仍与全树一致），不能直接用于后续按索引定位，定位请另调一次完整 dump',
+        properties: {
+          maxNodes: {
+            type: 'number',
+            description: '设备端最多生成的节点数，默认 100',
+          },
+          maxDepth: {
+            type: 'number',
+            description: '设备端最大深度，默认 12',
+          },
+        },
+        additionalProperties: false,
+      },
       raw: {
         type: 'boolean',
         description: '直接返回原始 XML（体积大，节点索引不可用）',
@@ -284,6 +300,21 @@ const uiDump: McpTool = {
   handler: async (args) => {
     const deviceId = await resolveDeviceId(args.deviceId)
     const compressed = args.compressed !== false
+    // 显式传入 deviceCrop 时才把裁剪下推到设备端；默认路径完全不变
+    const cropArg = args.deviceCrop
+    const deviceCrop =
+      cropArg && typeof cropArg === 'object'
+        ? {
+            maxNodes:
+              typeof cropArg.maxNodes === 'number' && cropArg.maxNodes > 0
+                ? Math.floor(cropArg.maxNodes)
+                : 100,
+            maxDepth:
+              typeof cropArg.maxDepth === 'number' && cropArg.maxDepth > 0
+                ? Math.floor(cropArg.maxDepth)
+                : 12,
+          }
+        : null
     let xml = ''
     let source = 'fast'
     let dumpMs = 0
@@ -300,7 +331,7 @@ const uiDump: McpTool = {
     }
 
     if (compressed) {
-      const dump = await dumpFast(deviceId)
+      const dump = await dumpFast(deviceId, deviceCrop || {})
       xml = dump.xml
       source = dump.source
       dumpMs = dump.ms
@@ -314,7 +345,10 @@ const uiDump: McpTool = {
     }
 
     const parseStarted = Date.now()
-    const snapshot = parseSnapshot(deviceId, xml, compressed)
+    // 设备端裁剪出来的树是稀疏的，不能覆盖内部用于定位的完整快照
+    const snapshot = parseSnapshot(deviceId, xml, compressed, {
+      transient: !!deviceCrop,
+    })
 
     return render(deviceId, snapshot, source, args, {
       dumpMs,
@@ -349,6 +383,20 @@ function render(
     expiresAt: snapshot.createdAt + SNAPSHOT_TTL_MS,
     dumpMs: cost.dumpMs,
     parseMs: cost.parseMs,
+    // 设备端裁剪时说明这棵树是稀疏的，不能直接用于后续按索引定位
+    deviceCrop: args.deviceCrop
+      ? {
+          maxNodes:
+            typeof args.deviceCrop.maxNodes === 'number'
+              ? args.deviceCrop.maxNodes
+              : 100,
+          maxDepth:
+            typeof args.deviceCrop.maxDepth === 'number'
+              ? args.deviceCrop.maxDepth
+              : 12,
+          sparse: true,
+        }
+      : undefined,
   }
 
   let diff: any = null

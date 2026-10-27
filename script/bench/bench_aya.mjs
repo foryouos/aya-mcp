@@ -202,12 +202,51 @@ async function main() {
     return { ms: out.ms }
   }, 10)
 
+  // 5b. 点击按压时长：injectInputEvent(sync=false) 不等待应用消费，
+  // 预期 pressMs 只影响事件时间戳，不影响耗时
+  result.tapPress0 = await bench('tapPress0', async () => {
+    const out = await call('aya_tap', {
+      x: 5,
+      y: 1050,
+      withUi: false,
+      settle: 0,
+      pressMs: 0,
+    })
+
+    return { ms: out.ms }
+  }, 20)
+  result.tapPress20 = await bench('tapPress20', async () => {
+    const out = await call('aya_tap', {
+      x: 5,
+      y: 1050,
+      withUi: false,
+      settle: 0,
+      pressMs: 20,
+    })
+
+    return { ms: out.ms }
+  }, 20)
+
   // 7. 原始 XML 层级（与 u2 的 compressed XML 同口径）
   await call('aya_key', { key: 'back', withUi: false, settle: 300 })
   result.dumpRaw = await bench('dumpRaw', async () => {
     const out = await call('aya_ui_dump', { raw: true })
     return { ms: out.ms, bytes: JSON.stringify(out.data || {}).length }
   }, 10, 1100)
+
+  // 8. 设备端裁剪（deviceCrop）：把节点裁剪下推到设备端，量化第 2 项的收益。
+  // 该参数是实验性的：返回的树是稀疏的，后续定位请改用整树 dump。
+  try {
+    await call('aya_key', { key: 'back', withUi: false, settle: 300 })
+    result.dumpDeviceCrop = await bench('dumpDeviceCrop', async () => {
+      const out = await call('aya_ui_dump', {
+        deviceCrop: { maxNodes: 100, visibleOnly: true },
+      })
+      return { ms: out.ms, bytes: JSON.stringify(out.data || {}).length }
+    }, 10, 1100)
+  } catch (err) {
+    result.dumpDeviceCrop = { error: String(err) }
+  }
 
   fs.writeFileSync(OUT, JSON.stringify(result, null, 2), 'utf8')
   console.log(JSON.stringify(result, null, 2))

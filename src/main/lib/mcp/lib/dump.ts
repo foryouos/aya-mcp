@@ -24,10 +24,18 @@ export interface IDumpResult {
 }
 
 const cache: {
-  [deviceId: string]: { xml: string; at: number; source: DumpSource }
+  [key: string]: { xml: string; at: number; source: DumpSource }
 } = {}
 
 const accessibilityBlocked: { [deviceId: string]: number } = {}
+
+/**
+ * dump 的缓存键要带上裁剪参数：全量与裁剪的 XML 内容不同，
+ * 共用一个键会让「先裁剪后全量」拿到被截断的树。
+ */
+function cacheKey(deviceId: string, maxNodes: number, maxDepth: number) {
+  return `${deviceId}|${maxNodes}|${maxDepth}`
+}
 
 function withTimeout<T>(task: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -49,15 +57,19 @@ function withTimeout<T>(task: Promise<T>, ms: number): Promise<T> {
  * 常驻 UiAutomation 通道：省掉每次 dump 的进程启动与 connect，实测 2.5s → 百毫秒级。
  * 任何失败都返回空串并熔断，由调用方降级。
  */
-async function dumpViaAccessibility(deviceId: string): Promise<string> {
+async function dumpViaAccessibility(
+  deviceId: string,
+  maxNodes: number,
+  maxDepth: number
+): Promise<string> {
   if (Date.now() < (accessibilityBlocked[deviceId] || 0)) {
     return ''
   }
 
   const xml = await withTimeout(
     dumpUiXml(deviceId, {
-      maxNodes: ACCESSIBILITY_MAX_NODES,
-      maxDepth: ACCESSIBILITY_MAX_DEPTH,
+      maxNodes,
+      maxDepth,
     }).catch((err) => {
       logger.debug('ui.dump failed', err && err.message)
 
@@ -117,16 +129,21 @@ async function runDump(deviceId: string, joiner: '&&' | ';') {
   return base.shell(deviceId, cmd)
 }
 
-async function doDump(deviceId: string): Promise<IDumpResult> {
+async function doDump(
+  deviceId: string,
+  maxNodes: number,
+  maxDepth: number
+): Promise<IDumpResult> {
   const started = Date.now()
-  const cached = cache[deviceId]
+  const key = cacheKey(deviceId, maxNodes, maxDepth)
+  const cached = cache[key]
   if (cached && started - cached.at < CACHE_TTL) {
     recordDumpCacheHit()
 
     return { xml: cached.xml, source: 'cache', ms: 0 }
   }
 
-  let xml = await dumpViaAccessibility(deviceId)
+  let xml = await dumpViaAccessibility(deviceId, maxNodes, maxDepth)
   let source: DumpSource = 'accessibility'
 
   if (!xml) {
@@ -158,13 +175,31 @@ async function doDump(deviceId: string): Promise<IDumpResult> {
     )
   }
 
-  cache[deviceId] = { xml, at: Date.now(), source }
+  cache[key] = { xml, at: Date.now(), source }
   const ms = Date.now() - started
   recordDump(ms)
 
   return { xml, source, ms }
 }
 
-export function dumpFast(deviceId: string): Promise<IDumpResult> {
-  return withDeviceQueue(deviceId, () => doDump(deviceId))
+export interface IDumpOptions {
+  // 设备端生成节点的预算：调小可显著减少传输与解析量，但返回的树会被截断
+  maxNodes?: number
+  maxDepth?: number
+}
+
+export function dumpFast(
+  deviceId: string,
+  options: IDumpOptions = {}
+): Promise<IDumpResult> {
+  const maxNodes = Math.max(
+    1,
+    Math.min(Math.floor(Number(options.maxNodes) || ACCESSIBILITY_MAX_NODES), 20000)
+  )
+  const maxDepth = Math.max(
+    1,
+    Math.min(Math.floor(Number(options.maxDepth) || ACCESSIBILITY_MAX_DEPTH), 200)
+  )
+
+  return withDeviceQueue(deviceId, () => doDump(deviceId, maxNodes, maxDepth))
 }
