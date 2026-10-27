@@ -329,13 +329,24 @@ nav.links a.active {
 .hero::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -60px;
+  z-index: 1;
   background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 52px 52px;
-  -webkit-mask-image: radial-gradient(760px 400px at 68% 18%, #000 0%, transparent 72%);
-  mask-image: radial-gradient(760px 400px at 68% 18%, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(1100px 560px at 62% 26%, #000 0%, transparent 76%);
+  mask-image: radial-gradient(1100px 560px at 62% 26%, #000 0%, transparent 76%);
   pointer-events: none;
+  animation: gridDrift 34s linear infinite;
+}
+
+@keyframes gridDrift {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: 52px 52px, 52px 52px;
+  }
 }
 
 /* 噪点层 */
@@ -343,15 +354,115 @@ nav.links a.active {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   opacity: 0.4;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
   pointer-events: none;
+  animation: noiseShift 9s steps(3) infinite;
+}
+
+@keyframes noiseShift {
+  0% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(-7px, 5px);
+  }
+  66% {
+    transform: translate(6px, -6px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
 }
 
 .hero .wrap {
   position: relative;
-  z-index: 1;
+  z-index: 3;
+}
+
+/* 呼吸光斑 */
+.orb {
+  position: absolute;
+  z-index: 2;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(78px);
+}
+
+.orb-a {
+  width: 460px;
+  height: 460px;
+  right: -90px;
+  top: -140px;
+  background: radial-gradient(circle, rgba(62, 194, 118, 0.5), transparent 70%);
+  animation: orbA 17s ease-in-out infinite;
+}
+
+.orb-b {
+  width: 360px;
+  height: 360px;
+  left: -110px;
+  bottom: -150px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.32), transparent 70%);
+  animation: orbB 21s ease-in-out infinite;
+}
+
+@keyframes orbA {
+  0%,
+  100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.16) translate(-26px, 20px);
+    opacity: 0.62;
+  }
+}
+
+@keyframes orbB {
+  0%,
+  100% {
+    transform: scale(1.06) translate(0, 0);
+    opacity: 0.26;
+  }
+  50% {
+    transform: scale(0.92) translate(32px, -18px);
+    opacity: 0.44;
+  }
+}
+
+/* 斜向扫光 */
+.beam {
+  position: absolute;
+  top: -30%;
+  left: -45%;
+  z-index: 2;
+  width: 34%;
+  height: 170%;
+  transform: rotate(16deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  filter: blur(14px);
+  pointer-events: none;
+  animation: beamMove 15s ease-in-out infinite;
+}
+
+@keyframes beamMove {
+  0% {
+    left: -48%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 1;
+  }
+  100% {
+    left: 120%;
+    opacity: 0;
+  }
 }
 
 .badge {
