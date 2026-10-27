@@ -6,7 +6,7 @@
     <title>AYA MCP · 让 AI 直接操控你的 Android 设备 | 73 个 aya_* 工具</title>
     <meta
       name="description"
-      content="AYA MCP 把 Android 设备能力以 73 个 MCP 工具暴露给 CodeBuddy、WorkBuddy、Claude 等 AI 客户端：截图、UI 层级、点击滑动、装卸载应用、文件传输、logcat、串口日志、WebView 调试、屏幕适配、录屏投屏，全部一句话完成。仅监听 127.0.0.1，写操作默认关闭。"
+      content="AYA MCP 把 Android 设备能力以 73 个 MCP 工具暴露给 CodeBuddy、WorkBuddy、Claude 等 AI 客户端：截图、UI 层级、点击滑动、装卸载应用、文件传输、logcat、串口日志、WebView 调试、屏幕适配、录屏投屏，全部一句话完成。同板实测比 uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。仅监听 127.0.0.1，写操作默认关闭。"
     />
     <meta
       name="keywords"
@@ -29,7 +29,7 @@
     <meta property="og:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备" />
     <meta
       property="og:description"
-      content="73 个 MCP 工具，把截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口启动日志、WebView 调试与录屏全部交给 AI。三步接入 CodeBuddy / WorkBuddy / Claude，仅监听 127.0.0.1。"
+      content="73 个 MCP 工具，把截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口启动日志、WebView 调试与录屏全部交给 AI。同板实测比 uiautomator2 快 1.7–5 倍。三步接入 CodeBuddy / WorkBuddy / Claude，仅监听 127.0.0.1。"
     />
     <meta property="og:url" content="https://aya-mcp.foryouos.cn/" />
     <meta property="og:image" content="https://aya-mcp.foryouos.cn/og.png" />
@@ -39,7 +39,7 @@
     <meta name="twitter:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备" />
     <meta
       name="twitter:description"
-      content="73 个 MCP 工具，一句话让 AI 帮你操作 Android 手机：截图、点击、装应用、抓日志、读串口、调 WebView、录屏。"
+      content="73 个 MCP 工具，一句话让 AI 帮你操作 Android 手机：截图、点击、装应用、抓日志、读串口、调 WebView、录屏。同板实测比 uiautomator2 快 1.7–5 倍。"
     />
     <meta name="twitter:image" content="https://aya-mcp.foryouos.cn/og.png" />
 
@@ -56,9 +56,10 @@
             "operatingSystem": "Windows, macOS, Linux",
             "url": "https://aya-mcp.foryouos.cn/",
             "softwareVersion": "2.1.2",
-            "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 73 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏。",
+            "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 73 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏；同板实测比 Python uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。",
             "featureList": [
               "73 个 MCP 工具（29 只读 / 44 写）",
+              "同板实测比 uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍",
               "UI 层级快照与语义化点击",
               "应用安装 / 卸载 / 启停 / 清数据",
               "设备与本机双向文件传输",
@@ -107,7 +108,7 @@
                 "name": "数据会上传到云端吗？",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "不会。MCP 服务只监听 127.0.0.1，校验 Origin，请求体限制 2MB，并通过 Bearer Token 鉴权；令牌可随时在设置中重置。写操作默认隐藏，需手动开启"允许写入操作"。"
+                  "text": "不会。MCP 服务只监听 127.0.0.1，校验 Origin，请求体限制 2MB，并通过 Bearer Token 鉴权；令牌可随时在设置中重置。写操作默认隐藏，需手动开启「允许写入操作」。"
                 }
               },
               {
@@ -116,6 +117,14 @@
                 "acceptedAnswer": {
                   "@type": "Answer",
                   "text": "原版 AYA 提供投屏、文件管理、日志、性能、Shell 等桌面端能力；本分支完全保留这些能力，只新增了 MCP 服务层（设置 → MCP），不改变原有使用习惯。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "AYA MCP 比 Python uiautomator2 更快吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "在同一台 RK3576 / Android 14 上交替实测：读取界面层级 131 毫秒 vs 309 毫秒，点击 91 毫秒 vs 180 毫秒，滑动 390 毫秒 vs 1160 毫秒，写入文本 93 毫秒 vs 253–476 毫秒，截图回传 14 KB vs 6.2 MB。aya 走常驻 UiAutomation 注入并把界面压成紧凑 JSON，u2 走 atx-agent jsonrpc 并返回整棵 XML，所以一次层级读取的上下文成本相差约 24 倍。aya 另外还支持无障碍事件订阅、串口启动日志、录屏投屏等 u2 没有的能力；但两者争抢同一个设备端无障碍连接，同一设备上不能同时运行。"
                 }
               }
             ]
@@ -232,8 +241,9 @@
       nav.links {
         margin-left: auto;
         display: flex;
-        gap: 22px;
-        font-size: 15px;
+        align-items: center;
+        gap: 18px;
+        font-size: 14.5px;
       }
 
       nav.links a {
@@ -1075,6 +1085,7 @@
         <nav class="links" aria-label="主导航">
           <a href="#what">什么是 MCP</a>
           <a href="tools.html">工具清单</a>
+          <a href="#perf">性能对比</a>
           <a href="#enable">打开 MCP</a>
           <a href="#quickstart">三步接入</a>
           <a href="#scenes">使用场景</a>
@@ -1105,6 +1116,7 @@
           </div>
           <div class="hero-stats">
             <div class="stat"><b>73</b><span>MCP 工具（29 只读 / 44 写）</span></div>
+            <div class="stat"><b>1.7–5×</b><span>同板实测快于 uiautomator2</span></div>
             <div class="stat"><b>&lt; 1 min</b><span>从开启到 AI 接管设备</span></div>
             <div class="stat"><b>127.0.0.1</b><span>仅本机监听，不出网</span></div>
             <div class="stat"><b>Win / mac / Linux</b><span>跨平台 Electron 桌面端</span></div>
@@ -1258,6 +1270,115 @@
           <div class="note">
             <strong>点击定位小贴士：</strong><code>aya_ui_dump</code> 返回的 <code>i</code> 是未过滤完整树的 DFS 前序号，过滤只减少返回节点、不改变
             <code>i</code>。<code>snapshotId</code> 60s 过期，任何输入类工具执行后立即失效，返回 <code>STALE_SNAPSHOT</code> 时重新 dump 即可。
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= 性能对比 ======================= -->
+      <section id="perf">
+        <div class="wrap">
+          <p class="kicker">Benchmark</p>
+          <h2>同一台设备实测：比 uiautomator2 快 1.7–5 倍</h2>
+          <p class="lead">
+            在同一台 RK3576 / Android 14、同一界面（设置首页与搜索页）上交替测量：aya 侧直连 MCP 端点、不经过 AI
+            客户端，u2 侧用 Python uiautomator2。每个用例 10–20 次取中位数，完整方法见仓库
+            <a href="https://github.com/foryouos/aya-mcp/blob/master/TEST_REPORT.md" target="_blank" rel="noopener">TEST_REPORT 第 8 节</a>。
+          </p>
+
+          <div class="toolbox">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <path d="M3 17l5-6 4 4 5-7 4 5" />
+              </svg>
+              同板实测
+              <span class="count">RK3576 · Android 14</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>操作</th><th>uiautomator2</th><th>AYA MCP</th><th>差异</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>读取界面层级</td>
+                  <td>309 ms / 93 KB</td>
+                  <td><b>131 ms / 3.9 KB</b></td>
+                  <td><span class="tag r">2.35× 快 · 24× 小</span></td>
+                </tr>
+                <tr>
+                  <td>点击（坐标）</td>
+                  <td>180 ms</td>
+                  <td><b>91 ms</b></td>
+                  <td><span class="tag r">2.0× 快</span></td>
+                </tr>
+                <tr>
+                  <td>滑动（300 ms 动作时长）</td>
+                  <td>1160 ms</td>
+                  <td><b>390 ms</b></td>
+                  <td><span class="tag r">3.0× 快</span></td>
+                </tr>
+                <tr>
+                  <td>写入文本</td>
+                  <td>253–476 ms</td>
+                  <td><b>93 ms</b></td>
+                  <td><span class="tag r">2.7–5.1× 快</span></td>
+                </tr>
+                <tr>
+                  <td>按控件定位点击</td>
+                  <td>937 ms</td>
+                  <td><b>338 ms</b></td>
+                  <td><span class="tag r">2.8× 快</span></td>
+                </tr>
+                <tr>
+                  <td>截图</td>
+                  <td>145 ms / 6.2 MB PNG</td>
+                  <td><b>162 ms / 14 KB JPEG</b></td>
+                  <td><span class="tag r">体积 436× 小</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid g3" style="margin-top: 18px">
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M4 6h16M4 12h10M4 18h7" />
+                </svg>
+              </div>
+              <h3>上下文成本差 24 倍</h3>
+              <p>一次层级读取，aya 回 3.9 KB 紧凑 JSON（约 1.2k tokens），u2 回 93 KB 整棵 XML（约 30k tokens）。长任务里这比毫秒差距更致命。</p>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
+                </svg>
+              </div>
+              <h3>少一次模型往返</h3>
+              <p>aya_tap 默认回传点击后的新界面，「点击 + 观察」一次调用完成；u2 要 AI 自己写代码、再解析 XML、再喂回上下文。</p>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M12 3v18M3 12h18" />
+                  <circle cx="12" cy="12" r="8" />
+                </svg>
+              </div>
+              <h3>u2 没有的能力</h3>
+              <p>无障碍事件订阅（aya_ui_watch）、事件驱动等待（aya_wait_for）、串口启动日志、录屏与投屏控制、屏幕适配、性能统计，共 73 个工具。</p>
+            </div>
+          </div>
+
+          <div class="note">
+            <strong>什么时候仍然用 uiautomator2：</strong>上百步的固定回归（写一次 Python 循环跑完，不经过模型往返）、需要断言与 CI
+            报告、或需要 OCR / 图像处理等 Python 生态。
+            <strong>注意：</strong>aya 的常驻 UiAutomation 与 uiautomator2 争抢同一个无障碍连接，同一台设备上不能同时运行——aya
+            在跑时 u2 会报 <code>UiAutomation not connected</code>，停掉 aya 设备端服务后 u2 立即可用。
+          </div>
+
+          <div class="cta" style="margin-top: 26px">
+            <a class="btn btn-primary" href="tools.html">查看全部 73 个工具</a>
+            <a class="btn btn-ghost" style="color: var(--ink); border-color: var(--border)" href="#quickstart">3 步接入 MCP</a>
           </div>
         </div>
       </section>
@@ -1595,6 +1716,17 @@
                 默认不支持。服务只监听 <code>127.0.0.1</code>（本机回环），局域网内其它设备和公网都连不上，设备数据不出本机。这是默认的安全设定。
                 若有跨机需求（例如手机接在一台机器、AI 客户端在另一台），可用 SSH 隧道、frp、ngrok 等把本机 <code>127.0.0.1:7788</code>
                 端口转发出去；开放前请务必开启 Bearer Token，并只暴露给可信网络，切勿直接面向公网。
+              </p>
+            </details>
+            <details>
+              <summary>AYA MCP 和 Python uiautomator2 有什么区别？该用哪个？</summary>
+              <p>
+                同一台 RK3576 / Android 14 上交替实测：读取界面层级 <strong>131 ms vs 309 ms</strong>，点击
+                <strong>91 ms vs 180 ms</strong>，滑动 <strong>390 ms vs 1160 ms</strong>，写入文本
+                <strong>93 ms vs 253–476 ms</strong>，截图回传 <strong>14 KB vs 6.2 MB</strong>。aya 走常驻 UiAutomation
+                注入、并把界面压成紧凑 JSON（一次层级读取约 1.2k tokens，u2 约 30k），u2 走 atx-agent jsonrpc 并返回整棵 XML。
+                模型即席操作选 aya；上百步固定回归、需要断言与 CI 报告、或需要 OCR / 图像处理选 u2。注意两者争抢同一个设备端
+                无障碍连接，同一设备上不能同时运行。
               </p>
             </details>
           </div>
