@@ -55,7 +55,7 @@
             "applicationSubCategory": "Android 设备控制 / MCP 服务",
             "operatingSystem": "Windows, macOS, Linux",
             "url": "https://aya-mcp.foryouos.cn/",
-            "softwareVersion": "2.1.3",
+            "softwareVersion": "2.1.4",
             "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 73 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏；同板实测比 Python uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。",
             "featureList": [
               "73 个 MCP 工具（29 只读 / 44 写）",
@@ -2223,7 +2223,7 @@ details p {
             />
             <path d="M25 36h14" stroke="#fff" stroke-width="5" stroke-linecap="round" />
           </svg>
-          AYA&nbsp;MCP <small>v2.1.2</small>
+          AYA&nbsp;MCP <small>v2.1.4</small>
         </a>
         <nav class="links" aria-label="主导航">
           <a href="#what">什么是 MCP</a>
@@ -2944,6 +2944,13 @@ details p {
               </thead>
               <tbody>
                 <tr>
+                  <td><code>v2.1.4</code></td>
+                  <td>
+                    新增独立的软件更新页面：启动后后台自动检查新版本，主窗口可见时右下角提醒，收进托盘时推送系统通知；支持应用内下载安装包，
+                    实时显示进度并可取消，下载完成后一键安装。
+                  </td>
+                </tr>
+                <tr>
                   <td><code>v2.1.3</code></td>
                   <td>
                     注入通道提速：tap / swipe / key / text / screencap 改走常驻 UiAutomation，单次动作从 200–400ms 降到几十毫秒；文本改用
@@ -3020,7 +3027,7 @@ details p {
           <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（
           <a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">github.com/liriliri/aya</a>，作者
           <b>surunzi / liriliri</b>）二次开发，遵循原项目 <b>AGPL-3.0</b> 许可证；桌面端基础能力（投屏、文件管理、日志、性能、Shell
-          等）均来自上游，。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.3</b>。
+          等）均来自上游，。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.4</b>。
         </div>
 
         <div class="copy-bar">

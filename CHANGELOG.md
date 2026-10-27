@@ -1,3 +1,11 @@
+## v2.1.4 (27 Oct 2026)
+
+* feat: dedicated software update window with version comparison, release notes, download progress and one click install
+* feat: check for updates silently in the background on every startup, remind through an in-app card when the main window is visible or a system notification when it is hidden in the tray
+* feat: download the installer inside the app with live progress and cancel support, partial files are cleaned up
+* fix: broadcast update state to every window instead of only the main window, so the update page always shows the current result
+* fix: report timeout and GitHub rate limit errors separately instead of a generic check failure
+
 ## v2.1.3 (27 Oct 2026)
 
 * perf: aya_tap / aya_swipe / aya_key inject through the resident UiAutomation instead of `adb shell input`, cutting a single action from 200-400ms to tens of milliseconds (falls back to shell input automatically)
