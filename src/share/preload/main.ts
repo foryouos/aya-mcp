@@ -25,6 +25,13 @@ import {
   IpcShowSaveDialog,
   IpcShowVideo,
 } from '../common/types'
+import {
+  IpcCancelUpdateDownload,
+  IpcCheckUpdate,
+  IpcDownloadUpdate,
+  IpcGetUpdateState,
+  IpcInstallUpdate,
+} from 'common/types'
 
 export default {
   getSettingsStore: invoke<IpcGetStore>('getSettingsStore'),
@@ -65,4 +72,12 @@ export default {
   closeWin: invoke('closeWin'),
   toggleWinMaximize: invoke('toggleWinMaximize'),
   hideWin: invoke('hideWin'),
+  checkUpdate: invoke<IpcCheckUpdate>('checkUpdate'),
+  getUpdateState: invoke<IpcGetUpdateState>('getUpdateState'),
+  downloadUpdate: invoke<IpcDownloadUpdate>('downloadUpdate'),
+  cancelUpdateDownload: invoke<IpcCancelUpdateDownload>(
+    'cancelUpdateDownload'
+  ),
+  installUpdate: invoke<IpcInstallUpdate>('installUpdate'),
+  showUpdateWindow: invoke('showUpdateWindow'),
 }

@@ -5,11 +5,11 @@ import * as process from 'share/main/window/process'
 import * as about from 'share/main/window/about'
 import * as avd from '../window/avd'
 import * as devices from '../window/devices'
+import * as updates from '../window/updates'
 import isMac from 'licia/isMac'
 import { t } from 'common/util'
 import upperCase from 'licia/upperCase'
 import isWindows from 'licia/isWindows'
-import * as updater from 'share/main/lib/updater'
 import { getUserDataPath, handleEvent } from 'share/main/lib/util'
 import { isDev } from 'share/common/util'
 import * as language from 'share/main/lib/language'
@@ -47,7 +47,7 @@ function getTemplate(): MenuItemConstructorOptions[] {
       {
         label: `${t('checkUpdate')}...`,
         click() {
-          updater.checkUpdate()
+          updates.showWin()
         },
       },
       ...hideMenu,

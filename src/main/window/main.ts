@@ -4,6 +4,7 @@ import { getOpenFileFromArgv, handleEvent } from 'share/main/lib/util'
 import * as window from 'share/main/lib/window'
 import * as screencast from './screencast'
 import * as devices from './devices'
+import * as updates from './updates'
 import log from 'share/common/log'
 import once from 'licia/once'
 import { IpcGetStore, IpcSetStore } from 'share/common/types'
@@ -81,6 +82,10 @@ function setupTray() {
       {
         label: '显示',
         click: () => win?.show(),
+      },
+      {
+        label: '检查更新',
+        click: () => updates.showWin(),
       },
       {
         type: 'separator',

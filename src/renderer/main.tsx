@@ -69,6 +69,10 @@ function renderApp() {
       App = lazy(() => import('share/renderer/about/App.js') as Promise<any>)
       title = t('aboutAya')
       break
+    case 'updates':
+      App = lazy(() => import('share/renderer/updates/App.js') as Promise<any>)
+      title = t('updateTitle')
+      break
     case 'video':
       App = lazy(() => import('share/renderer/video/App.js') as Promise<any>)
       break

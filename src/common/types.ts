@@ -316,3 +316,49 @@ export type IpcSerialWait = (
   waited: number
   line: ISerialLine | null
 }>
+
+export type UpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'latest'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
+export interface IUpdateAsset {
+  name: string
+  size: number
+  url: string
+}
+
+export interface IUpdateRelease {
+  version: string
+  name: string
+  notes: string
+  url: string
+  publishedAt: string
+  assets: IUpdateAsset[]
+}
+
+export interface IUpdateState {
+  phase: UpdatePhase
+  currentVersion: string
+  // 当前平台对应的安装包；没有对应产物时为空，只能前往发布页手动下载
+  asset: IUpdateAsset | null
+  release: IUpdateRelease | null
+  hasUpdate: boolean
+  progress: number
+  received: number
+  total: number
+  downloadedPath: string
+  error: string
+  checkedAt: number
+}
+
+export type IpcCheckUpdate = (silent?: boolean) => Promise<IUpdateState>
+export type IpcGetUpdateState = () => Promise<IUpdateState>
+export type IpcDownloadUpdate = () => Promise<IUpdateState>
+export type IpcCancelUpdateDownload = () => Promise<IUpdateState>
+export type IpcInstallUpdate = () => Promise<IUpdateState>
+export type IpcShowUpdateWindow = () => void
