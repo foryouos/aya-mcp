@@ -34,6 +34,9 @@ const LINUX_TOOLS = new Set<string>([
   'aya_add_port',
   'aya_remove_port',
   'aya_list_processes',
+  // CPU/内存/温度与 /proc、/sys 同源，Linux 上同样可用（电量/帧率为空）
+  'aya_performance',
+  'aya_device_info',
   // 日志：Linux 上走 journalctl/dmesg，接口与 logcat 对齐
   'aya_logcat',
   'aya_logcat_wait',

@@ -288,13 +288,15 @@ function getMarketName(properties: types.PlainObj<string>) {
 
 export async function getPerformance(deviceId: string) {
   const cpus = await getCpus(deviceId)
+  const platform = await getDevicePlatform(deviceId)
 
   return {
     cpus,
     cpuLoads: await getCpuLoads(deviceId, cpus),
     cpuTemperature: await getCpuTemperature(deviceId),
     ...(await getMemory(deviceId)),
-    ...(await getBattery(deviceId)),
+    // Linux 主板没有 dumpsys battery，留空而不是返回 0，避免误报电量 0%
+    ...(platform.platform === 'android' ? await getBattery(deviceId) : {}),
   }
 }
 
