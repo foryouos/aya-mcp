@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>AYA MCP · 让 AI 直接操控你的 Android 设备 | 73 个 aya_* 工具</title>
+    <title>AYA MCP · 让 AI 直接操控你的 Android 设备与 Linux 主板 | 73 个 aya_* 工具</title>
     <meta
       name="description"
-      content="AYA MCP 把 Android 设备能力以 73 个 MCP 工具暴露给 CodeBuddy、WorkBuddy、Claude 等 AI 客户端：截图、UI 层级、点击滑动、装卸载应用、文件传输、logcat、串口日志、WebView 调试、屏幕适配、录屏投屏，全部一句话完成。同板实测比 uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。仅监听 127.0.0.1，写操作默认关闭。"
+      content="AYA MCP 把 Android 设备能力以 73 个 MCP 工具暴露给 CodeBuddy、WorkBuddy、Claude 等 AI 客户端：截图、UI 层级、点击滑动、装卸载应用、文件传输、logcat、串口日志、WebView 调试、屏幕适配、录屏投屏，全部一句话完成。同板实测比 uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。同时支持带 adb 的 Linux 工控主板（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto），日志走 journalctl / dmesg。仅监听 127.0.0.1，写操作默认关闭。"
     />
     <meta
       name="keywords"
-      content="AYA,MCP,Model Context Protocol,Android,adb,AI 控制手机,AI 自动化测试,Android 自动化,设备控制,UI 自动化,logcat,scrcpy,liriliri"
+      content="AYA,MCP,Model Context Protocol,Android,adb,AI 控制手机,AI 自动化测试,Android 自动化,设备控制,UI 自动化,logcat,scrcpy,Linux 工控主板,RK3568,RK3576,Ubuntu,Debian,Buildroot,Yocto,journalctl"
     />
     <meta name="author" content="AYA MCP（基于 liriliri/aya 二次开发）" />
     <meta name="theme-color" content="#0f1712" />
@@ -26,20 +26,20 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="AYA MCP" />
     <meta property="og:locale" content="zh_CN" />
-    <meta property="og:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备" />
+    <meta property="og:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备与 Linux 主板" />
     <meta
       property="og:description"
-      content="73 个 MCP 工具，把截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口启动日志、WebView 调试与录屏全部交给 AI。同板实测比 uiautomator2 快 1.7–5 倍。三步接入 CodeBuddy / WorkBuddy / Claude，仅监听 127.0.0.1。"
+      content="73 个 MCP 工具，把截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口启动日志、WebView 调试与录屏全部交给 AI。同板实测比 uiautomator2 快 1.7–5 倍。另支持带 adb 的 Linux 工控主板（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto）。三步接入 CodeBuddy / WorkBuddy / Claude，仅监听 127.0.0.1。"
     />
     <meta property="og:url" content="https://aya-mcp.foryouos.cn/" />
     <meta property="og:image" content="https://aya-mcp.foryouos.cn/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备" />
+    <meta name="twitter:title" content="AYA MCP · 让 AI 直接操控你的 Android 设备与 Linux 主板" />
     <meta
       name="twitter:description"
-      content="73 个 MCP 工具，一句话让 AI 帮你操作 Android 手机：截图、点击、装应用、抓日志、读串口、调 WebView、录屏。同板实测比 uiautomator2 快 1.7–5 倍。"
+      content="73 个 MCP 工具，一句话让 AI 帮你操作 Android 手机：截图、点击、装应用、抓日志、读串口、调 WebView、录屏。同板实测比 uiautomator2 快 1.7–5 倍。也支持带 adb 的 Linux 工控主板（RK3568 / RK3576）。"
     />
     <meta name="twitter:image" content="https://aya-mcp.foryouos.cn/og.png" />
 
@@ -52,13 +52,14 @@
             "@type": "SoftwareApplication",
             "name": "AYA MCP",
             "applicationCategory": "DeveloperApplication",
-            "applicationSubCategory": "Android 设备控制 / MCP 服务",
+            "applicationSubCategory": "Android / Linux 设备控制 · MCP 服务",
             "operatingSystem": "Windows, macOS, Linux",
             "url": "https://aya-mcp.foryouos.cn/",
-            "softwareVersion": "2.1.4",
-            "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 73 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏；同板实测比 Python uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。",
+            "softwareVersion": "2.1.5",
+            "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 73 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏；同板实测比 Python uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。同时支持带 adb 的 Linux 工控主板（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto），日志走 journalctl / dmesg。",
             "featureList": [
               "73 个 MCP 工具（29 只读 / 44 写）",
+              "Linux 工控主板支持（Debian / Ubuntu / Buildroot / Yocto，日志走 journalctl / dmesg）",
               "同板实测比 uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍",
               "UI 层级快照与语义化点击",
               "应用安装 / 卸载 / 启停 / 清数据",
@@ -101,6 +102,14 @@
                 "acceptedAnswer": {
                   "@type": "Answer",
                   "text": "不需要 Root，也不需要在手机上安装任何 App。AYA 通过 adb 与设备通信，只需开启 USB 调试（或无线调试）并在电脑上启动 AYA。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "支持 Linux 工控主板吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "支持带 adb 服务的 Debian / Ubuntu / Buildroot / Yocto 主板（RK3568、RK3576 等）。终端、文件、进程、性能、日志（journalctl / dmesg）、端口转发与串口可用；应用管理、布局树、截图录屏、输入注入、投屏、WebView 调试依赖 Android 专有命令，会自动隐藏，对应 MCP 工具返回 NOT_SUPPORTED。"
                 }
               },
               {
@@ -2229,6 +2238,7 @@ details p {
           <a href="#what">什么是 MCP</a>
           <a href="tools.html">工具清单</a>
           <a href="#perf">性能对比</a>
+          <a href="#linux">Linux 主板</a>
           <a href="#enable">打开 MCP</a>
           <a href="#quickstart">三步接入</a>
           <a href="#scenes">使用场景</a>
@@ -2270,6 +2280,8 @@ details p {
               AYA 内置一个只监听 <code>127.0.0.1</code> 的 MCP（Model Context Protocol）服务，把手机能力封装成
               <strong>73 个 <code>aya_*</code> 工具</strong>。在 CodeBuddy、WorkBuddy、Claude
               里说一句"打开设置，把字体调到最大并截图"，剩下的交给 AI —— 不用再写脚本、跑命令、粘输出。
+              <br />
+              同一套面板也支持 <strong>带 adb 的 Linux 工控主板</strong>（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto）。
             </p>
             <div class="cta">
               <a class="btn btn-primary" href="#quickstart">3 步接入 MCP</a>
@@ -2595,6 +2607,124 @@ details p {
         </div>
       </section>
 
+      <!-- ======================= Linux 工控主板 ======================= -->
+      <section id="linux">
+        <div class="wrap">
+          <p class="kicker">Linux Boards</p>
+          <h2>不止 Android：也能接 Linux 工控主板</h2>
+          <p class="lead">
+            带 adb 服务的 Debian / Ubuntu / Buildroot / Yocto 主板（RK3568、RK3576 等）接上就能用。平台自动识别，
+            Android 专有功能自动隐藏 —— 不会出现「点了就报错」或「白等 10 秒才失败」。
+          </p>
+
+          <div class="scene">
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M4 17l6-5-6-5" /><path d="M12 19h8" />
+                </svg>
+              </div>
+              <div>
+                <h3>基础能力开箱可用</h3>
+                <p>
+                  终端（adb <code>shell,v2:</code> PTY）、文件 push / pull、进程（带完整命令行）、CPU / 内存 / 温度、
+                  端口转发、串口，全部照常。
+                </p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M4 6h16M4 12h16M4 18h10" />
+                </svg>
+              </div>
+              <div>
+                <h3>日志换成 journalctl / dmesg</h3>
+                <p>
+                  有 systemd 走 <code>journalctl -o json</code>，无 systemd 自动回落 <code>dmesg</code>；级别、搜索、暂停
+                  与 <code>aya_logcat</code>、<code>aya_logcat_wait</code> 表现一致。
+                </p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M3 3l18 18" /><path d="M10.6 10.6a2 2 0 002.8 2.8" />
+                  <path d="M9.4 5.2A10 10 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-2.4 3.3M5.6 6.7A17 17 0 002 12s3.5 7 10 7c1.2 0 2.3-.2 3.3-.6" />
+                </svg>
+              </div>
+              <div>
+                <h3>Android 专有功能自动隐藏</h3>
+                <p>
+                  应用管理、布局树、截图录屏、输入注入、投屏、WebView 调试在 Linux 上不存在：面板直接隐藏，对应 MCP 工具
+                  在几十毫秒内返回 <code>NOT_SUPPORTED</code> 并说明原因。
+                </p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <rect x="7" y="7" width="10" height="10" rx="2" />
+                  <path d="M4 10h3M4 14h3M17 10h3M17 14h3M10 4v3M14 4v3M10 17v3M14 17v3" />
+                </svg>
+              </div>
+              <div>
+                <h3>平台自动判定</h3>
+                <p>
+                  <code>getprop</code> + <code>/etc/os-release</code> + <code>app_process</code> 综合判断，按设备缓存 5 分钟；
+                  同时插着 Android 与 Linux 板子时，各自按各自的平台走。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbox" style="margin-top: 26px">
+            <div class="tool-head">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4fb155" stroke-width="2">
+                <path d="M3 12h4l2 5 3-10 2 5h5" />
+              </svg>
+              实测数据
+              <span class="count">RK3568 · Ubuntu 22.04.5</span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>能力</th><th>结果</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>设备识别</td>
+                  <td><code>Ubuntu 22.04.5 LTS · aarch64 · kernel 5.10.160</code>，不再是 <code>undefined</code></td>
+                </tr>
+                <tr>
+                  <td><code>aya_shell</code> / <code>aya_list_dir</code></td>
+                  <td>121 ms / 75 ms</td>
+                </tr>
+                <tr>
+                  <td><code>aya_list_processes</code></td>
+                  <td>140 ms，155 个进程</td>
+                </tr>
+                <tr>
+                  <td><code>aya_performance</code></td>
+                  <td>449 ms，4 核 · 39.4 ℃ · 内存 379 / 3902 MB（电量留空）</td>
+                </tr>
+                <tr>
+                  <td><code>aya_logcat</code>（journald）</td>
+                  <td>128 ms 拉到历史，设备新写一条日志实时命中</td>
+                </tr>
+                <tr>
+                  <td><code>aya_tap</code> / <code>aya_ui_dump</code></td>
+                  <td>57 ms / 48 ms 返回 <code>NOT_SUPPORTED</code>，不再等 10 秒超时</td>
+                </tr>
+                <tr>
+                  <td>同进程内另一台 Android 设备</td>
+                  <td>RK3576 / Android 14：包管理、logcat、性能、进程全部正常</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- ======================= 打开 MCP 服务 ======================= -->
       <section id="enable" class="soft">
         <div class="wrap">
@@ -2910,6 +3040,14 @@ details p {
               </p>
             </details>
             <details>
+              <summary>支持 Linux 工控主板吗？</summary>
+              <p>
+                支持带 adb 服务的 Debian / Ubuntu / Buildroot / Yocto 主板（RK3568、RK3576 等）。终端、文件、进程、性能、
+                日志（journalctl / dmesg）、端口转发、串口可用；应用管理、布局树、截图录屏、输入注入、投屏、WebView 调试
+                依赖 Android 专有命令，在 Linux 上自动隐藏，对应 MCP 工具返回 <code>NOT_SUPPORTED</code> 并说明原因。
+              </p>
+            </details>
+            <details>
               <summary>AYA MCP 和 Python uiautomator2 有什么区别？该用哪个？</summary>
               <p>
                 同一台 RK3576 / Android 14 上交替实测：层级 <strong>131 ms vs 309 ms</strong>、点击 <strong>91 vs 180 ms</strong>、滑动
@@ -2943,6 +3081,14 @@ details p {
                 <tr><th>版本</th><th>改动</th></tr>
               </thead>
               <tbody>
+                <tr>
+                  <td><code>v2.1.5</code></td>
+                  <td>
+                    支持带 adb 的 Linux 工控主板（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto）：平台自动识别，
+                    概览 / 进程 / 性能按 Linux 适配，新增 journalctl / dmesg 日志后端；Android 专有面板与工具按平台隐藏或返回
+                    <code>NOT_SUPPORTED</code>，并去掉 Linux 设备上每次 10 秒的空等。
+                  </td>
+                </tr>
                 <tr>
                   <td><code>v2.1.4</code></td>
                   <td>
@@ -3005,6 +3151,7 @@ details p {
             <ul>
               <li><a href="#what">什么是 MCP</a></li>
               <li><a href="tools.html">工具清单（73 个）</a></li>
+              <li><a href="#linux">Linux 主板支持</a></li>
               <li><a href="#enable">打开 MCP</a></li>
               <li><a href="#quickstart">三步接入</a></li>
               <li><a href="#security">安全机制</a></li>

@@ -1,3 +1,13 @@
+## v2.1.5 (28 Oct 2026)
+
+* feat: support Linux industrial boards over adb (RK3568/RK3576 on Debian, Ubuntu, Buildroot, Yocto): platform auto-detection, device list shows distro/arch instead of `undefined undefined`
+* feat: overview, process and performance panels adapted for Linux (`/proc/device-tree`, `ps -eo`, `/sys/class/thermal`, `df -k`)
+* feat: new Linux log backend (`journalctl -o json`, falling back to `dmesg`) wired into the log panel plus `aya_logcat` / `aya_logcat_wait`
+* feat: Android-only panels (apps, layout, screenshot, webview) are hidden and their MCP tools return `NOT_SUPPORTED` with a reason instead of timing out
+* fix: the device-side service (`aya.dex` + `app_process`) is rejected on Linux, removing a 10s stall on every related call
+* fix: `getMarketName` no longer throws when `ro.product.device` is missing; `getTopPackage` / `getFileUrl` no longer raise uncaught errors
+* chore: verified on RK3568 / Ubuntu 22.04.5 LTS / kernel 5.10.160 (aarch64, root)
+
 ## v2.1.4 (27 Oct 2026)
 
 * feat: dedicated software update window with version comparison, release notes, download progress and one click install

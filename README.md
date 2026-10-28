@@ -6,14 +6,40 @@
 
 AYA 是一款跨平台（Windows / macOS / Linux）的 Android `adb` 桌面工具，提供投屏、文件管理、日志、性能监控、Shell、应用管理等能力。
 
-**本分支（aya-mcp）** 在完整保留上游全部桌面能力的基础上，新增两块能力：
+**本分支（aya-mcp）** 在完整保留上游全部桌面能力的基础上，新增三块能力：
 
 - **MCP 服务**：把 Android 设备能力封装为 73 个 `aya_*` 工具（29 只读 / 44 写），让 CodeBuddy、WorkBuddy、Claude 等 AI 客户端直接用自然语言操控已连接的设备。工具清单与接入方式由 [`page/index.html`](page/index.html) 详细介绍。
 - **串口调试面板**：直接接收主板启动日志，自动划分 bootloader / kernel / android 阶段，支持阶段与关键字过滤、暂停、保存会话、波特率自动探测。
+- **Linux 工控主板支持**：带 adb 服务的 Debian / Ubuntu / Buildroot / Yocto 主板（RK3568、RK3576 等）可直接接入，自动识别平台并按平台隐藏 Android 专有功能，见下文「[Linux 工控主板支持](#linux-工控主板支持adb-直连)」。
 
-当前版本 **v2.1.4**（版本号独立于上游 AYA）。
+当前版本 **v2.1.5**（版本号独立于上游 AYA）。
 
 > 关闭设置中的 MCP 开关时，它就是原版 AYA，使用方式完全不变。
+
+## Linux 工控主板支持（adb 直连）
+
+除 Android 手机 / 平板 / 模拟器外，桌面端也可以直接连**带 adb 服务的 Linux 工控主板**（实测 RK3568、RK3576；Debian / Ubuntu / Buildroot / Yocto 均可）。接上后自动识别平台，按平台决定面板与工具是否可用，不会出现「点了就报错」或「白等 10 秒再失败」。
+
+**可直接使用**
+
+| 能力 | 说明 |
+| --- | --- |
+| 终端（Shell） | adb `shell,v2:` PTY，交互式命令、`journalctl`、`apt` 等照常 |
+| 文件管理 | push / pull / 列目录 / 删除 / 重命名 / 属性（走 adb sync 协议，不依赖 `ls` 输出格式） |
+| 进程 | `ps -eo pid,pcpu,time,rss,user,comm,args`，带完整命令行 |
+| 性能 | `/proc/stat` 负载与频率、`/proc/meminfo`、`/sys/class/thermal` 温度（电量、帧率为空） |
+| 概览 | 板卡型号（`/proc/device-tree/model`）、SoC、发行版、内核、内存、存储、分辨率 |
+| 日志 | 日志面板改读 `journalctl -o json`（无 systemd 时自动降级 `dmesg`），级别 / 标签 / 搜索 / 暂停照常；MCP 侧 `aya_logcat`、`aya_logcat_wait` 同源 |
+| 端口转发 | adb forward / reverse |
+| 串口 | 与 adb 无关，主板调试口照常使用 |
+
+**自动隐藏（Android 专有）**：应用管理（`pm` / `am`）、布局树（uiautomator）、截图与录屏（`screencap` / `screenrecord`）、输入注入（`input`）、投屏（scrcpy）、WebView 调试。对应的 MCP 工具会立即返回 `NOT_SUPPORTED` 并说明原因（实测 48–62 ms，不再等超时）。
+
+**平台判定**：`getprop ro.build.version.sdk` 有值判为 Android；否则结合 `uname -s`、`/etc/os-release`、`command -v app_process` 判为 Linux，结果按设备缓存 5 分钟（换板 / 刷机后自动重探）。探测失败一律按 Android 处理，保证原有设备行为不变。
+
+> 日志跟随没有用 `journalctl -f`：实测经 adb 非 tty 通道拿不到任何字节（`dmesg -w` 同理），因此改为 1.5 s 轮询 + `__CURSOR` 去重，效果与跟随一致。
+
+**实测环境**：`SMARTFLY YY3568 Board` / RK3568 / Ubuntu 22.04.5 LTS / kernel 5.10.160 / aarch64 / root；同进程内另一台 RK3576（Android 14）功能不受影响。
 
 ## 性能对比：同板实测 vs uiautomator2
 
@@ -66,6 +92,8 @@ node script/bench/bench_aya.mjs --out tmp-bench-aya.json
 - `src/`：Electron 源码
   - `src/main/lib/mcp/*`：MCP Server（JSON-RPC 2.0 + SSE）、工具实现、鉴权
   - `src/main/lib/mcp/tools/*`：73 个 `aya_*` 工具（29 只读 / 44 写）
+  - `src/main/lib/adb/platform.ts`：Android / Linux 平台探测与能力缓存（`getprop`、`/etc/os-release`、`app_process`、`journalctl`…）
+  - `src/main/lib/log/linux.ts`：Linux 日志后端（journalctl / dmesg 轮询、统一条目结构）
   - `src/main/lib/serial/*`：串口读取、阶段识别、日志缓冲区与会话文件
   - `src/renderer/.../serial/*`：串口调试面板
   - `src/renderer/.../McpConfigModal.tsx`：设置内的 MCP 开关与配置片段
@@ -155,6 +183,8 @@ npm run release
 | 改了主进程代码但行为没变 | 主进程需重新编译并重启，重跑 `dev.bat` |
 | 投屏提示 `scrcpy: Aborted` | 缺少 `resources/scrcpy.jar`，执行 `npm run scrcpy` |
 | adb 找不到设备 | 确认 `resources/adb/adb.exe` 存在且 `adb devices` 有输出 |
+| Linux 板子上没有「应用 / 布局 / 截图 / WebView」面板 | 这些功能依赖 `pm` / `am` / uiautomator / `screencap`，Linux 上不存在，按平台自动隐藏属正常；可用「终端」或 `aya_shell` 替代 |
+| Linux 板子上日志面板为空 | 先看设备有没有 `journalctl`（systemd）；Buildroot / Yocto 无 systemd 时自动落到 `dmesg`，非 root 需要放开 `kernel.dmesg_restrict` |
 | 安装依赖很慢 | 脚本默认使用 npmmirror 的 Electron 镜像，可自行设置 `ELECTRON_MIRROR` |
 | 想同时用 AYA MCP 与 uiautomator2 | 二者争抢同一个无障碍连接，同一设备上不能同时运行：aya 设备端在跑时 u2 会报 `UiAutomation not connected`，需先停掉另一侧（见上文「性能对比」） |
 

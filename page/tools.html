@@ -1426,6 +1426,10 @@ td:first-child {
             <p class="sub">
               工具名统一以 <code>aya_</code> 开头。<strong>29 个只读工具</strong>默认开放；<strong>44 个写工具</strong>需在
               设置 → MCP 中勾选「允许写操作」后才会出现在客户端。下面可按名称搜索，或只看只读 / 写工具。
+              <br />
+              连接 <strong>Linux 工控主板</strong>（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto）时，依赖 Android
+              专有命令的工具（应用管理、布局树、截图录屏、输入注入、投屏、WebView 调试）会返回 <code>NOT_SUPPORTED</code>；
+              Shell、文件、进程、性能、日志（journalctl / dmesg）、端口转发、串口照常可用。
             </p>
           </div>
 
