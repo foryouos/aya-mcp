@@ -1,5 +1,6 @@
 import { Client } from '@devicefarmer/adbkit'
 import { shell } from './base'
+import { assertAndroid, getDevicePlatform } from './platform'
 import singleton from 'licia/singleton'
 import map from 'licia/map'
 import trim from 'licia/trim'
@@ -28,6 +29,12 @@ export const getPackages = singleton(<IpcGetPackages>(async (
   deviceId,
   system = true
 ) => {
+  // Linux 主板没有 pm：返回空列表，让进程/文件面板照常工作
+  const platform = await getDevicePlatform(deviceId)
+  if (platform.platform !== 'android') {
+    return []
+  }
+
   const result: string = await shell(
     deviceId,
     `pm list packages${system ? '' : ' -3'} --user ${await getCurrentUser(
@@ -39,15 +46,18 @@ export const getPackages = singleton(<IpcGetPackages>(async (
 }))
 
 export const stopPackage: IpcStopPackage = async function (deviceId, pkg) {
+  await assertAndroid(deviceId, '应用管理（am force-stop）')
   await shell(deviceId, `am force-stop ${pkg}`)
 }
 
 export const clearPackage: IpcClearPackage = async function (deviceId, pkg) {
+  await assertAndroid(deviceId, '应用管理（pm clear）')
   const device = await client.getDevice(deviceId)
   await device.clear(pkg)
 }
 
 export const startPackage: IpcStartPackage = async function (deviceId, pkg) {
+  await assertAndroid(deviceId, '应用管理（am start）')
   const component = await getMainComponent(deviceId, pkg)
   const device = await client.getDevice(deviceId)
   await device.startActivity({
@@ -59,6 +69,7 @@ export const installPackage: IpcInstallPackage = async function (
   deviceId,
   apkPath
 ) {
+  await assertAndroid(deviceId, 'APK 安装（pm install）')
   const device = await client.getDevice(deviceId)
   await device.install(apkPath)
 }
@@ -67,6 +78,7 @@ export const uninstallPackage: IpcUninstallPackage = async function (
   deviceId,
   pkg
 ) {
+  await assertAndroid(deviceId, '应用卸载（pm uninstall）')
   const device = await client.getDevice(deviceId)
   await device.uninstall(pkg)
 }
@@ -89,6 +101,12 @@ async function getMainComponent(deviceId: string, pkg: string) {
 
 export const getTopPackage = singleton(<IpcGetTopPackage>(
   async function (deviceId) {
+    // Linux 主板没有 Activity 概念，返回空值让性能页/WebView 页自动跳过
+    const platform = await getDevicePlatform(deviceId)
+    if (platform.platform !== 'android') {
+      return { name: '', pid: 0 }
+    }
+
     const topActivity = await shell(deviceId, 'dumpsys activity')
     const lines = topActivity.split('\n')
     let line = ''
@@ -125,10 +143,12 @@ export const disablePackage: IpcDisablePackage = async function (
   deviceId,
   pkg
 ) {
+  await assertAndroid(deviceId, '应用管理（pm disable-user）')
   await shell(deviceId, `pm disable-user ${pkg}`)
 }
 
 export const enablePackage: IpcEnablePackage = async function (deviceId, pkg) {
+  await assertAndroid(deviceId, '应用管理（pm enable）')
   await shell(deviceId, `pm enable ${pkg}`)
 }
 

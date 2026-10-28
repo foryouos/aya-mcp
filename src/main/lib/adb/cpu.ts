@@ -5,6 +5,7 @@ import trim from 'licia/trim'
 import toNum from 'licia/toNum'
 import startWith from 'licia/startWith'
 import { shell } from './base'
+import { getDevicePlatform } from './platform'
 import types from 'licia/types'
 import average from 'licia/average'
 import identity from 'licia/identity'
@@ -113,6 +114,11 @@ export async function getCpus(deviceId: string, speed = true) {
 const regTemperature =
   /Temperature\{mValue=([\d.]+),\s*mType=(\d+),\s*mName=(\w+)/
 export async function getCpuTemperature(deviceId: string) {
+  const platform = await getDevicePlatform(deviceId)
+  if (platform.platform === 'linux') {
+    return getLinuxTemperature(deviceId)
+  }
+
   const thermal = await shell(deviceId, 'dumpsys thermalservice')
   const lines = thermal.split('\n')
 
@@ -131,4 +137,46 @@ export async function getCpuTemperature(deviceId: string) {
   }
 
   return stripNum(average(...map(cpuTemperatures, identity)), 3)
+}
+
+interface IThermalZone {
+  type: string
+  temp: number
+}
+
+// Linux 主板用 /sys/class/thermal：RK3568 上是 soc-thermal + gpu-thermal，
+// 优先取 CPU/SOC 相关 zone，没有就取全部 zone 的均值
+async function getLinuxTemperature(deviceId: string): Promise<number> {
+  const out = await shell(
+    deviceId,
+    'for z in /sys/class/thermal/thermal_zone*; do echo $z $(cat $z/type 2>/dev/null) $(cat $z/temp 2>/dev/null); done'
+  )
+  const zones: IThermalZone[] = []
+
+  each(out.split('\n'), (line) => {
+    line = trim(line)
+    if (!line) {
+      return
+    }
+    const parts = line.split(/\s+/)
+    if (parts.length < 3) {
+      return
+    }
+    const temp = toNum(parts[2]) / 1000
+    if (!temp) {
+      return
+    }
+    zones.push({ type: parts[1], temp })
+  })
+
+  if (!zones.length) {
+    return 0
+  }
+
+  const cpuZones = zones.filter((zone) =>
+    /cpu|soc|cluster|core|big|little|ap/i.test(zone.type)
+  )
+  const picked = cpuZones.length ? cpuZones : zones
+
+  return stripNum(average(...picked.map((zone) => zone.temp)), 3)
 }

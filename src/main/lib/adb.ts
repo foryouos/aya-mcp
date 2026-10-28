@@ -21,6 +21,11 @@ import isWindows from 'licia/isWindows'
 import isEmpty from 'licia/isEmpty'
 import * as base from './adb/base'
 import { shell, getAdbPath, spawnAdb, isRooted } from './adb/base'
+import {
+  getDevicePlatform,
+  assertAndroid,
+  IDevicePlatform,
+} from './adb/platform'
 import * as logcat from './adb/logcat'
 import * as shellAdb from './adb/shell'
 import * as server from './adb/server'
@@ -33,6 +38,7 @@ import * as port from './adb/port'
 import { getCpuLoads, getCpus, getCpuTemperature } from './adb/cpu'
 import log from 'share/common/log'
 import {
+  IDevice,
   IpcConnectDevice,
   IpcDisconnectDevice,
   IpcDumpWindowHierarchy,
@@ -70,29 +76,63 @@ export const getDevices: IpcGetDevices = async function () {
     (device: Device) => device.type === 'emulator' || device.type === 'device'
   )
 
+  // 每台设备独立降级：以前用 Promise.all(...).catch(() => []) 兜底，
+  // 只要有一台设备读属性失败，整个设备列表都会变空
   return Promise.all(
-    map(devices, async (device: Device) => {
-      const properties = await client.getDevice(device.id).getProperties()
-
-      let name = `${properties['ro.product.manufacturer']} ${properties['ro.product.model']}`
-      const marketName = getMarketName(properties)
-      if (marketName) {
-        name = marketName
-      }
-
-      return {
+    map(devices, async (device: Device): Promise<IDevice> => {
+      const info: IDevice = {
         id: device.id,
         type: device.type,
-        serialno: properties['ro.serialno'] || '',
-        name,
-        androidVersion: properties['ro.build.version.release'],
-        sdkVersion: properties['ro.build.version.sdk'],
+        serialno: '',
+        name: device.id,
+        androidVersion: '',
+        sdkVersion: '',
+        platform: 'android',
+        distro: '',
+        arch: '',
       }
+
+      try {
+        const platform = await getDevicePlatform(device.id)
+        info.platform = platform.platform
+        info.distro = platform.distro
+        info.arch = platform.arch
+
+        if (platform.platform === 'linux') {
+          // Linux 主板没有 getprop：名称/序列号改用发行版信息与主机名
+          info.name = platform.name || device.id
+          info.serialno = platform.hostname || ''
+          return info
+        }
+
+        const properties = await client.getDevice(device.id).getProperties()
+        let name = `${properties['ro.product.manufacturer']} ${properties['ro.product.model']}`
+        const marketName = getMarketName(properties)
+        if (marketName) {
+          name = marketName
+        }
+
+        info.name = name
+        info.serialno = properties['ro.serialno'] || ''
+        info.androidVersion = properties['ro.build.version.release'] || ''
+        info.sdkVersion = properties['ro.build.version.sdk'] || ''
+      } catch (err) {
+        logger.warn(
+          `read device info failed: ${device.id} ${(err as Error).message}`
+        )
+      }
+
+      return info
     })
-  ).catch(() => [])
+  )
 }
 
 export async function getOverview(deviceId: string) {
+  const platform = await getDevicePlatform(deviceId)
+  if (platform.platform === 'linux') {
+    return getLinuxOverview(deviceId, platform)
+  }
+
   const device = await client.getDevice(deviceId)
   const properties = await device.getProperties()
   const cpus = await getCpus(deviceId, false)
@@ -126,6 +166,54 @@ export async function getOverview(deviceId: string) {
   }
 }
 
+// Linux 工控主板没有 getprop / dumpsys / wm，概览信息全部从 /proc、/sys、ip、df 读
+async function getLinuxOverview(deviceId: string, platform: IDevicePlatform) {
+  const cpus = await getCpus(deviceId, false)
+  const [boardModel, compatible, ipOut, dfOut, modes, kernelVersion] =
+    await shell(deviceId, [
+      'cat /proc/device-tree/model 2>/dev/null',
+      'cat /proc/device-tree/compatible 2>/dev/null',
+      'ip -o addr show scope global 2>/dev/null',
+      'df -k / 2>/dev/null',
+      'for f in /sys/class/drm/card*-*/modes; do head -1 $f 2>/dev/null; done',
+      'uname -r',
+    ])
+
+  // device-tree 的字符串没有换行，末尾可能残留 \0
+  const model = trim(boardModel).replace(/\0/g, '')
+  // "rockchip,rk3568" -> RK3568
+  const soc = (compatible.split(',')[1] || '').split('\0')[0].toUpperCase()
+  const ipMatch = ipOut.match(/inet (\d+\.\d+\.\d+\.\d+)/)
+  const macMatch = ipOut.match(
+    /link\/ether (([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2}))/
+  )
+  const dfLine = trim(dfOut.split('\n').pop() || '').split(/\s+/)
+  const resolution = trim(modes.split('\n')[0] || '')
+
+  return {
+    name: model || platform.name,
+    processor: soc || platform.arch,
+    abi: platform.arch,
+    brand: platform.distro,
+    model: model || platform.name,
+    serialno: platform.hostname,
+    cpuNum: cpus.length,
+    kernelVersion,
+    fontScale: 0,
+    wifi: '',
+    root: platform.root,
+    ip: ipMatch ? ipMatch[1] : '',
+    mac: macMatch ? macMatch[1] : '',
+    storageTotal: toNum(dfLine[1]) * 1024,
+    storageUsed: toNum(dfLine[2]) * 1024,
+    ...(await getMemory(deviceId)),
+    resolution,
+    physicalResolution: resolution,
+    density: 0,
+    physicalDensity: 0,
+  }
+}
+
 async function getIpAndMac(deviceId: string) {
   let ip = ''
   let mac = ''
@@ -148,6 +236,7 @@ async function getIpAndMac(deviceId: string) {
 }
 
 export async function setFontScale(deviceId: string, scale: number) {
+  await assertAndroid(deviceId, '字体缩放（settings put）')
   await shell(deviceId, `settings put system font_scale ${scale}`)
 }
 
@@ -175,6 +264,12 @@ function getMarketName(properties: types.PlainObj<string>) {
 
   const device = properties['ro.product.device']
   const model = properties['ro.product.model']
+
+  // Linux 主板没有 getprop，两个字段都是 undefined；
+  // android-device-list 对非字符串入参会直接抛 TypeError
+  if (!device) {
+    return ''
+  }
 
   let marketName = ''
 
@@ -220,6 +315,7 @@ async function getBattery(deviceId: string) {
 }
 
 export const screencap: IpcScreencap = async function (deviceId) {
+  await assertAndroid(deviceId, '屏幕截图（screencap）')
   const device = await client.getDevice(deviceId)
   const data = await device.screencap()
   const buf = await Adb.util.readAll(data)
@@ -230,6 +326,7 @@ export const screencap: IpcScreencap = async function (deviceId) {
 export const dumpWindowHierarchy: IpcDumpWindowHierarchy = async function (
   deviceId
 ) {
+  await assertAndroid(deviceId, '界面树抓取（uiautomator）')
   const path = '/data/local/tmp/aya_uidump.xml'
   await shell(deviceId, `uiautomator dump ${path}`)
   const data = await file.pullFileData(deviceId, path)
@@ -325,10 +422,12 @@ const pairDevice: IpcPairDevice = async function (host, port, password) {
 }
 
 export const inputKey: IpcInputKey = async function (deviceId, keyCode) {
+  await assertAndroid(deviceId, '按键注入（input keyevent）')
   await base.shell(deviceId, `input keyevent ${keyCode}`)
 }
 
 export const inputTap: IpcInputTap = async function (deviceId, x, y) {
+  await assertAndroid(deviceId, '点击注入（input tap）')
   return base.shell(deviceId, `input tap ${Math.round(x)} ${Math.round(y)}`)
 }
 
@@ -340,6 +439,7 @@ export const inputSwipe: IpcInputSwipe = async function (
   y2,
   duration = 300
 ) {
+  await assertAndroid(deviceId, '滑动注入（input swipe）')
   return base.shell(
     deviceId,
     `input swipe ${Math.round(x1)} ${Math.round(y1)} ${Math.round(
@@ -349,6 +449,7 @@ export const inputSwipe: IpcInputSwipe = async function (
 }
 
 export const inputText: IpcInputText = async function (deviceId, text) {
+  await assertAndroid(deviceId, '文本注入（input text）')
   return base.shell(deviceId, `input text ${text}`)
 }
 

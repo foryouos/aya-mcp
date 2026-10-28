@@ -22,7 +22,11 @@ export default observer(function DeviceManager() {
       id: device.id,
       name: device.name,
       serialno: device.serialno,
-      androidVersion: `Android ${device.androidVersion} (API ${device.sdkVersion})`,
+      // Linux 工控主板没有 Android 版本号，改用平台 + 架构展示
+      androidVersion:
+        device.platform === 'linux'
+          ? `Linux (${device.arch || device.distro || 'unknown'})`
+          : `Android ${device.androidVersion} (API ${device.sdkVersion})`,
       status: device.type === 'offline' ? t('offline') : t('online'),
       type: device.type,
     }
@@ -74,7 +78,7 @@ const columns = [
   },
   {
     id: 'androidVersion',
-    title: t('androidVersion'),
+    title: t('osVersion'),
     sortable: true,
     weight: 30,
   },

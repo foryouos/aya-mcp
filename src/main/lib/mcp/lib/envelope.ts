@@ -42,6 +42,8 @@ const RETRYABLE: { [code in McpErrorCode]: boolean } = {
   TIMEOUT: true,
   PORT_IN_USE: true,
   INVALID_ARGS: false,
+  // 平台不支持（如 Linux 主板没有 uiautomator），重试也不会变好
+  NOT_SUPPORTED: false,
   INTERNAL: true,
 }
 

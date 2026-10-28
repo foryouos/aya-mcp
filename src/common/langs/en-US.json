@@ -46,6 +46,7 @@
   "app": "App",
   "model": "Model",
   "androidVersion": "Android Version",
+  "osVersion": "OS Version",
   "brand": "Brand",
   "name": "Name",
   "processor": "Processor",

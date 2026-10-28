@@ -16,6 +16,7 @@ import ToolbarIcon from 'share/renderer/components/ToolbarIcon'
 import PortMappingModal from './PortMappingModal'
 import RemoteControllerModal from './RemoteControllerModal'
 import toBool from 'licia/toBool'
+import toNum from 'licia/toNum'
 
 export default observer(function Overview() {
   const [portModalVisible, setPortModalVisible] = useState(false)
@@ -69,11 +70,19 @@ export default observer(function Overview() {
         </div>
         <div className={Style.row}>
           {item(t('serialno'), overview.serialno, 'serial-number')}
-          {item(
-            t('androidVersion'),
-            `Android ${device.androidVersion} (API ${device.sdkVersion})`,
-            'android'
-          )}
+          {device.platform === 'linux'
+            ? item(
+                t('osVersion'),
+                `${device.name || device.distro || 'Linux'}${
+                  device.arch ? ` (${device.arch})` : ''
+                }`,
+                'android'
+              )
+            : item(
+                t('androidVersion'),
+                `Android ${device.androidVersion} (API ${device.sdkVersion})`,
+                'android'
+              )}
           {item(t('kernelVersion'), overview.kernelVersion, 'android')}
         </div>
         <div className={Style.row}>
@@ -96,12 +105,18 @@ export default observer(function Overview() {
         <div className={Style.row}>
           {item(
             t('physicalResolution'),
-            `${overview.physicalResolution} (${overview.physicalDensity}dpi)`,
+            `${overview.physicalResolution}${
+              toNum(overview.physicalDensity)
+                ? ` (${overview.physicalDensity}dpi)`
+                : ''
+            }`,
             'phone'
           )}
           {item(
             t('resolution'),
-            `${overview.resolution} (${overview.density}dpi)`,
+            `${overview.resolution}${
+              toNum(overview.density) ? ` (${overview.density}dpi)` : ''
+            }`,
             'phone'
           )}
           {item(

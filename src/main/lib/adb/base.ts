@@ -18,6 +18,7 @@ import { getSettingsStore } from '../store'
 import childProcess from 'node:child_process'
 import contain from 'licia/contain'
 import { IpcGetProcesses, IpcReverseTcp, IProcess } from 'common/types'
+import { getDevicePlatform } from './platform'
 
 const logger = log('adbBase')
 
@@ -37,6 +38,13 @@ export const getPidNames = singleton(async (deviceId: string) => {
 export const getProcesses = singleton(<IpcGetProcesses>(async (
   deviceId: string
 ) => {
+  // procps 的 top 只认大写字段名（-o pid 会报 unrecognized field），
+  // 而且 COMMAND 会按终端宽度截断、拿不到完整命令行；Linux 上改用 ps
+  const platform = await getDevicePlatform(deviceId)
+  if (platform.platform === 'linux') {
+    return getLinuxProcesses(deviceId)
+  }
+
   let columns = ['pid', '%cpu', 'time+', 'res', 'user', 'name', 'args']
   let command = 'top -b -n 1'
   each(columns, (column) => {
@@ -102,6 +110,43 @@ export const getProcesses = singleton(<IpcGetProcesses>(async (
 
   return processes
 }))
+
+// ps 的列名固定、COMMAND 不截断，args 取剩余部分即为完整命令行。
+// 注意 %CPU 是进程生命周期平均值（top 是瞬时值），用来排序够用。
+async function getLinuxProcesses(deviceId: string): Promise<IProcess[]> {
+  const result: string = await shell(
+    deviceId,
+    'ps -eo pid,pcpu,time,rss,user,comm,args'
+  )
+  const processes: IProcess[] = []
+
+  each(result.split('\n'), (line) => {
+    line = trim(line)
+    if (!line) {
+      return
+    }
+    const parts = line.split(/\s+/)
+    if (parts.length < 6 || parts[0] === 'PID') {
+      return
+    }
+    const name = parts[5]
+    const args = parts.slice(6).join(' ')
+    if (name === 'ps' && startWith(args, 'ps -eo')) {
+      return
+    }
+    processes.push({
+      pid: parts[0],
+      '%cpu': parts[1],
+      'time+': parts[2],
+      res: parts[3],
+      user: parts[4],
+      name,
+      args,
+    } as any)
+  })
+
+  return processes
+}
 
 export async function init(c: Client) {
   client = c

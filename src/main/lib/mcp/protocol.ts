@@ -3,6 +3,7 @@ import { findTool, getToolSchema, getVisibleTools } from './tools'
 import { errorResult, McpError, withTimeout } from './lib/result'
 import { decorateResult } from './lib/envelope'
 import { recordTool } from './lib/stats'
+import { getPlatformBlockReason } from './lib/platform'
 import log from 'share/common/log'
 
 const logger = log('mcp')
@@ -58,6 +59,18 @@ async function callTool(name: string, args: Record<string, unknown>) {
           `工具 ${name} 不存在或当前不可用（写操作需在 AYA 设置中开启“允许写操作”）`
         )
       ),
+      0
+    )
+  }
+
+  // Linux 工控主板没有 pm/am/uiautomator/screencap/logcat，
+  // 提前返回 NOT_SUPPORTED，避免调用方等超时或拿到 "command not found"
+  const blocked = await getPlatformBlockReason(name, args).catch(() => '')
+  if (blocked) {
+    recordTool(name, 0, 'NOT_SUPPORTED')
+
+    return decorateResult(
+      errorResult(new McpError('NOT_SUPPORTED', blocked)),
       0
     )
   }

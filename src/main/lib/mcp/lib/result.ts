@@ -11,6 +11,7 @@ export type McpErrorCode =
   | 'TIMEOUT'
   | 'PORT_IN_USE'
   | 'INVALID_ARGS'
+  | 'NOT_SUPPORTED'
   | 'INTERNAL'
 
 export interface ITextContent {

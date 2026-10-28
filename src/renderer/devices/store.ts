@@ -81,13 +81,19 @@ class Store extends BaseStore {
     this.device = device
 
     this.screenshot = null
-    if (device && device.type !== 'offline') {
-      main.screencap(device.id).then((data) => {
-        const url = dataUrl.stringify(data, 'image/png')
-        runInAction(() => {
-          this.screenshot = url
+    // Linux 主板没有 screencap，直接跳过，避免每次选中设备都抛一次错
+    if (device && device.type !== 'offline' && device.platform !== 'linux') {
+      main
+        .screencap(device.id)
+        .then((data) => {
+          const url = dataUrl.stringify(data, 'image/png')
+          runInAction(() => {
+            this.screenshot = url
+          })
         })
-      })
+        .catch(() => {
+          // 部分设备截图失败不应影响选中流程
+        })
     }
   }
   updateDevices(devices: IDevice[]) {

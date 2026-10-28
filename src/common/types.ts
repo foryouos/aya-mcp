@@ -5,6 +5,12 @@ export interface IDevice {
   androidVersion: string
   sdkVersion: string
   type: 'emulator' | 'device' | 'offline' | 'unauthorized' | 'unknown'
+  // 带 adb 的 Linux 工控主板（RK3568/RK3576 等）没有 getprop/pm/am，
+  // platform 决定面板与 MCP 工具是否可用；缺省按 android 处理，兼容历史数据
+  platform?: 'android' | 'linux'
+  // android / ubuntu / debian / buildroot / yocto / linux
+  distro?: string
+  arch?: string
 }
 
 export interface IAvd {

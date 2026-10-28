@@ -1,4 +1,12 @@
 import * as base from '../../adb/base'
+import { getDevicePlatform } from '../../adb/platform'
+import {
+  ILinuxLogLine,
+  parseLinuxLog,
+  pickLogSource,
+  snapshotCommand,
+} from '../../log/linux'
+import dateFormat from 'licia/dateFormat'
 import { resolveDeviceId } from '../lib/device'
 import {
   filterLogcat,
@@ -62,7 +70,40 @@ function buildCommand(query: ILogQuery, timeoutFetch?: number) {
   return command
 }
 
+// Linux 主板没有 logcat：用 journalctl/dmesg，转成同样的 entry 结构
+function toMcpEntries(entries: ILinuxLogLine[]) {
+  return entries.map((entry) => ({
+    time: dateFormat(entry.date, 'mm-dd HH:MM:ss.l'),
+    pid: entry.pid,
+    tid: 0,
+    level: entry.level,
+    tag: entry.tag,
+    message: entry.message,
+  }))
+}
+
 async function fetchLogs(query: ILogQuery, fetchLines?: number) {
+  const platform = await getDevicePlatform(query.deviceId)
+  if (platform.platform === 'linux') {
+    const source = pickLogSource(platform)
+    const command = snapshotCommand(source, fetchLines || query.lines)
+    const raw = await base.shell(query.deviceId, command)
+    let entries = toMcpEntries(parseLinuxLog(raw, source))
+    if (query.pid) {
+      entries = entries.filter((entry) => entry.pid === query.pid)
+    }
+    // journalctl/dmesg 没有 Android 的 tag 体系，过滤放主机侧
+    return {
+      raw,
+      entries: filterLogcat(entries, {
+        level: query.level,
+        tag: query.tag,
+        keyword: query.keyword,
+      }),
+      command,
+    }
+  }
+
   const command = buildCommand(query, fetchLines)
   const raw = await base.shell(query.deviceId, command)
   const entries = filterLogcat(parseLogcat(raw), {
@@ -183,6 +224,16 @@ const clearLogcat: McpTool = {
   timeout: 30000,
   handler: async (args) => {
     const deviceId = await resolveDeviceId(args.deviceId)
+    const platform = await getDevicePlatform(deviceId)
+    if (platform.platform === 'linux') {
+      return jsonResult({
+        ok: false,
+        deviceId,
+        errorHint:
+          'Linux 设备没有 logcat 环形缓冲，无法清空；请看最近日志（aya_logcat 带 lines/keyword），或执行 aya_shell "journalctl --rotate" 轮转（需 root）',
+      })
+    }
+
     const output = await base.shell(deviceId, 'logcat -c')
     const errorHint = detectShellError(output)
 

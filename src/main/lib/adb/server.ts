@@ -6,6 +6,7 @@ import singleton from 'licia/singleton'
 import wire from '../wire'
 import waitUntil from 'licia/waitUntil'
 import { forwardTcp, getDeviceStore, setDeviceStore, shell } from './base'
+import { getDevicePlatform, NotSupportedError } from './platform'
 import contain from 'licia/contain'
 import log from 'share/common/log'
 import { IPackageInfo, IpcGetFileUrl, IpcGetPackageInfos } from 'common/types'
@@ -31,6 +32,17 @@ class AyaClient {
     method: string,
     params: types.PlainObj<any> = {}
   ): Promise<any> {
+    // 设备端服务是 aya.dex + app_process + UiAutomation，Linux 主板必然起不来。
+    // 提前拦掉，否则 push→start→waitUntil 会白等 10 秒才报错。
+    const platform = await getDevicePlatform(this.deviceId)
+    if (platform.platform !== 'android') {
+      throw new NotSupportedError(
+        `UI/应用相关能力依赖设备端 AYA 服务（Android app_process + UiAutomation），当前设备是 ${
+          platform.name || 'Linux'
+        }，不支持该能力`
+      )
+    }
+
     if (!this.socket) {
       await this.connect()
     }
@@ -358,6 +370,13 @@ const getPackageInfos: IpcGetPackageInfos = singleton(async function (
   deviceId,
   packageNames
 ) {
+  // Linux 主板没有 PackageManager，返回空列表让调用方优雅降级；
+  // 这里不能用抛错，singleton 会把 reject 缓存下来污染后续调用
+  const platform = await getDevicePlatform(deviceId)
+  if (platform.platform !== 'android') {
+    return []
+  }
+
   const client = await getAyaClient(deviceId)
   const result = await client.sendMessage('getPackageInfos', {
     packageNames,
@@ -442,6 +461,12 @@ const getFileServerPort = singleton(async function (deviceId): Promise<number> {
 })
 
 const getFileUrl: IpcGetFileUrl = async function (deviceId, path, port) {
+  // 文件服务是设备端 AYA 服务的一部分，Linux 上没有；返回空串让调用方跳过预览
+  const platform = await getDevicePlatform(deviceId)
+  if (platform.platform !== 'android') {
+    return ''
+  }
+
   if (!port) {
     port = await getFileServerPort(deviceId)
   }
