@@ -145,6 +145,8 @@ const logs: McpTool = {
         time: new Date(line.time).toISOString(),
         source: line.source,
         text: line.text,
+        // tx=true 表示这行是主机发给设备的数据，不是设备输出
+        tx: line.tx || undefined,
       })),
       hint:
         result.total === 0

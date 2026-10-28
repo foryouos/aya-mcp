@@ -27,6 +27,8 @@ const DEFAULT_MAX_LINES = 200000
 const MAX_LOG_FILE_SIZE = 512 * 1024 * 1024
 const EMIT_INTERVAL = 120
 const MAX_LINE_LENGTH = 8192
+// 数据静默这么久后把残留的半行推出去（设备提示符、进度输出常常不带换行）
+const PARTIAL_FLUSH_MS = 250
 
 // 串口日志按阶段划分：引导(loader) -> 内核(kernel) -> Android
 // 阶段默认单向推进；命中强引导标记时回到 loader，兼容板子重启后再次进入引导
@@ -71,6 +73,7 @@ let logFiles: string[] = []
 
 let pendingEmit: ISerialLine[] = []
 let emitTimer: NodeJS.Timeout | null = null
+let partialTimer: NodeJS.Timeout | null = null
 
 // 自动波特率探测状态：探测期间不落盘、不解析，只收集原始字节用于打分
 let detecting = false
@@ -134,18 +137,54 @@ function trimBuffer() {
   }
 }
 
-function pushLine(text: string) {
+function pushLine(text: string, tx = false) {
   const line: ISerialLine = {
     seq: ++seq,
     time: Date.now(),
-    source: classify(text),
+    // 发送的数据不参与阶段判定，否则用户敲的命令会把内核阶段误判成别的阶段
+    source: tx ? stage : classify(text),
     text,
   }
+  if (tx) {
+    line.tx = true
+  }
   lines.push(line)
-  if (!paused) {
+  // 发送是用户主动行为，暂停推送时也要回显，否则用户会以为命令没发出去
+  if (!paused || tx) {
     pendingEmit.push(line)
   }
   trimBuffer()
+}
+
+function clearPartialTimer() {
+  if (partialTimer) {
+    clearTimeout(partialTimer)
+    partialTimer = null
+  }
+}
+
+// 设备输出最后一行经常不带换行（bootloader 提示符、进度、波特率不对时的乱码串），
+// 只认换行会导致「字节数一直在涨但日志框没有新内容」，
+// 所以数据静默一小段时间后把残留内容当作一行推出去。
+function flushPendingLine() {
+  partialTimer = null
+  if (!pendingText) {
+    return
+  }
+  const text = pendingText
+  pendingText = ''
+  if (text.trim()) {
+    pushLine(text)
+    scheduleEmit()
+  }
+}
+
+function armPartialTimer() {
+  clearPartialTimer()
+  if (!pendingText) {
+    return
+  }
+  partialTimer = setTimeout(flushPendingLine, PARTIAL_FLUSH_MS)
 }
 
 function feed(text: string) {
@@ -161,6 +200,16 @@ function feed(text: string) {
   if (pendingText.length > MAX_LINE_LENGTH) {
     pushLine(pendingText)
     pendingText = ''
+  }
+  armPartialTimer()
+}
+
+// 把主机发出的内容也记进日志（含落盘），便于对照设备回显
+function recordTx(text: string) {
+  for (const part of text.split(/\r\n|\n|\r/)) {
+    if (part.trim()) {
+      pushLine(part, true)
+    }
   }
 }
 
@@ -302,6 +351,7 @@ function resetSession(portPath: string, baudRate: number) {
   dropped = 0
   bytes = 0
   txBytes = 0
+  clearPartialTimer()
   decoder = new StringDecoder('utf8')
   pendingText = ''
   stage = 'other'
@@ -344,6 +394,9 @@ export async function closeSerial(): Promise<ISerialStatus> {
     target.removeAllListeners('close')
     await closeAsync(target)
   }
+  // 收尾时把最后一段没有换行的内容补成一行，避免丢尾
+  clearPartialTimer()
+  flushPendingLine()
   emitLines()
   closeSpool()
   sendStatus()
@@ -428,6 +481,7 @@ function attachPort(serialPort: SerialPort) {
 }
 
 function resetDecoder() {
+  clearPartialTimer()
   decoder = new StringDecoder('utf8')
   pendingText = ''
 }
@@ -588,6 +642,7 @@ export function clearSerial(): ISerialStatus {
   seq = 0
   bytes = 0
   txBytes = 0
+  clearPartialTimer()
   pendingText = ''
   decoder = new StringDecoder('utf8')
   // 清空只清显示缓冲，设备仍处在原来的阶段（已开机就是 Android），
@@ -639,8 +694,13 @@ export function queryLines(query: ISerialQuery = {}): ISerialQueryResult {
     query.lines === 0 ? 0 : Math.min(Math.max(query.lines || 200, 1), 60000)
 
   const latest = !!query.latest
-  const result: ISerialLine[] = []
+  let result: ISerialLine[] = []
   let matched = 0
+  // latest 场景用环形缓冲保留最近 limit 行：
+  // 以前的 shift() 在 20 万行缓冲上会退化成 O(n²)，一次查询就能把主进程卡住
+  const ring: ISerialLine[] = []
+  let ringPos = 0
+  let ringFull = false
 
   for (let i = head; i < lines.length; i++) {
     const line = lines[i]
@@ -656,17 +716,24 @@ export function queryLines(query: ISerialQuery = {}): ISerialQueryResult {
     matched++
     if (limit === 0) {
       result.push(line)
-    } else if (result.length < limit) {
-      result.push(line)
-    } else if (latest) {
-      // 只保留最近的 limit 行，避免返回早已滚出去的开头
-      result.shift()
-      result.push(line)
+    } else if (!latest) {
+      if (result.length < limit) {
+        result.push(line)
+      }
+    } else if (ring.length < limit) {
+      ring.push(line)
+    } else {
+      ring[ringPos] = line
+      ringPos = (ringPos + 1) % limit
+      ringFull = true
     }
   }
 
-  if (limit > 0 && result.length > limit) {
-    result.length = limit
+  if (limit > 0 && latest) {
+    result =
+      ringFull && ringPos > 0
+        ? ring.slice(ringPos).concat(ring.slice(0, ringPos))
+        : ring
   }
 
   return {
@@ -773,10 +840,18 @@ export async function writeSerial(
   await new Promise<void>((resolve) => {
     port!.drain(() => resolve())
   })
-  txBytes += Buffer.byteLength(data + suffix, 'utf8')
+
+  const sent = data + suffix
+  const size = Buffer.byteLength(sent, 'utf8')
+  txBytes += size
+  // 发送的内容同样进入缓冲区与落盘文件，日志框里能看到自己发出了什么
+  writeSpool(Buffer.from(sent, 'utf8'))
+  recordTx(data)
+  // 发送是交互操作，立即推送，不等 120ms 节流
+  emitLines()
   sendStatus()
 
-  return Buffer.byteLength(data + suffix, 'utf8')
+  return size
 }
 
 export interface ISerialStage {

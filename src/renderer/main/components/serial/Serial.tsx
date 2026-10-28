@@ -42,6 +42,15 @@ const SOURCE_LABELS: Record<SerialSource, string> = {
   other: 'serialOther',
 }
 
+// CSS Modules 用 camelCaseOnly 导出，下划线类名只能按驼峰取，
+// 之前用 Style[`row_${source}`] 一直是 undefined，阶段色条其实没生效
+const ROW_CLASSES: Record<SerialSource, string> = {
+  bootloader: Style.rowBootloader,
+  kernel: Style.rowKernel,
+  android: Style.rowAndroid,
+  other: Style.rowOther,
+}
+
 function buildMatcher(keyword: string, regex: boolean): RegExp | null {
   const val = keyword.trim()
   if (!val) {
@@ -113,17 +122,26 @@ export default observer(function Serial() {
   const [viewportHeight, setViewportHeight] = useState(0)
   const [viewportWidth, setViewportWidth] = useState(0)
   const [maxLength, setMaxLength] = useState(0)
+  // 用户上滑后不再自动跟随，用这个数字提示“下面还有新日志”
+  const [pendingNew, setPendingNew] = useState(0)
 
   const linesRef = useRef<ISerialLine[]>([])
   const filteredRef = useRef<ISerialLine[]>([])
   const filterRef = useRef({ search: '', useRegex: false, source: 'all' as string })
   const atBottomRef = useRef(true)
+  const autoScrollRef = useRef(true)
   const manualPauseRef = useRef(false)
   const viewportRef = useRef<HTMLDivElement>(null)
   const charWidthRef = useRef(7.2)
+  // 事件回调是一次性闭包，读 React state 会拿到旧值，最长行宽度必须走 ref
+  const maxLengthRef = useRef(0)
   const syncTokenRef = useRef(0)
   const searchTokenRef = useRef(0)
   const statusRef = useRef<ISerialStatus | null>(null)
+  // 已收到的最新行号，用来发现推送批次丢失（渲染进程忙、暂停恢复等）并自动补齐
+  const lastSeqRef = useRef(0)
+  const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingNewRef = useRef(0)
   statusRef.current = status
 
   const matcher = useMemo(
@@ -145,14 +163,28 @@ export default observer(function Serial() {
 
   function setLines(list: ISerialLine[]) {
     linesRef.current = list
+    lastSeqRef.current = list.length ? list[list.length - 1].seq : 0
     let max = 0
     for (const line of list) {
       if (line.text.length > max) {
         max = line.text.length
       }
     }
+    maxLengthRef.current = max
     setMaxLength(max)
     rebuildFiltered()
+    setVersion((v) => v + 1)
+  }
+
+  // 会话被重建/清空时，本地缓冲全部作废
+  function resetLocal() {
+    linesRef.current = []
+    filteredRef.current = []
+    lastSeqRef.current = 0
+    pendingNewRef.current = 0
+    maxLengthRef.current = 0
+    setPendingNew(0)
+    setMaxLength(0)
     setVersion((v) => v + 1)
   }
 
@@ -176,8 +208,6 @@ export default observer(function Serial() {
     if (!f.search.trim() && f.source === 'all') {
       filteredRef.current = linesRef.current
       setVersion((v) => v + 1)
-      atBottomRef.current = true
-      setAutoScroll(true)
       return
     }
 
@@ -187,6 +217,8 @@ export default observer(function Serial() {
         regex: f.useRegex,
         source: f.source as any,
         lines: 5000,
+        // 要看的是“现在匹配到什么”，取最近的匹配行而不是会话开头
+        latest: true,
       })
       if (token !== searchTokenRef.current) {
         return
@@ -200,12 +232,6 @@ export default observer(function Serial() {
     }
 
     setVersion((v) => v + 1)
-    setScrollTop(0)
-    if (viewportRef.current) {
-      viewportRef.current.scrollTop = 0
-    }
-    atBottomRef.current = false
-    setAutoScroll(false)
   }
 
   function appendLines(incoming: ISerialLine[]) {
@@ -216,20 +242,28 @@ export default observer(function Serial() {
     const f = filterRef.current
     const active = isFilterActive()
     const re = active ? buildMatcher(f.search, f.useRegex) : null
-    let max = maxLength
+    // 无过滤时 filtered 与 lines 是同一个数组，再 push 一次会凭空多出一行
+    const separate = filteredRef.current !== lines
+    let max = maxLengthRef.current
 
     for (const line of incoming) {
       lines.push(line)
       if (line.text.length > max) {
         max = line.text.length
       }
-      if (active && lineMatch(line, re, f.source)) {
+      if (active && separate && lineMatch(line, re, f.source)) {
         filteredRef.current.push(line)
       }
     }
 
-    if (max !== maxLength) {
+    if (max !== maxLengthRef.current) {
+      maxLengthRef.current = max
       setMaxLength(max)
+    }
+
+    if (!autoScrollRef.current) {
+      pendingNewRef.current += incoming.length
+      setPendingNew(pendingNewRef.current)
     }
 
     if (lines.length > MAX_LOCAL_LINES + TRIM_STEP) {
@@ -268,25 +302,44 @@ export default observer(function Serial() {
     })
   }
 
-  async function syncRecent() {
+  async function syncRecent(follow = true) {
     const token = ++syncTokenRef.current
     try {
-      const res = await main.serialQuery({ lines: MAX_LOCAL_LINES })
+      // latest：拿缓冲里最新的 N 行，否则缓冲区涨到 20 万行后会一直显示会话开头
+      const res = await main.serialQuery({ lines: MAX_LOCAL_LINES, latest: true })
       if (token !== syncTokenRef.current) {
         return
       }
       setStatus(res.status)
-      setLines(res.lines)
+      // 查询期间可能又有新行通过推送到达，把这段尾巴接回去，别被快照覆盖掉
+      const snapLast = res.lines.length
+        ? res.lines[res.lines.length - 1].seq
+        : 0
+      const tail = linesRef.current.filter((line) => line.seq > snapLast)
+      setLines(tail.length ? res.lines.concat(tail) : res.lines)
       if (isFilterActive()) {
         // 保持搜索条件时重新从主进程完整缓冲取匹配结果
         applyFilter()
         return
       }
-      atBottomRef.current = true
-      setAutoScroll(true)
+      if (follow) {
+        atBottomRef.current = true
+        setAutoScroll(true)
+      }
     } catch {
       // 主进程未就绪时忽略
     }
+  }
+
+  // 发现日志断号后延迟补一次快照，避免频繁重查
+  function scheduleResync() {
+    if (resyncTimerRef.current) {
+      return
+    }
+    resyncTimerRef.current = setTimeout(() => {
+      resyncTimerRef.current = null
+      syncRecent(false)
+    }, 300)
   }
 
   useEffect(() => {
@@ -306,7 +359,17 @@ export default observer(function Serial() {
       if (current && payload.sessionId && current.sessionId !== payload.sessionId) {
         return
       }
-      appendLines(payload.lines)
+      const incoming = payload.lines
+      const first = incoming.length ? incoming[0].seq : 0
+      // 两次推送之间的行号不连续，说明中间丢了批次（渲染进程忙、暂停恢复、
+      // 主进程重启等），补一次快照，否则日志框会一直缺那一段
+      if (first > 0 && lastSeqRef.current > 0 && first > lastSeqRef.current + 1) {
+        scheduleResync()
+      }
+      if (first > 0) {
+        lastSeqRef.current = incoming[incoming.length - 1].seq
+      }
+      appendLines(incoming)
       setStatus((prev) =>
         prev
           ? {
@@ -314,7 +377,7 @@ export default observer(function Serial() {
               dropped: payload.dropped,
               bytes: payload.bytes,
               logFileSize: payload.logFileSize,
-              lines: prev.lines + payload.lines.length,
+              lines: prev.lines + incoming.length,
             }
           : prev
       )
@@ -323,7 +386,17 @@ export default observer(function Serial() {
       if (!alive) {
         return
       }
+      const prev = statusRef.current
+      // 会话被重建或清空（MCP 重新打开串口、清空缓冲等）时本地数据已失效
+      const reset =
+        !!prev && (prev.sessionId !== next.sessionId || next.seq < lastSeqRef.current)
       setStatus(next)
+      if (reset) {
+        resetLocal()
+        syncRecent()
+        return
+      }
+      lastSeqRef.current = Math.max(lastSeqRef.current, next.seq)
     })
 
     refreshPorts()
@@ -346,6 +419,10 @@ export default observer(function Serial() {
       offData()
       offStatus()
       observer?.disconnect()
+      if (resyncTimerRef.current) {
+        clearTimeout(resyncTimerRef.current)
+        resyncTimerRef.current = null
+      }
     }
   }, [])
 
@@ -378,20 +455,27 @@ export default observer(function Serial() {
     if (visible) {
       if (!manualPauseRef.current) {
         main.serialSetPaused(false)
-        syncRecent()
       }
+      // 无论是否手动暂停，回到面板都同步一次缓冲区，
+      // 否则暂停期间攒下的日志一直看不到，像是“有数据但没日志”
+      syncRecent()
     } else if (!manualPauseRef.current) {
       main.serialSetPaused(true)
     }
   }, [panel])
 
   useEffect(() => {
+    autoScrollRef.current = autoScroll
     const viewport = viewportRef.current
     if (!viewport || !autoScroll) {
       return
     }
     viewport.scrollTop = viewport.scrollHeight
     setScrollTop(viewport.scrollTop)
+    if (pendingNewRef.current) {
+      pendingNewRef.current = 0
+      setPendingNew(0)
+    }
   }, [version, autoScroll])
 
   const filtered = filteredRef.current
@@ -423,6 +507,7 @@ export default observer(function Serial() {
       const next = await main.serialOpen(portPath, baudRate)
       setStatus(next)
       // 新会话会清空主进程缓冲，这里同步清掉旧视图
+      resetLocal()
       await syncRecent()
     } catch (err) {
       notify(`${t('serialConnectFailed')}: ${(err as Error).message}`)
@@ -455,13 +540,22 @@ export default observer(function Serial() {
   function clear() {
     main.serialClear().then((next) => {
       setStatus(next)
-      linesRef.current = []
-      filteredRef.current = []
-      setMaxLength(0)
-      setVersion((v) => v + 1)
+      resetLocal()
       atBottomRef.current = true
       setAutoScroll(true)
     })
+  }
+
+  function scrollToEnd() {
+    const viewport = viewportRef.current
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight
+      setScrollTop(viewport.scrollTop)
+    }
+    atBottomRef.current = true
+    pendingNewRef.current = 0
+    setPendingNew(0)
+    setAutoScroll(true)
   }
 
   // 保留原始内容（首尾空格可能是协议的一部分），不做 trim
@@ -690,15 +784,7 @@ export default observer(function Serial() {
         <ToolbarIcon
           icon="scroll-end"
           title={t('scrollToEnd')}
-          onClick={() => {
-            const viewport = viewportRef.current
-            if (viewport) {
-              viewport.scrollTop = viewport.scrollHeight
-              setScrollTop(viewport.scrollTop)
-            }
-            atBottomRef.current = true
-            setAutoScroll(true)
-          }}
+          onClick={scrollToEnd}
           disabled={!total}
         />
         <ToolbarIcon
@@ -725,6 +811,7 @@ export default observer(function Serial() {
           const atBottom =
             el.scrollHeight - el.scrollTop - el.clientHeight < ROW_HEIGHT * 2
           atBottomRef.current = atBottom
+          autoScrollRef.current = atBottom
           if (atBottom !== autoScroll) {
             setAutoScroll(atBottom)
           }
@@ -741,16 +828,19 @@ export default observer(function Serial() {
           >
             {visible.map((line, index) => {
               const absIndex = start + index
+              const prevLine = absIndex > 0 ? filtered[absIndex - 1] : null
               // 阶段切换处画一条分隔线，让 loader 到 kernel 的衔接一目了然
               const stageStart =
-                absIndex > 0 &&
-                filtered[absIndex - 1]?.source !== line.source
+                !!prevLine &&
+                !line.tx &&
+                !prevLine.tx &&
+                prevLine.source !== line.source
               return (
                 <div
                   key={line.seq}
                   className={[
                     Style.row,
-                    Style[`row_${line.source}`],
+                    line.tx ? Style.rowTx : ROW_CLASSES[line.source],
                     stageStart ? Style.stageStart : '',
                   ]
                     .filter(Boolean)
@@ -760,8 +850,12 @@ export default observer(function Serial() {
                   <span className={Style.time}>
                     {dateFormat(new Date(line.time), 'HH:MM:ss.l')}
                   </span>
-                  <span className={`${Style.badge} ${Style[line.source]}`}>
-                    {t(SOURCE_LABELS[line.source])}
+                  <span
+                    className={`${Style.badge} ${
+                      line.tx ? Style.tx : Style[line.source]
+                    }`}
+                  >
+                    {t(line.tx ? 'serialSend' : SOURCE_LABELS[line.source])}
                   </span>
                   <span className={Style.text}>
                     {renderHighlight(line.text, matcher)}
@@ -777,6 +871,12 @@ export default observer(function Serial() {
             </div>
           )}
         </div>
+        {/* 用户翻上去看历史时不再自动滚动，这里提示下面还有多少新日志 */}
+        {pendingNew > 0 && !autoScroll && (
+          <button className={Style.newLines} onClick={scrollToEnd}>
+            ↓ {t('serialNewLines', { n: String(pendingNew) })}
+          </button>
+        )}
         <div className={Style.sendBar}>
           {/* 发送框刻意不用 HistoryInput：调试命令常常只发一次，
               历史下拉反而挡住日志，因此保持纯输入框不记录历史 */}
@@ -794,16 +894,18 @@ export default observer(function Serial() {
               }
             }}
           />
+          <span className={Style.newlineLabel}>{t('serialNewline')}</span>
           <select
             className={Style.newline}
             value={newline}
-            title={t('serialNewline')}
+            title={t('serialNewlineHint')}
+            aria-label={t('serialNewline')}
             onChange={(e) =>
               changeNewline(e.target.value as 'crlf' | 'lf' | 'none')
             }
           >
-            <option value="crlf">CRLF</option>
-            <option value="lf">LF</option>
+            <option value="crlf">{t('serialNewlineCrlf')}</option>
+            <option value="lf">{t('serialNewlineLf')}</option>
             <option value="none">{t('serialNewlineNone')}</option>
           </select>
           <button

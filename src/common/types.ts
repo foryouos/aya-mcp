@@ -232,6 +232,8 @@ export interface ISerialLine {
   time: number
   source: SerialSource
   text: string
+  // true 表示这一行是主机发给设备的数据，用于在日志里回显发送内容
+  tx?: boolean
 }
 
 export interface ISerialStatus {
