@@ -129,7 +129,9 @@ export default observer(function Overview() {
           )}
         </div>
         <div className={Style.row}>
-          {item('Wi-Fi', overview.wifi, 'wifi')}
+          {device.platform === 'linux'
+            ? item(t('networkInterface'), overview.networkInterface, 'wifi')
+            : item('Wi-Fi', overview.wifi, 'wifi')}
           {item(t('ipAddress'), overview.ip, 'browser')}
           {item(t('macAddress'), overview.mac, 'browser')}
         </div>

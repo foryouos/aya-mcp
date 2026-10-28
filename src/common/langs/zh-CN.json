@@ -47,6 +47,7 @@
   "model": "型号",
   "androidVersion": "Android 版本",
   "osVersion": "系统版本",
+  "networkInterface": "网卡",
   "brand": "品牌",
   "name": "名称",
   "processor": "处理器",

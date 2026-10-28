@@ -166,27 +166,94 @@ export async function getOverview(deviceId: string) {
   }
 }
 
+// ip -o 的输出会用一个反斜杠 + 换行折行（link 信息另起一行），拍平后再解析
+function flattenIpOutput(out: string) {
+  return out.replace(/\\\s*\n/g, ' ')
+}
+
+/**
+ * 从 `ip route/link/addr` 的输出里挑出真正在用的网卡。
+ * 以前只看 `ip -o addr show scope global`，DHCP 还没拿到地址时整段为空，
+ * MAC 也跟着丢了；这里改成按默认路由 + operstate 选网卡，MAC 与 IP 分开取。
+ */
+function parseLinuxNet(defaultRoute: string, linkOut: string, addrOut: string) {
+  const ifaces: { name: string; mac: string; up: boolean }[] = []
+  flattenIpOutput(linkOut)
+    .split('\n')
+    .forEach((line) => {
+      const name = line.match(/^\d+:\s+([^\s:@]+)/)
+      if (!name) {
+        return
+      }
+      const mac = line.match(/link\/ether\s+([0-9a-f]{2}(?::[0-9a-f]{2}){5})/i)
+      ifaces.push({
+        name: name[1],
+        mac: mac ? mac[1].toLowerCase() : '',
+        up: /state\s+UP/.test(line),
+      })
+    })
+
+  const dev = defaultRoute.match(/default\s+.*\bdev\s+(\S+)/)
+  const candidates = ifaces.filter((item) => item.mac && item.name !== 'lo')
+  const primary =
+    (dev && candidates.find((item) => item.name === dev[1])) ||
+    candidates.find((item) => item.up) ||
+    candidates[0]
+
+  if (!primary) {
+    return { ifname: '', mac: '', ip: '' }
+  }
+
+  const prefix = new RegExp(`^\\d+:\\s+${primary.name}\\s`)
+  const lines = flattenIpOutput(addrOut)
+    .split('\n')
+    .filter((line) => prefix.test(line))
+  const pick = (re: RegExp) => {
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(re)
+      if (match) {
+        return match[1]
+      }
+    }
+    return ''
+  }
+  // 优先 IPv4，其次全局 IPv6，最后链路本地 IPv6
+  const ip =
+    pick(/inet\s+(\d+\.\d+\.\d+\.\d+)/) ||
+    pick(/inet6\s+([0-9a-f:]+)\/\d+\s+scope\s+global/i) ||
+    pick(/inet6\s+([0-9a-f:]+)/i)
+
+  return { ifname: primary.name, mac: primary.mac, ip }
+}
+
 // Linux 工控主板没有 getprop / dumpsys / wm，概览信息全部从 /proc、/sys、ip、df 读
 async function getLinuxOverview(deviceId: string, platform: IDevicePlatform) {
   const cpus = await getCpus(deviceId, false)
-  const [boardModel, compatible, ipOut, dfOut, modes, kernelVersion] =
-    await shell(deviceId, [
-      'cat /proc/device-tree/model 2>/dev/null',
-      'cat /proc/device-tree/compatible 2>/dev/null',
-      'ip -o addr show scope global 2>/dev/null',
-      'df -k / 2>/dev/null',
-      'for f in /sys/class/drm/card*-*/modes; do head -1 $f 2>/dev/null; done',
-      'uname -r',
-    ])
+  const [
+    boardModel,
+    compatible,
+    defaultRoute,
+    linkOut,
+    addrOut,
+    dfOut,
+    modes,
+    kernelVersion,
+  ] = await shell(deviceId, [
+    'cat /proc/device-tree/model 2>/dev/null',
+    'cat /proc/device-tree/compatible 2>/dev/null',
+    'ip route show default 2>/dev/null',
+    'ip -o link show 2>/dev/null',
+    'ip -o addr show 2>/dev/null',
+    'df -k / 2>/dev/null',
+    'for f in /sys/class/drm/card*-*/modes; do head -1 $f 2>/dev/null; done',
+    'uname -r',
+  ])
 
   // device-tree 的字符串没有换行，末尾可能残留 \0
   const model = trim(boardModel).replace(/\0/g, '')
   // "rockchip,rk3568" -> RK3568
   const soc = (compatible.split(',')[1] || '').split('\0')[0].toUpperCase()
-  const ipMatch = ipOut.match(/inet (\d+\.\d+\.\d+\.\d+)/)
-  const macMatch = ipOut.match(
-    /link\/ether (([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2}))/
-  )
+  const net = parseLinuxNet(defaultRoute, linkOut, addrOut)
   const dfLine = trim(dfOut.split('\n').pop() || '').split(/\s+/)
   const resolution = trim(modes.split('\n')[0] || '')
 
@@ -202,8 +269,10 @@ async function getLinuxOverview(deviceId: string, platform: IDevicePlatform) {
     fontScale: 0,
     wifi: '',
     root: platform.root,
-    ip: ipMatch ? ipMatch[1] : '',
-    mac: macMatch ? macMatch[1] : '',
+    // Linux 上没有 Wi-Fi 概念，用网卡名代替，避免概览里显示「未知」
+    networkInterface: net.ifname,
+    ip: net.ip,
+    mac: net.mac,
     storageTotal: toNum(dfLine[1]) * 1024,
     storageUsed: toNum(dfLine[2]) * 1024,
     ...(await getMemory(deviceId)),

@@ -47,6 +47,7 @@
   "model": "Model",
   "androidVersion": "Android Version",
   "osVersion": "OS Version",
+  "networkInterface": "Network",
   "brand": "Brand",
   "name": "Name",
   "processor": "Processor",
