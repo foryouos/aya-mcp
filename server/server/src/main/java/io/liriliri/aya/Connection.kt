@@ -15,18 +15,67 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class Connection(private val client: LocalSocket) : Thread() {
     private companion object {
         private const val TAG = "Aya.Connection"
         private var packageCache = JSONObject()
         private const val ICON_CACHE_DIR = "/data/local/tmp/aya/icons"
+        // label/icon 的内存缓存原来只活在进程内，设备重启后要重新解析全部 APK 资源表，
+        // 首次加载会超过主机超时。这里把缓存落到磁盘，重启后直接命中。
+        private const val CACHE_INDEX_FILE = "$ICON_CACHE_DIR/index.json"
+        private const val MAX_PARALLEL = 4
 
         init {
             val iconCacheDir = File(ICON_CACHE_DIR)
             if (!iconCacheDir.exists()) {
                 iconCacheDir.mkdirs()
             }
+            loadCacheIndex()
+        }
+
+        @Synchronized
+        private fun loadCacheIndex() {
+            try {
+                val file = File(CACHE_INDEX_FILE)
+                if (file.exists()) {
+                    packageCache = JSONObject(file.readText())
+                    Log.i(TAG, "Loaded ${packageCache.length()} cached package infos")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load cache index", e)
+            }
+        }
+
+        @Synchronized
+        private fun saveCacheIndex() {
+            try {
+                val tmp = File("$CACHE_INDEX_FILE.tmp")
+                tmp.writeText(packageCache.toString())
+                val target = File(CACHE_INDEX_FILE)
+                if (target.exists()) {
+                    target.delete()
+                }
+                tmp.renameTo(target)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save cache index", e)
+            }
+        }
+
+        @Synchronized
+        private fun cacheGet(key: String): JSONObject? {
+            return if (packageCache.has(key)) packageCache.getJSONObject(key) else null
+        }
+
+        @Synchronized
+        private fun cachePut(key: String, label: String, icon: String) {
+            val info = JSONObject()
+            info.put("label", label)
+            info.put("icon", icon)
+            packageCache.put(key, info)
         }
     }
 
@@ -170,12 +219,42 @@ class Connection(private val client: LocalSocket) : Thread() {
     private fun getPackageInfos(params: JSONObject): JSONArray {
         val packageNames = Util.jsonArrayToStringArray(params.getJSONArray("packageNames"))
         val result = JSONArray()
+        val size = packageNames.size
+        if (size == 0) {
+            return result
+        }
 
-        packageNames.forEach {
-            try {
-                result.put(getPackageInfo(it))
-            } catch (e: Exception) {
-                Log.e(TAG, "Fail to get package info", e)
+        // 单个包要反射解析整份 APK 资源表并编码图标，
+        // 串行处理 50 个包在设备刚启动时很容易超过主机超时，这里改成小并发。
+        val infos = arrayOfNulls<JSONObject>(size)
+        val executor = Executors.newFixedThreadPool(Math.min(MAX_PARALLEL, size))
+        val latch = CountDownLatch(size)
+        for (i in 0 until size) {
+            val index = i
+            executor.execute {
+                try {
+                    infos[index] = getPackageInfo(packageNames[index])
+                } catch (e: Exception) {
+                    Log.e(TAG, "Fail to get package info: ${packageNames[index]}", e)
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+
+        try {
+            latch.await(120, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            Log.e(TAG, "Interrupted while loading package infos", e)
+        }
+        executor.shutdown()
+
+        // 整批处理完统一落盘一次，避免每包都写文件
+        saveCacheIndex()
+
+        for (info in infos) {
+            if (info != null) {
+                result.put(info)
             }
         }
 
@@ -219,10 +298,10 @@ class Connection(private val client: LocalSocket) : Thread() {
         val cacheKey = "$packageName.$apkSize"
         var icon = ""
 
-        if (packageCache.has(cacheKey)) {
-            val cacheInfo = packageCache.getJSONObject(cacheKey)
-            label = cacheInfo.getString("label")
-            icon = cacheInfo.getString("icon")
+        val cached = cacheGet(cacheKey)
+        if (cached != null) {
+            label = cached.optString("label", packageName)
+            icon = cached.optString("icon", "")
         } else {
             val resources = getResources(apkPath)
             val labelRes = applicationInfo.labelRes
@@ -248,10 +327,7 @@ class Connection(private val client: LocalSocket) : Thread() {
                     Log.e(TAG, "Failed to get icon for $packageName")
                 }
             }
-            val cacheInfo = JSONObject()
-            cacheInfo.put("label", label)
-            cacheInfo.put("icon", icon)
-            packageCache.put(cacheKey, cacheInfo)
+            cachePut(cacheKey, label, icon)
         }
         info.put("label", label)
         info.put("icon", icon)

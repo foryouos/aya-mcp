@@ -14,3 +14,19 @@
     outline: none !important;
   }
 }
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 520px;
+  padding: 24px;
+  color: #ddd;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.error-message {
+  word-break: break-all;
+}

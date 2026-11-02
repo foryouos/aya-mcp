@@ -155,25 +155,93 @@ export async function init(c: Client) {
   handleEvent('getProcesses', getProcesses)
 }
 
-export async function shell(deviceId: string, cmd: string): Promise<string>
-export async function shell(deviceId: string, cmd: string[]): Promise<string[]>
+// 设备重启 / 断线时 adb shell 通道可能是半开的：socket 既不断开也不返回，
+// 挂在上面的调用方（以及 singleton 缓存）会永久 pending
+const DEFAULT_SHELL_TIMEOUT = 20 * 1000
+
+/**
+ * 给任意 Promise 加超时。
+ * 底层挂起时往往既不会 resolve 也不会 reject（半开连接），
+ * 只能靠外层超时打断，否则调用方与 singleton 缓存会永久卡住。
+ */
+export function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs)
+    promise.then(
+      (val) => {
+        clearTimeout(timer)
+        resolve(val)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      }
+    )
+  })
+}
+
 export async function shell(
   deviceId: string,
-  cmd: string | string[]
+  cmd: string,
+  timeoutMs?: number
+): Promise<string>
+export async function shell(
+  deviceId: string,
+  cmd: string[],
+  timeoutMs?: number
+): Promise<string[]>
+export async function shell(
+  deviceId: string,
+  cmd: string | string[],
+  timeoutMs = DEFAULT_SHELL_TIMEOUT
 ): Promise<string | string[]> {
   logger.debug('shell', cmd)
 
   const device = await client.getDevice(deviceId)
   const cmds: string[] = isStr(cmd) ? [cmd] : cmd
 
-  const socket = await device.shell(cmds.join('\necho "aya_separator"\n'))
-  const output: string = (await Adb.util.readAll(socket)).toString()
+  // 建连阶段单独限时，保证「建连 + 读取」的总耗时可控
+  const connectTimeout = Math.min(timeoutMs, 10 * 1000)
+  const socket = await withTimeout(
+    device.shell(cmds.join('\necho "aya_separator"\n')),
+    connectTimeout,
+    `adb shell connect timeout after ${connectTimeout}ms: ${cmds[0]}`
+  )
+  let timer: NodeJS.Timeout | undefined
 
-  if (isStr(cmd)) {
-    return trim(output)
+  try {
+    const raw = await Promise.race([
+      Adb.util.readAll(socket),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          // 半开连接不会自己结束，必须主动销毁，否则 socket 与等待者都会泄漏
+          try {
+            socket.destroy()
+          } catch {
+            // ignore
+          }
+          reject(
+            new Error(`adb shell timeout after ${timeoutMs}ms: ${cmds[0]}`)
+          )
+        }, timeoutMs)
+      }),
+    ])
+    const output: string = raw.toString()
+
+    if (isStr(cmd)) {
+      return trim(output)
+    }
+
+    return map(output.split('aya_separator'), (val) => trim(val))
+  } finally {
+    if (timer) {
+      clearTimeout(timer)
+    }
   }
-
-  return map(output.split('aya_separator'), (val) => trim(val))
 }
 
 export async function forwardTcp(deviceId: string, remote: string) {

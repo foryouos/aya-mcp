@@ -5,6 +5,7 @@ import once from 'licia/once'
 import { handleEvent } from 'share/main/lib/util'
 import { IpcGetStore, IpcSetStore } from 'share/common/types'
 import { IpcSetScreencastAlwaysOnTop } from 'common/types'
+import { stopActiveScrcpy } from '../lib/adb/scrcpy'
 
 const store = getScreencastStore()
 
@@ -31,6 +32,7 @@ export function showWin(deviceId?: string) {
     if (win === next) {
       win = null
     }
+    stopActiveScrcpy()
     const mainWin = window.getWin('main')
     if (mainWin) {
       mainWin.show()
@@ -40,6 +42,8 @@ export function showWin(deviceId?: string) {
     if (win === next) {
       win = null
     }
+    // renderer 可能已被 destroy，来不及发 stopScrcpy
+    stopActiveScrcpy()
   })
 
   // deviceId 可选：MCP 调用指定设备时，让投屏窗口固定该设备而不是跟随主窗口选中项

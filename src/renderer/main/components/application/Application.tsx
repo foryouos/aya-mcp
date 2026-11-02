@@ -38,8 +38,43 @@ import { useWindowResize } from 'share/renderer/lib/hooks'
 import fileSize from 'licia/fileSize'
 import jsonClone from 'licia/jsonClone'
 
+// IPC 底层（adb shell / 设备端 RPC）若永久挂起，try/finally 不会执行，
+// 所以每个请求都必须有超时兜底，否则页面会永久停在 loading。
+// 这里必须比主进程侧的超时更长（shell 20s / RPC 90s），
+// 让主进程先失败并清掉 singleton 缓存，否则重试会复用同一个 pending 请求
+// 主进程侧 getPackages 最坏约 50s（两条 shell 命令各自建连 + 读取），这里留出余量
+const GET_PACKAGES_TIMEOUT = 60 * 1000
+const GET_PACKAGE_INFOS_TIMEOUT = 120 * 1000
+
+// 设备重启期间 adb 已经上线但系统服务还没起来，第一次必然失败。
+// 失败后按指数退避自动重试，累计约 3+6+12+24+48 = 93s，覆盖一次完整重启。
+const MAX_AUTO_RETRY = 5
+const AUTO_RETRY_BASE_DELAY = 3 * 1000
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs)
+    promise.then(
+      (val) => {
+        clearTimeout(timer)
+        resolve(val)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      }
+    )
+  })
+}
+
 export default observer(function Application() {
   const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
   const [packageInfo, setPackageInfo] = useState<IPackageInfo | null>(null)
   const [packageInfos, setPackageInfos] = useState<IPackageInfo[]>([])
   const [filter, setFilter] = useState('')
@@ -55,6 +90,12 @@ export default observer(function Application() {
   })
   const draggingRef = useRef(0)
   const iconsRef = useRef<any[]>([])
+  // 用 ref 做并发锁：isLoading 是异步生效的，连点会放两次请求进来
+  const loadingRef = useRef(false)
+  // 记录上次失败原因，设备重连（如重启完成）后自动补一次加载
+  const loadErrorRef = useRef('')
+  const autoRetryRef = useRef(0)
+  const autoRetryTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const { device } = store
 
@@ -63,25 +104,52 @@ export default observer(function Application() {
   }, [])
   useWindowResize(() => dataGridRef.current?.fit())
 
-  async function refresh(packageName?: string) {
-    if (!device || isLoading) {
+  useEffect(() => {
+    // 设备重启时 adb 会先后推送多次 changeDevice，
+    // 若上次加载是失败的，就在设备重新可用后自动重试，不需要用户手动刷新
+    return main.on('changeDevice', () => {
+      if (loadingRef.current) {
+        return
+      }
+      if (loadErrorRef.current || isEmpty(iconsRef.current)) {
+        refresh()
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (autoRetryTimerRef.current) {
+        clearTimeout(autoRetryTimerRef.current)
+        autoRetryTimerRef.current = null
+      }
+    }
+  }, [])
+
+  async function refresh(packageName?: string, auto = false) {
+    // 事件回调里的闭包可能持有旧的 device，这里始终取最新的
+    const device = store.device
+    if (!device || loadingRef.current) {
       return
     }
     if (!packageName) {
-      setPackageInfos([])
+      if (autoRetryTimerRef.current) {
+        clearTimeout(autoRetryTimerRef.current)
+        autoRetryTimerRef.current = null
+      }
+      // 手动/事件触发的刷新视为一次新的尝试，重置退避计数
+      if (!auto) {
+        autoRetryRef.current = 0
+        setRetryCount(0)
+      }
+      loadingRef.current = true
       setIsLoading(true)
-      const packages = await main.getPackages(
-        device.id,
-        store.application.sysPackage
-      )
-      const chunks = chunk(packages, 50)
+      setLoadError('')
+      setPackageInfos([])
+      let loaded = 0
       let packageInfos: any[] = []
-      for (let i = 0, len = chunks.length; i < len; i++) {
-        const chunk = chunks[i]
-        packageInfos = concat(
-          packageInfos,
-          await main.getPackageInfos(device.id, chunk)
-        )
+      // 图标列表是整体重建的，逐批刷新会反复触发全量 DOM 重建与图片请求
+      const flush = (packageInfos: any[]) => {
         iconsRef.current = map(packageInfos, (info) => {
           const style: any = {
             borderRadius: '20%',
@@ -97,32 +165,99 @@ export default observer(function Application() {
             style,
           }
         })
-        setPackageInfos(packageInfos)
+        setPackageInfos(packageInfos.slice())
       }
-      setIsLoading(false)
+      const scheduleAutoRetry = () => {
+        if (autoRetryRef.current >= MAX_AUTO_RETRY) {
+          autoRetryRef.current = 0
+          setRetryCount(0)
+          return
+        }
+        const delay = AUTO_RETRY_BASE_DELAY * Math.pow(2, autoRetryRef.current)
+        autoRetryRef.current++
+        setRetryCount(autoRetryRef.current)
+        autoRetryTimerRef.current = setTimeout(() => {
+          autoRetryTimerRef.current = null
+          refresh(undefined, true)
+        }, delay)
+      }
+      try {
+        const packages = await withTimeout(
+          main.getPackages(device.id, store.application.sysPackage),
+          GET_PACKAGES_TIMEOUT,
+          'getPackages timeout'
+        )
+        // 每批更小，单批耗时可控，设备刚启动时不会一批就顶到 RPC 超时
+        const chunks = chunk(packages, 20)
+        for (let i = 0, len = chunks.length; i < len; i++) {
+          const chunk = chunks[i]
+          packageInfos = concat(
+            packageInfos,
+            await withTimeout(
+              main.getPackageInfos(device.id, chunk),
+              GET_PACKAGE_INFOS_TIMEOUT,
+              'getPackageInfos timeout'
+            )
+          )
+          loaded = packageInfos.length
+          // 每 3 批刷新一次，减少重建次数
+          if ((i + 1) % 3 === 0 || i === len - 1) {
+            flush(packageInfos)
+          }
+        }
+        loadErrorRef.current = ''
+        autoRetryRef.current = 0
+        setRetryCount(0)
+      } catch (err) {
+        if (loaded > 0) {
+          flush(packageInfos)
+        }
+        const message = err instanceof Error ? err.message : String(err)
+        loadErrorRef.current = message
+        setLoadError(t('loadPackagesFailed', { message }))
+        // 已经拿到部分数据时用通知提示，避免把已有列表盖住
+        if (loaded > 0) {
+          notify(t('loadPackagesFailed', { message }), { icon: 'warning' })
+        }
+        scheduleAutoRetry()
+      } finally {
+        // 无论成功还是失败都必须复位，
+        // 否则按钮永久禁用、入口守卫挡住重试，页面再也恢复不了
+        loadingRef.current = false
+        setIsLoading(false)
+      }
     } else {
-      const idx = findIdx(
-        packageInfos,
-        (info) => info.packageName === packageName
-      )
-      if (idx !== -1) {
-        const infos = await main.getPackageInfos(device.id, [packageName])
-        const info = infos[0]
-        packageInfos[idx] = info
-        const style: any = {
-          borderRadius: '20%',
+      try {
+        const idx = findIdx(
+          packageInfos,
+          (info) => info.packageName === packageName
+        )
+        if (idx !== -1) {
+          const infos = await withTimeout(
+            main.getPackageInfos(device.id, [packageName]),
+            GET_PACKAGES_TIMEOUT,
+            'getPackageInfos timeout'
+          )
+          const info = infos[0]
+          packageInfos[idx] = info
+          const style: any = {
+            borderRadius: '20%',
+          }
+          if (!info.enabled) {
+            style.filter = 'grayscale(100%)'
+          }
+          iconsRef.current[idx] = {
+            info: info,
+            src: info.icon || defaultIcon,
+            name: info.label,
+            style,
+          }
+          iconsRef.current = clone(iconsRef.current)
+          setPackageInfos(clone(packageInfos))
         }
-        if (!info.enabled) {
-          style.filter = 'grayscale(100%)'
-        }
-        iconsRef.current[idx] = {
-          info: info,
-          src: info.icon || defaultIcon,
-          name: info.label,
-          style,
-        }
-        iconsRef.current = clone(iconsRef.current)
-        setPackageInfos(clone(packageInfos))
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        notify(t('loadPackagesFailed', { message }), { icon: 'warning' })
       }
     }
   }
@@ -485,7 +620,29 @@ export default observer(function Application() {
           [Style.highlight]: dropHighlight,
         })}
       >
-        {isLoading && isEmpty(packageInfos) ? <PannelLoading /> : applications}
+        {isLoading && isEmpty(packageInfos) ? (
+          <PannelLoading />
+        ) : retryCount > 0 && isEmpty(packageInfos) ? (
+          <div className={Style.loadError}>
+            <div className={Style.loadErrorMessage}>
+              {t('waitingDeviceReady')}
+            </div>
+            <div className={Style.loadErrorHint}>
+              {t('autoRetrying', {
+                count: retryCount,
+                total: MAX_AUTO_RETRY,
+              })}
+            </div>
+            <button onClick={() => refresh()}>{t('retry')}</button>
+          </div>
+        ) : loadError && isEmpty(packageInfos) ? (
+          <div className={Style.loadError}>
+            <div className={Style.loadErrorMessage}>{loadError}</div>
+            <button onClick={() => refresh()}>{t('retry')}</button>
+          </div>
+        ) : (
+          applications
+        )}
       </div>
       {!isNull(packageInfo) && (
         <PackageInfoModal

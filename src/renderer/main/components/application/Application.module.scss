@@ -22,6 +22,30 @@
   background: var(--color-primary-bg);
 }
 
+.load-error {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.load-error-message {
+  max-width: 520px;
+  color: var(--color-text-secondary, #888);
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.load-error-hint {
+  color: var(--color-text-secondary, #888);
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 .open-effect {
   position: absolute;
   border-radius: 50%;

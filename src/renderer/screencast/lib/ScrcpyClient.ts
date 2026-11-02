@@ -55,6 +55,11 @@ export default class ScrcpyClient extends Emitter {
   private readiness = new Readiness()
   private recorder = new Recorder()
   private keyboard = new Keyboard(this)
+  // 已建立的对端连接必须显式关闭：server.close() 只是停止 accept，
+  // 不会断开已有 socket，反复开关投屏会累积解码器与 fd
+  private sockets: Set<any> = new Set()
+  private player: any
+  private destroyed = false
   constructor(deviceId: string, options: ScrcpyOptions3_1) {
     super()
 
@@ -65,18 +70,54 @@ export default class ScrcpyClient extends Emitter {
     this.start()
   }
   async getVideo() {
+    this.ensureAlive()
     await this.readiness.ready('video')
+    this.ensureAlive()
     return this.video
   }
   async getControl() {
+    this.ensureAlive()
     await this.readiness.ready('control')
     return this.control
   }
   destroy() {
+    if (this.destroyed) {
+      return
+    }
+    this.destroyed = true
     logger.info('destroy')
+
+    this.sockets.forEach((socket) => {
+      try {
+        socket.destroy()
+      } catch {
+        // ignore
+      }
+    })
+    this.sockets.clear()
 
     if (this.server) {
       this.server.close()
+      this.server = undefined
+    }
+
+    try {
+      this.video?.decoder?.close?.()
+    } catch {
+      // ignore
+    }
+    try {
+      this.player?.stop?.()
+    } catch {
+      // ignore
+    }
+
+    // 通知主进程关闭设备端 scrcpy 进程与它的 adb shell 通道
+    main.stopScrcpy(this.deviceId).catch(noop)
+  }
+  private ensureAlive() {
+    if (this.destroyed) {
+      throw new Error('scrcpy client destroyed')
     }
   }
   startRecording() {
@@ -130,13 +171,28 @@ export default class ScrcpyClient extends Emitter {
       this.deviceId,
       `localabstract:scrcpy_${lpad(options.value.scid as string, 8, '0')}`
     )
+    // reverseTcp 期间窗口可能已经被关掉
+    if (this.destroyed) {
+      return
+    }
 
     const server = node.createServer(async (socket) => {
+      this.sockets.add(socket)
+      socket.on('close', () => this.sockets.delete(socket))
+      if (this.destroyed) {
+        socket.destroy()
+        return
+      }
+
       // video socket is the first connection
       if (!this.video) {
         this.video = {}
         this.createVideo(socketToReadableStream(socket))
-        socket.on('close', () => this.emit('close'))
+        socket.on('close', () => {
+          if (!this.destroyed) {
+            this.emit('close')
+          }
+        })
         return
       }
 
@@ -150,7 +206,7 @@ export default class ScrcpyClient extends Emitter {
         }
       })
       sleep(1000).then(() => {
-        if (!isAudio) {
+        if (!isAudio && !this.destroyed) {
           this.createControl(socketToReadableWritablePair(socket))
         }
       })
@@ -412,6 +468,7 @@ export default class ScrcpyClient extends Emitter {
       } else if (metadata.codec === ScrcpyAudioCodec.Opus) {
         logger.info('audio codec opus')
         player = new Float32PcmPlayer(48000, 2)
+        this.player = player
         playbackStream
           .pipeThrough(
             new OpusStream({

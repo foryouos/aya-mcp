@@ -595,8 +595,9 @@ export async function init() {
     logger.info('track devices')
     try {
       const tracker = await client.trackDevices()
-      tracker.on('add', onDeviceChange)
-      tracker.on('remove', onDeviceChange)
+      tracker.on('add', (device: Device) => onDeviceChange(device))
+      tracker.on('change', (device: Device) => onDeviceChange(device))
+      tracker.on('remove', () => onDeviceChange())
       tracker.on('error', () => {
         logger.error('tracker error')
       })
@@ -615,9 +616,65 @@ export async function init() {
     // adb 就绪后主动通知渲染进程刷新一次设备列表，兜底启动早期的失败查询
     setTimeout(() => window.sendAll('changeDevice'), 2000)
   }
-  function onDeviceChange() {
+  const bootWaiters: { [deviceId: string]: Promise<void> } = {}
+
+  /**
+   * 设备重启时 adb 很快就会 online，但系统服务（PackageManager / ActivityManager）
+   * 还没起来，此时刷新应用列表必然失败。
+   * 等 sys.boot_completed=1 再通知渲染进程，可以让第一次刷新就成功。
+   */
+  async function waitForBoot(deviceId: string) {
+    // 非 Android 设备没有 getprop，直接放行
+    try {
+      const platform = await getDevicePlatform(deviceId)
+      if (platform.platform !== 'android') {
+        return
+      }
+    } catch {
+      // 探测失败按 Android 处理
+    }
+
+    const deadline = Date.now() + 120 * 1000
+    while (Date.now() < deadline) {
+      try {
+        const result = await shell(deviceId, 'getprop sys.boot_completed', 5000)
+        if (trim(result) === '1') {
+          logger.info('device boot completed', deviceId)
+          return
+        }
+      } catch {
+        // 设备还在启动，命令不可用时忽略
+      }
+      await sleep(2000)
+    }
+    logger.warn('wait device boot timeout', deviceId)
+  }
+
+  function ensureBootReady(deviceId: string) {
+    if (!bootWaiters[deviceId]) {
+      bootWaiters[deviceId] = waitForBoot(deviceId).finally(() => {
+        delete bootWaiters[deviceId]
+      })
+    }
+
+    return bootWaiters[deviceId]
+  }
+
+  function onDeviceChange(device?: Device) {
     logger.info('device change')
-    setTimeout(() => window.sendAll('changeDevice'), 2000)
+    // 设备重启/断开后，设备端 AYA 服务的 socket 可能是半开的，
+    // 主动断掉，让下一次请求重新建连并重新拉起设备端服务
+    server.resetAyaClients()
+
+    if (!device || !device.id) {
+      setTimeout(() => window.sendAll('changeDevice'), 2000)
+      return
+    }
+
+    ensureBootReady(device.id).finally(() => {
+      // 稍等片刻，让系统服务稳定后再让页面刷新
+      setTimeout(() => window.sendAll('changeDevice'), 1000)
+    })
   }
   track()
 

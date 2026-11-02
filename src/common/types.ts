@@ -166,6 +166,7 @@ export type IpcReverseTcp = (
   remote: string
 ) => Promise<number>
 export type IpcStartScrcpy = (deviceId: string, args: string[]) => Promise<void>
+export type IpcStopScrcpy = (deviceId: string) => Promise<void>
 export type IpcConnectDevice = (host: string, port?: number) => Promise<void>
 export type IpcDisconnectDevice = IpcConnectDevice
 export type IpcMoveFile = (

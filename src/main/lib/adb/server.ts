@@ -5,7 +5,13 @@ import { handleEvent, resolveResources } from 'share/main/lib/util'
 import singleton from 'licia/singleton'
 import wire from '../wire'
 import waitUntil from 'licia/waitUntil'
-import { forwardTcp, getDeviceStore, setDeviceStore, shell } from './base'
+import {
+  forwardTcp,
+  getDeviceStore,
+  setDeviceStore,
+  shell,
+  withTimeout,
+} from './base'
 import { getDevicePlatform, NotSupportedError } from './platform'
 import contain from 'licia/contain'
 import log from 'share/common/log'
@@ -21,16 +27,78 @@ const logger = log('server')
 
 let client: Client
 
+// 单条 RPC 的默认超时。设备端是「每连接一线程 + 请求串行」，
+// 没有超时的话设备端一卡，前端就会永久停在 loading 上。
+const DEFAULT_RPC_TIMEOUT = 30 * 1000
+// 建连（含 push + 拉起设备端服务）整体上限。
+// 设备刚重启时 app_process 起得慢，需要留足时间
+const CONNECT_TIMEOUT = 40 * 1000
+// 单帧上限：长度前缀错位（比如缓冲区被截断）时避免无限等待与内存膨胀
+const MAX_FRAME_SIZE = 64 * 1024 * 1024
+
+interface IPendingRequest {
+  resolve: (value?: any) => void
+  reject: (err: Error) => void
+  timer: NodeJS.Timeout
+}
+
+function toError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err))
+}
+
+/**
+ * 从缓冲区切出一个长度前缀帧（protobuf delimited）。
+ * 返回 null 表示数据还没收全；长度前缀非法时抛错，由调用方重置缓冲区。
+ */
+function readDelimitedFrame(
+  buf: Buffer
+): { payload: Buffer; end: number } | null {
+  let len = 0
+  let shift = 0
+  let pos = 0
+  while (pos < buf.length) {
+    const byte = buf[pos]
+    pos++
+    // 用乘法而不是位移，避免长度超过 2^31 时的符号问题
+    len += (byte & 0x7f) * Math.pow(2, shift)
+    if ((byte & 0x80) === 0) {
+      break
+    }
+    shift += 7
+    if (shift > 28) {
+      throw new Error('invalid frame length')
+    }
+  }
+  // 长度前缀本身还没收全
+  if (pos === 0 || (buf[pos - 1] & 0x80) !== 0) {
+    return null
+  }
+  if (len > MAX_FRAME_SIZE) {
+    throw new Error(`frame too large: ${len}`)
+  }
+  if (buf.length < pos + len) {
+    return null
+  }
+
+  return { payload: buf.subarray(pos, pos + len), end: pos + len }
+}
+
+// 所有实例（含 ui.watch 的独立连接），设备变化时统一断开
+const ayaClients: Set<AyaClient> = new Set()
+
 class AyaClient {
   private deviceId = ''
   private socket: any = null
-  private resolves: Map<string, (value?: any) => void> = new Map()
+  private buf: Buffer = Buffer.alloc(0)
+  private resolves: Map<string, IPendingRequest> = new Map()
   constructor(deviceId: string) {
     this.deviceId = deviceId
+    ayaClients.add(this)
   }
   async sendMessage(
     method: string,
-    params: types.PlainObj<any> = {}
+    params: types.PlainObj<any> = {},
+    timeoutMs = DEFAULT_RPC_TIMEOUT
   ): Promise<any> {
     // 设备端服务是 aya.dex + app_process + UiAutomation，Linux 主板必然起不来。
     // 提前拦掉，否则 push→start→waitUntil 会白等 10 秒才报错。
@@ -44,68 +112,155 @@ class AyaClient {
     }
 
     if (!this.socket) {
-      await this.connect()
+      // 设备重启时 openLocal 可能既不 resolve 也不 reject。
+      // 没有这层超时，sendMessage 会一直挂着，singleton 还会把这个
+      // pending 请求缓存下来，导致后续重试永远复用同一个死 Promise。
+      await withTimeout(
+        this.connect(),
+        CONNECT_TIMEOUT,
+        `aya server connect timeout after ${CONNECT_TIMEOUT}ms`
+      )
+    }
+    if (!this.socket) {
+      throw new Error('aya server not connected')
     }
 
     const id = uuid()
-
-    this.socket.write(
-      wire.io.liriliri.aya.Request.encodeDelimited({
-        id,
-        method,
-        params: JSON.stringify(params),
-      }).finish()
-    )
-
-    return new Promise((resolve) => {
-      this.resolves.set(id, resolve)
+    // 先登记再写，避免响应比登记更快到达
+    const promise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.resolves.delete(id)
+        const err = new Error(
+          `aya rpc ${method} timeout after ${timeoutMs}ms`
+        )
+        // 超时说明这条连接已经不可用（设备重启等半开场景不会触发 close）。
+        // 不主动断开的话，后续请求会继续写到死 socket 上，重试永远失败。
+        this.close(err.message)
+        reject(err)
+      }, timeoutMs)
+      // 未完成的 RPC 不应该阻止进程退出
+      if (typeof timer.unref === 'function') {
+        timer.unref()
+      }
+      this.resolves.set(id, { resolve, reject, timer })
     })
+
+    try {
+      this.socket.write(
+        wire.io.liriliri.aya.Request.encodeDelimited({
+          id,
+          method,
+          params: JSON.stringify(params),
+        }).finish()
+      )
+    } catch (err) {
+      this.rejectRequest(id, toError(err))
+    }
+
+    return promise
   }
-  close() {
+  close(reason = 'aya server connection closed') {
     const socket = this.socket
     this.socket = null
+    this.buf = Buffer.alloc(0)
+    this.failAll(new Error(reason))
     try {
-      if (socket && typeof socket.end === 'function') {
+      // destroy 而不是 end：半开连接上 end 不保证能真正释放
+      if (socket && typeof socket.destroy === 'function') {
+        socket.destroy()
+      } else if (socket && typeof socket.end === 'function') {
         socket.end()
       }
     } catch {
       // ignore
     }
-    this.resolves.forEach((resolve) => resolve(undefined))
-    this.resolves.clear()
+  }
+  private rejectRequest(id: string, err: Error) {
+    const pending = this.resolves.get(id)
+    if (!pending) {
+      return
+    }
+    this.resolves.delete(id)
+    clearTimeout(pending.timer)
+    pending.reject(err)
+  }
+  /**
+   * 连接断开时把挂起的请求全部 reject。
+   * 否则这些 Promise 会永久 pending，调用方（如应用列表）就永远卡在 loading。
+   */
+  private failAll(err: Error) {
+    const pendings = this.resolves
+    this.resolves = new Map()
+    pendings.forEach(({ reject, timer }) => {
+      clearTimeout(timer)
+      reject(err)
+    })
+  }
+  private onDisconnect(socket: any, err?: Error) {
+    // 旧 socket 的迟到事件不能影响新连接
+    if (this.socket && this.socket !== socket) {
+      return
+    }
+    logger.warn('disconnect', err ? err.message : '')
+    this.socket = null
+    this.buf = Buffer.alloc(0)
+    this.failAll(err || new Error('aya server connection closed'))
+  }
+  private drainResponses() {
+    while (this.buf.length > 0) {
+      let frame: { payload: Buffer; end: number } | null
+      try {
+        frame = readDelimitedFrame(this.buf)
+      } catch (err) {
+        // 流已错位，丢弃缓冲，等下一个完整响应重建
+        logger.warn('invalid response frame, reset buffer', err)
+        this.buf = Buffer.alloc(0)
+        return
+      }
+      if (!frame) {
+        break
+      }
+      this.buf = this.buf.subarray(frame.end)
+      try {
+        const { id, result } = wire.io.liriliri.aya.Response.decode(
+          frame.payload
+        )
+        const pending = this.resolves.get(id)
+        if (pending) {
+          this.resolves.delete(id)
+          clearTimeout(pending.timer)
+          pending.resolve(JSON.parse(result))
+        }
+      } catch (err) {
+        logger.warn('decode response failed', err)
+      }
+    }
   }
   private async connect(tryStart = true) {
     logger.info('connect')
     try {
       const device = client.getDevice(this.deviceId)
       const socket = await device.openLocal('localabstract:aya')
-      let buf = Buffer.alloc(0)
+      this.buf = Buffer.alloc(0)
       socket.on('readable', () => {
-        const newBuf = socket.read()
-        if (!newBuf) {
-          return
+        let chunk
+        while (null !== (chunk = socket.read())) {
+          this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : chunk
         }
-        buf = Buffer.concat([buf, newBuf])
-        try {
-          const message = wire.io.liriliri.aya.Response.decodeDelimited(buf)
-          buf = Buffer.alloc(0)
-          const { id, result } = message
-          const resolve = this.resolves.get(id)
-          if (resolve) {
-            resolve(JSON.parse(result))
-          }
-        } catch {
-          // ignore
-        }
+        this.drainResponses()
       })
-      socket.on('end', () => (this.socket = null))
+      socket.on('end', () => this.onDisconnect(socket))
+      socket.on('close', () => this.onDisconnect(socket))
+      socket.on('error', (err: Error) => this.onDisconnect(socket, err))
       this.socket = socket
-    } catch {
+    } catch (err) {
       if (tryStart) {
         await this.push()
         await this.start()
-        await waitUntil(() => this.isRunning(), 10000, 100)
+        await waitUntil(() => this.isRunning(), 20000, 200)
         await this.connect(false)
+      } else {
+        throw err
       }
     }
   }
@@ -336,7 +491,8 @@ export async function watchUi(
 
   try {
     const result = await Promise.race([
-      client.sendMessage('ui.watch', params),
+      // 这里的超时要比自身 race 留得更长，让 race 决定最终错误信息
+      client.sendMessage('ui.watch', params, Math.max(timeoutMs, 1000) + 5000),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
           () => reject(new Error('ui.watch timeout')),
@@ -359,6 +515,16 @@ export async function watchUi(
   }
 }
 
+/**
+ * 设备重启/断开时调用。
+ * 此时主机侧的 socket 往往是半开的（既收不到 FIN 也收不到错误），
+ * 不主动断开的话下一次请求会继续写到死连接上，只能一直等到超时。
+ */
+export function resetAyaClients(reason = 'device changed') {
+  ayaClients.forEach((ayaClient) => ayaClient.close(reason))
+  each(watchClients, (_, deviceId) => delete watchClients[deviceId])
+}
+
 export async function getUiCapabilities(deviceId: string) {
   const client = await getAyaClient(deviceId)
   const result = await client.sendMessage('ui.state')
@@ -378,9 +544,13 @@ const getPackageInfos: IpcGetPackageInfos = singleton(async function (
   }
 
   const client = await getAyaClient(deviceId)
-  const result = await client.sendMessage('getPackageInfos', {
-    packageNames,
-  })
+  // 设备端是逐包串行解析 APK 资源 + 生成图标，一批 50 个包耗时可能几十秒。
+  // 必须短于渲染进程的超时，否则前端重试时会复用这里还没结束的 pending 请求
+  const result = await client.sendMessage(
+    'getPackageInfos',
+    { packageNames },
+    60 * 1000
+  )
   const { packageInfos } = result
   const serverPort = await getFileServerPort(deviceId)
   if (!isEmpty(packageInfos)) {
@@ -449,12 +619,16 @@ const getFileServerPort = singleton(async function (deviceId): Promise<number> {
   const client = await getAyaClient(deviceId)
   let port = getDeviceStore(deviceId, 'fileServerPort')
   if (port) {
-    const { running } = await client.sendMessage('isFileServerRunning')
+    const { running } = await client.sendMessage(
+      'isFileServerRunning',
+      {},
+      15 * 1000
+    )
     if (running) {
       return port
     }
   }
-  const result = await client.sendMessage('startFileServer')
+  const result = await client.sendMessage('startFileServer', {}, 15 * 1000)
   port = await forwardTcp(deviceId, `tcp:${result.port}`)
   setDeviceStore(deviceId, 'fileServerPort', port)
   return port

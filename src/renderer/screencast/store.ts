@@ -59,6 +59,12 @@ class Store extends BaseStore {
     if (device === null) {
       main.closeScreencast()
     } else {
+      // 换设备时旧实例的 socket / 解码器 / 播放器不会自己消失，
+      // 必须先释放，否则长时间反复切换会累积多路解码
+      if (this.scrcpyClient) {
+        this.scrcpyClient.destroy()
+      }
+
       const deviceSettings = await main.getScreencastStore('settings')
       let settings = defaultSettings
       if (deviceSettings[device.id]) {

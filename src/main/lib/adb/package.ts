@@ -21,7 +21,9 @@ import {
 let client: Client
 
 const getCurrentUser = singleton(async (deviceId: string) => {
-  const result = await shell(deviceId, 'am get-current-user')
+  // 设备重启期间这条命令最容易卡住，单独给一个较短的上限，
+  // 避免它把整个 getPackages 的耗时拖长
+  const result = await shell(deviceId, 'am get-current-user', 10 * 1000)
   return parseInt(result, 10)
 })
 
