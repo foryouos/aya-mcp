@@ -1,3 +1,18 @@
+## v2.1.6 (3 Nov 2026)
+
+* fix: app list no longer stays stuck on loading after a device reboot: adb shell / RPC / connect all have timeouts, half-open sockets are torn down, and a device change resets every cached connection
+* perf: device-side package cache is persisted to `/data/local/tmp/aya/icons/index.json`, so a reboot no longer re-parses every APK resource table (first load 60s+ -> 1-2s)
+* perf: `getPackageInfos` parses packages with a shared 4-thread pool instead of a per-batch pool, and request/response logs are truncated so logcat writes stop dominating each batch
+* perf: icon HTTP server sends `ETag` / `Cache-Control`, so repeated renders reuse cached icons through 304 instead of re-downloading
+* perf: host caches `am get-current-user` / `dumpsys diskstats` / file server port, and builds icon URLs synchronously
+* feat: app list retries automatically with exponential backoff while a device reboots, showing "waiting for device" instead of a red error
+* feat: after a device change AYA waits for `sys.boot_completed` before telling panels to refresh, so the first load succeeds
+* feat: screencast shows a retry prompt when the video stream stops producing frames for 15s
+* fix: screencast fully releases sockets / decoders / the device-side scrcpy process on close, and window teardown stops the device process from the main process
+* fix: device-side screenshots recycle Bitmaps and close HardwareBuffers, so `aya_screencap` no longer slows down during long sessions
+* fix: device-side service uses a bounded connection pool, a 5 minute idle timeout and a shared worker pool, keeping the thread count flat
+* chore: verified on RK3576 / Android 14 with 100+ screenshots, 45 UI dumps, 30 package listings and 11 screencast cycles with zero failures; a device reboot recovers automatically in about 19s
+
 ## v2.1.5 (28 Oct 2026)
 
 * feat: support Linux industrial boards over adb (RK3568/RK3576 on Debian, Ubuntu, Buildroot, Yocto): platform auto-detection, device list shows distro/arch instead of `undefined undefined`

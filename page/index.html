@@ -55,7 +55,7 @@
             "applicationSubCategory": "Android / Linux 设备控制 · MCP 服务",
             "operatingSystem": "Windows, macOS, Linux",
             "url": "https://aya-mcp.foryouos.cn/",
-            "softwareVersion": "2.1.5",
+            "softwareVersion": "2.1.6",
             "description": "AYA 内置只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力以 73 个 aya_* 工具暴露给 AI 客户端，支持截图、UI 层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏；同板实测比 Python uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。同时支持带 adb 的 Linux 工控主板（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto），日志走 journalctl / dmesg。",
             "featureList": [
               "73 个 MCP 工具（29 只读 / 44 写）",
@@ -2232,7 +2232,7 @@ details p {
             />
             <path d="M25 36h14" stroke="#fff" stroke-width="5" stroke-linecap="round" />
           </svg>
-          AYA&nbsp;MCP <small>v2.1.5</small>
+          AYA&nbsp;MCP <small>v2.1.6</small>
         </a>
         <nav class="links" aria-label="主导航">
           <a href="#what">什么是 MCP</a>
@@ -3069,13 +3069,22 @@ details p {
                 <path d="M12 8v4l3 2" /><circle cx="12" cy="12" r="9" />
               </svg>
               更新日志
-              <span class="count">2026-10</span>
+              <span class="count">2026-11</span>
             </div>
             <table>
               <thead>
                 <tr><th>版本</th><th>改动</th></tr>
               </thead>
               <tbody>
+                <tr>
+                  <td><code>v2.1.6</code></td>
+                  <td>
+                    长跑稳定性与性能优化：设备重启后应用列表不再卡在加载（adb 请求 / 建连 / shell 全部加超时，半开连接主动断开，
+                    设备变化时重置全部连接）；设备端应用信息缓存落盘，重启后不再重新解析 APK 资源表（60s+ 降到 1~2 秒）；
+                    图标 HTTP 服务支持 ETag / 304 缓存，主进程补齐用户 / 磁盘 / 端口缓存；投屏新增 15 秒无帧看门狗，
+                    关闭时完整释放 socket、解码器与设备端进程；设备端截图补 Bitmap / HardwareBuffer 回收。
+                  </td>
+                </tr>
                 <tr>
                   <td><code>v2.1.5</code></td>
                   <td>
