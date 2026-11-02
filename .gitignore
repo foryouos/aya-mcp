@@ -17,3 +17,4 @@ build/*.provisionprofile
 .run-err.log
 .tmp-*/
 .tmp-mcp-test/
+.workbuddy/*

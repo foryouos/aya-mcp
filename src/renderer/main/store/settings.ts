@@ -9,6 +9,7 @@ export class Settings {
   useNativeTitlebar = false
   serialPath = ''
   serialBaudRate = 115200
+  shellHighlight = true
   constructor() {
     makeObservable(this, {
       language: observable,
@@ -18,6 +19,7 @@ export class Settings {
       useNativeTitlebar: observable,
       serialPath: observable,
       serialBaudRate: observable,
+      shellHighlight: observable,
       set: action,
     })
 
@@ -32,6 +34,7 @@ export class Settings {
       'useNativeTitlebar',
       'serialPath',
       'serialBaudRate',
+      'shellHighlight',
     ]
     for (let i = 0, len = names.length; i < len; i++) {
       const name = names[i]

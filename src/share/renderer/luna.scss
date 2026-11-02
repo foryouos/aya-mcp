@@ -109,6 +109,7 @@ $theme-variables: meta.module-variables(theme);
 }
 
 .luna-command-palette-list {
+  max-height: 60vh;
   li {
     border-radius: #{theme.$border-radius-x-s}px;
   }

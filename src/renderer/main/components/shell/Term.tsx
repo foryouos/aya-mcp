@@ -7,12 +7,39 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { useEffect, useRef } from 'react'
 import {
+  blue6,
+  blue8,
+  blue8Dark,
+  blue9Dark,
   colorBgContainer,
   colorBgContainerDark,
   colorPrimary,
   colorText,
   colorTextDark,
+  colorTextSecondary,
+  colorTextTertiary,
+  colorTextTertiaryDark,
+  cyan7,
+  cyan8,
+  cyan8Dark,
+  cyan9Dark,
   fontFamilyCode,
+  green7,
+  green8,
+  green7Dark,
+  green8Dark,
+  magenta7,
+  magenta8,
+  magenta8Dark,
+  magenta9Dark,
+  red6,
+  red7,
+  red7Dark,
+  red8Dark,
+  yellow8,
+  yellow9,
+  yellow8Dark,
+  yellow9Dark,
 } from 'common/theme'
 import copy from 'licia/copy'
 import Style from './Term.module.scss'
@@ -20,6 +47,7 @@ import '@xterm/xterm/css/xterm.css'
 import { t } from 'common/util'
 import contextMenu from 'share/renderer/lib/contextMenu'
 import isHidden from 'licia/isHidden'
+import { highlight } from './highlight'
 
 interface ITermProps {
   visible: boolean
@@ -70,7 +98,7 @@ export default observer(function Term(props: ITermProps) {
       if (sessionIdRef.current !== id) {
         return
       }
-      term.write(data)
+      term.write(store.settings.shellHighlight ? highlight(data) : data)
     }
     const offShellData = main.on('shellData', onShellData)
 
@@ -153,6 +181,17 @@ export default observer(function Term(props: ITermProps) {
         type: 'separator',
       },
       {
+        type: 'checkbox',
+        label: t('highlightOutput'),
+        checked: store.settings.shellHighlight,
+        click: () => {
+          store.settings.set('shellHighlight', !store.settings.shellHighlight)
+        },
+      },
+      {
+        type: 'separator',
+      },
+      {
         label: t('reset'),
         click() {
           if (sessionIdRef.current) {
@@ -196,6 +235,7 @@ function getTheme(dark = false) {
     background: colorBgContainer,
     foreground: colorText,
     cursor: colorText,
+    ...getAnsiColors(false),
   }
 
   if (dark) {
@@ -203,6 +243,7 @@ function getTheme(dark = false) {
       background: colorBgContainerDark,
       foreground: colorTextDark,
       cursor: colorTextDark,
+      ...getAnsiColors(true),
     }
   }
 
@@ -210,5 +251,47 @@ function getTheme(dark = false) {
     selectionForeground: '#fff',
     selectionBackground: colorPrimary,
     ...theme,
+  }
+}
+
+function getAnsiColors(dark: boolean) {
+  if (dark) {
+    return {
+      black: '#000000',
+      red: red7Dark,
+      green: green7Dark,
+      yellow: yellow8Dark,
+      blue: blue8Dark,
+      magenta: magenta8Dark,
+      cyan: cyan8Dark,
+      white: colorTextDark,
+      brightBlack: colorTextTertiaryDark,
+      brightRed: red8Dark,
+      brightGreen: green8Dark,
+      brightYellow: yellow9Dark,
+      brightBlue: blue9Dark,
+      brightMagenta: magenta9Dark,
+      brightCyan: cyan9Dark,
+      brightWhite: '#ffffff',
+    }
+  }
+
+  return {
+    black: '#000000',
+    red: red6,
+    green: green7,
+    yellow: yellow8,
+    blue: blue6,
+    magenta: magenta7,
+    cyan: cyan7,
+    white: colorText,
+    brightBlack: colorTextTertiary,
+    brightRed: red7,
+    brightGreen: green8,
+    brightYellow: yellow9,
+    brightBlue: blue8,
+    brightMagenta: magenta8,
+    brightCyan: cyan8,
+    brightWhite: colorTextSecondary,
   }
 }

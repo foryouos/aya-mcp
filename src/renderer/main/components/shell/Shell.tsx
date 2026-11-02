@@ -37,6 +37,25 @@ export default observer(function Shell() {
 
   useEffect(() => add(), [])
 
+  useEffect(() => {
+    if (!commandPaletteVisible) {
+      return
+    }
+    function onKeydown(e: KeyboardEvent) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') {
+        return
+      }
+      setTimeout(() => {
+        const active = document.querySelector('.luna-command-palette-active')
+        if (active) {
+          active.scrollIntoView({ block: 'nearest' })
+        }
+      }, 0)
+    }
+    document.addEventListener('keydown', onKeydown, true)
+    return () => document.removeEventListener('keydown', onKeydown, true)
+  }, [commandPaletteVisible])
+
   function add() {
     const id = uuid()
     const shell = {
@@ -93,11 +112,12 @@ export default observer(function Shell() {
     return {
       title: `${title} (${truncate(command, 95 - title.length)})`,
       handler: () => {
-        main.writeShell(selectedShell.sessionId, command)
+        const { sessionId, terminal } = selectedShell
+        main.writeShell(sessionId, command)
+        // 回到最新输出位置：之后命令回显与输出都会继续跟随底部
+        terminal?.scrollToBottom()
         setTimeout(() => {
-          if (selectedShell.terminal) {
-            selectedShell.terminal.focus()
-          }
+          terminal?.focus()
         }, 500)
       },
     }
@@ -148,13 +168,24 @@ export default observer(function Shell() {
   )
 })
 
+type ICommand = [title: string, command: string]
+
 function getCommands() {
-  const commands = [
+  const system: ICommand[] = [
     [t('reboot'), 'reboot\n'],
     [t('rebootRecovery'), 'reboot recovery\n'],
     [t('rebootBootloader'), 'reboot bootloader\n'],
+    [t('rebootLoader'), 'reboot loader\n'],
     [t('memInfo'), 'dumpsys meminfo\n'],
     [t('batteryInfo'), 'dumpsys battery\n'],
+    [t('cmdRoot'), 'su\n'],
+    [t('cmdUser'), 'id\n'],
+    [
+      t('cmdPlatform'),
+      'getprop ro.board.platform; getprop ro.product.model; getprop ro.build.version.release\n',
+    ],
+    [t('cmdDtbModel'), 'cat /proc/device-tree/model; echo\n'],
+    [t('cmdCmdline'), 'cat /proc/cmdline\n'],
     [
       `${t('start')} shizuku`,
       'sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh\n',
@@ -162,10 +193,95 @@ function getCommands() {
   ]
 
   if (store.language === 'zh-CN') {
-    commands.push([
+    system.push([
       '授权 GKD',
       'pm grant li.songe.gkd android.permission.WRITE_SECURE_SETTINGS; appops set li.songe.gkd ACCESS_RESTRICTED_SETTINGS allow\n',
     ])
+  }
+
+  const groups: Array<[string, ICommand[]]> = [
+    [t('groupSystem'), system],
+    [
+      t('groupDisplay'),
+      [
+        [t('cmdScreenSize'), 'wm size\n'],
+        [t('cmdScreenDensity'), 'wm density\n'],
+        [t('cmdDisplayInfo'), 'dumpsys display\n'],
+        [t('cmdSurfaceFlinger'), 'dumpsys SurfaceFlinger\n'],
+        [
+          t('cmdFramebuffer'),
+          'cat /sys/class/graphics/fb0/virtual_size\n',
+        ],
+        [t('cmdDrmSummary'), 'cat /sys/kernel/debug/dri/0/summary\n'],
+        [
+          t('cmdBacklight'),
+          'cat /sys/class/backlight/*/brightness\n',
+        ],
+      ],
+    ],
+    [
+      t('groupAudio'),
+      [
+        [t('cmdAudioInfo'), 'dumpsys audio\n'],
+        [t('cmdAudioFlinger'), 'dumpsys media.audio_flinger\n'],
+        [t('cmdAudioPolicy'), 'dumpsys media.audio_policy\n'],
+        [t('cmdSoundCards'), 'cat /proc/asound/cards\n'],
+        [t('cmdPcmDevices'), 'cat /proc/asound/pcm\n'],
+        [t('cmdTinyMix'), 'tinymix\n'],
+      ],
+    ],
+    [
+      t('groupGpio'),
+      [
+        [t('cmdGpioState'), 'cat /sys/kernel/debug/gpio\n'],
+        [t('cmdGpioInfo'), 'gpioinfo\n'],
+        [t('cmdGpioExport'), 'ls /sys/class/gpio\n'],
+        [t('cmdGpioIrq'), 'cat /proc/interrupts | grep -i gpio\n'],
+      ],
+    ],
+    [
+      t('groupPerf'),
+      [
+        [
+          t('cmdThermal'),
+          'cat /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp\n',
+        ],
+        [
+          t('cmdCpuFreq'),
+          'cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq\n',
+        ],
+        [
+          t('cmdClkSummary'),
+          'cat /sys/kernel/debug/clk/clk_summary | head -n 60\n',
+        ],
+        [t('cmdTop'), 'top -n 1 -m 15\n'],
+      ],
+    ],
+    [
+      t('groupStorage'),
+      [
+        [t('cmdPartitions'), 'cat /proc/partitions\n'],
+        [t('cmdBlockByName'), 'ls -l /dev/block/by-name\n'],
+        [t('cmdDiskUsage'), 'df -h\n'],
+      ],
+    ],
+    [
+      t('groupDebug'),
+      [
+        [t('cmdLogcat'), 'logcat -d -t 200\n'],
+        [t('cmdLogcatClear'), 'logcat -c\n'],
+        [t('cmdDmesg'), 'dmesg | tail -n 100\n'],
+        [t('cmdI2c'), 'ls /dev/i2c-*; i2cdetect -l\n'],
+      ],
+    ],
+  ]
+
+  const commands: ICommand[] = []
+
+  for (const [group, items] of groups) {
+    for (const [title, command] of items) {
+      commands.push([`${group} · ${title}`, command])
+    }
   }
 
   return commands

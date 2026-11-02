@@ -5,7 +5,6 @@ import LunaSetting, {
   LunaSettingHtml,
   LunaSettingNumber,
   LunaSettingSelect,
-  LunaSettingTitle,
 } from 'luna-setting/react'
 import { notify } from 'share/renderer/lib/util'
 import { t } from 'common/util'
@@ -152,6 +151,11 @@ export default observer(function SettingsModal(props: IModalProps) {
                 keyName="useNativeTitlebar"
                 value={store.settings.useNativeTitlebar}
                 description={t('useNativeTitlebar')}
+              />
+              <LunaSettingCheckbox
+                keyName="shellHighlight"
+                value={store.settings.shellHighlight}
+                description={t('highlightOutput')}
               />
             </LunaSetting>
           )}
