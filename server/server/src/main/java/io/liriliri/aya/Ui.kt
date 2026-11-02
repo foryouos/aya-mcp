@@ -504,25 +504,38 @@ object Ui {
 
         val bitmap = captureBitmap(instance)
             ?: throw IllegalStateException("takeScreenshot unavailable")
-        val scaled = scaleBitmap(bitmap, maxWidth)
-        val out = ByteArrayOutputStream(256 * 1024)
-        scaled.compress(
-            if (asPng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG,
-            quality,
-            out
-        )
-        val bytes = out.toByteArray()
+        // Bitmap 的 native 内存只能靠显式 recycle 释放，
+        // 长时间高频截图不回收会让 gralloc 内存持续上涨、截图越来越慢
+        try {
+            val scaled = scaleBitmap(bitmap, maxWidth)
+            try {
+                val out = ByteArrayOutputStream(256 * 1024)
+                scaled.compress(
+                    if (asPng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG,
+                    quality,
+                    out
+                )
+                val bytes = out.toByteArray()
 
-        return JSONObject()
-            .put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
-            .put("format", if (asPng) "png" else "jpeg")
-            .put("quality", if (asPng) JSONObject.NULL else quality)
-            .put("width", scaled.width)
-            .put("height", scaled.height)
-            .put("sourceWidth", bitmap.width)
-            .put("sourceHeight", bitmap.height)
-            .put("bytes", bytes.size)
-            .put("totalMs", SystemClock.uptimeMillis() - started)
+                return JSONObject()
+                    .put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                    .put("format", if (asPng) "png" else "jpeg")
+                    .put("quality", if (asPng) JSONObject.NULL else quality)
+                    .put("width", scaled.width)
+                    .put("height", scaled.height)
+                    .put("sourceWidth", bitmap.width)
+                    .put("sourceHeight", bitmap.height)
+                    .put("bytes", bytes.size)
+                    .put("totalMs", SystemClock.uptimeMillis() - started)
+            } finally {
+                // scaleBitmap 在无需缩放时会返回同一个对象
+                if (scaled !== bitmap) {
+                    scaled.recycle()
+                }
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private fun injectKey(
@@ -604,16 +617,28 @@ object Ui {
         // HardwareBuffer / ColorSpace 用反射拿，避免低版本设备类解析失败。
         return runCatching {
             val buffer = raw.javaClass.getMethod("getHardwareBuffer").invoke(raw) ?: return@runCatching null
-            val colorSpace = runCatching {
-                raw.javaClass.getMethod("getColorSpace").invoke(raw)
-            }.getOrNull()
-            val wrap = Bitmap::class.java.getMethod(
-                "wrapHardwareBuffer",
-                Class.forName("android.hardware.HardwareBuffer"),
-                Class.forName("android.graphics.ColorSpace")
-            )
-            val wrapped = wrap.invoke(null, buffer, colorSpace) as? Bitmap ?: return@runCatching null
-            wrapped.copy(Bitmap.Config.ARGB_8888, false)
+            try {
+                val colorSpace = runCatching {
+                    raw.javaClass.getMethod("getColorSpace").invoke(raw)
+                }.getOrNull()
+                val wrap = Bitmap::class.java.getMethod(
+                    "wrapHardwareBuffer",
+                    Class.forName("android.hardware.HardwareBuffer"),
+                    Class.forName("android.graphics.ColorSpace")
+                )
+                val wrapped = wrap.invoke(null, buffer, colorSpace) as? Bitmap
+                    ?: return@runCatching null
+                try {
+                    wrapped.copy(Bitmap.Config.ARGB_8888, false)
+                } finally {
+                    runCatching { wrapped.recycle() }
+                }
+            } finally {
+                // HardwareBuffer 由 gralloc 分配，不 close 会一直泄漏
+                runCatching {
+                    buffer.javaClass.getMethod("close").invoke(buffer)
+                }
+            }
         }.getOrElse {
             Log.w(TAG, "takeScreenshot result unsupported", it)
             null

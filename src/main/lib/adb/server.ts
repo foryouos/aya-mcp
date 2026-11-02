@@ -86,6 +86,13 @@ function readDelimitedFrame(
 // 所有实例（含 ui.watch 的独立连接），设备变化时统一断开
 const ayaClients: Set<AyaClient> = new Set()
 
+// 图标文件服务端口在设备端进程存活期间不会变。
+// 不加缓存的话，每一批 getPackageInfos 都会多一次 isFileServerRunning 往返
+const fileServerPortCache: {
+  [deviceId: string]: { port: number; at: number }
+} = {}
+const FILE_SERVER_PORT_TTL = 60 * 1000
+
 class AyaClient {
   private deviceId = ''
   private socket: any = null
@@ -523,6 +530,8 @@ export async function watchUi(
 export function resetAyaClients(reason = 'device changed') {
   ayaClients.forEach((ayaClient) => ayaClient.close(reason))
   each(watchClients, (_, deviceId) => delete watchClients[deviceId])
+  // 设备端进程已重启，缓存的端口与 forward 不再可信
+  each(fileServerPortCache, (_, deviceId) => delete fileServerPortCache[deviceId])
 }
 
 export async function getUiCapabilities(deviceId: string) {
@@ -554,10 +563,13 @@ const getPackageInfos: IpcGetPackageInfos = singleton(async function (
   const { packageInfos } = result
   const serverPort = await getFileServerPort(deviceId)
   if (!isEmpty(packageInfos)) {
+    // 这里只是拼 URL（平台在上面已经确认过），
+    // 逐条 await getFileUrl 会多出 N 次平台查询
+    const prefix = `http://127.0.0.1:${serverPort}`
     for (let i = 0, len = packageInfos.length; i < len; i++) {
       const info: IPackageInfo = packageInfos[i]
       if (info.icon) {
-        info.icon = await getFileUrl(deviceId, info.icon, serverPort)
+        info.icon = prefix + encodeURI(info.icon)
       }
     }
     if (isUndef(packageInfos[0].appSize)) {
@@ -577,8 +589,27 @@ const getPackageInfos: IpcGetPackageInfos = singleton(async function (
   return packageInfos
 })
 
+// dumpsys diskstats 在大设备上输出上万行、耗时数秒，
+// 而应用大小不会秒级变化，缓存一段时间避免每次刷新都跑
+const diskStatsCache: {
+  [deviceId: string]: {
+    at: number
+    data: types.PlainObj<{
+      appSize: number
+      dataSize: number
+      cacheSize: number
+    }>
+  }
+} = {}
+const DISK_STATS_TTL = 5 * 60 * 1000
+
 const getPackageDiskStats = async function (deviceId: string) {
-  const diskStats = await shell(deviceId, 'dumpsys diskstats')
+  const cached = diskStatsCache[deviceId]
+  if (cached && Date.now() - cached.at < DISK_STATS_TTL) {
+    return cached.data
+  }
+
+  const diskStats = await shell(deviceId, 'dumpsys diskstats', 60 * 1000)
   const packageDiskStats: types.PlainObj<{
     appSize: number
     dataSize: number
@@ -612,10 +643,17 @@ const getPackageDiskStats = async function (deviceId: string) {
     }
   }
 
+  diskStatsCache[deviceId] = { at: Date.now(), data: packageDiskStats }
+
   return packageDiskStats
 }
 
 const getFileServerPort = singleton(async function (deviceId): Promise<number> {
+  const cached = fileServerPortCache[deviceId]
+  if (cached && Date.now() - cached.at < FILE_SERVER_PORT_TTL) {
+    return cached.port
+  }
+
   const client = await getAyaClient(deviceId)
   let port = getDeviceStore(deviceId, 'fileServerPort')
   if (port) {
@@ -625,12 +663,14 @@ const getFileServerPort = singleton(async function (deviceId): Promise<number> {
       15 * 1000
     )
     if (running) {
+      fileServerPortCache[deviceId] = { port, at: Date.now() }
       return port
     }
   }
   const result = await client.sendMessage('startFileServer', {}, 15 * 1000)
   port = await forwardTcp(deviceId, `tcp:${result.port}`)
   setDeviceStore(deviceId, 'fileServerPort', port)
+  fileServerPortCache[deviceId] = { port, at: Date.now() }
   return port
 })
 

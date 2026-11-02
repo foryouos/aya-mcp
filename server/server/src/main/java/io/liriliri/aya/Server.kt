@@ -18,7 +18,9 @@ class Server {
         }
     }
 
-    private val executor = Executors.newCachedThreadPool()
+    // 主连接 + ui.watch 独立连接 + 临时重连，正常不会超过个位数；
+    // 用有界池避免异常情况下线程无限增长
+    private val executor = Executors.newFixedThreadPool(16)
     fun start(args: Array<String>) {
         Log.i(TAG, "Start server")
 

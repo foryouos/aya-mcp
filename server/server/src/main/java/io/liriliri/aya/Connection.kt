@@ -28,6 +28,13 @@ class Connection(private val client: LocalSocket) : Thread() {
         // 首次加载会超过主机超时。这里把缓存落到磁盘，重启后直接命中。
         private const val CACHE_INDEX_FILE = "$ICON_CACHE_DIR/index.json"
         private const val MAX_PARALLEL = 4
+        // 主机侧异常退出 / 窗口被强杀时不会发 FIN，
+        // 空闲超时后主动结束线程，避免服务端线程只增不减
+        private const val IDLE_TIMEOUT_MS = 5 * 60 * 1000
+
+        // 每批都新建线程池会导致线程反复创建销毁（每批 4 个），
+        // 改成进程级共享池，线程数稳定
+        private val workerPool = Executors.newFixedThreadPool(MAX_PARALLEL)
 
         init {
             val iconCacheDir = File(ICON_CACHE_DIR)
@@ -77,14 +84,33 @@ class Connection(private val client: LocalSocket) : Thread() {
             info.put("icon", icon)
             packageCache.put(key, info)
         }
+
+        // 一批 20 个包的 params/response 有几十 KB，
+        // 全量写 logcat 在低端设备上会明显拖慢每次请求
+        private fun brief(text: String, max: Int = 300): String {
+            return if (text.length > max) "${text.take(max)}...(${text.length})" else text
+        }
     }
 
     override fun run() {
+        try {
+            client.soTimeout = IDLE_TIMEOUT_MS
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to set socket timeout", e)
+        }
+
         while (!isInterrupted && client.isConnected) {
             try {
                 val request = Wire.Request.parseDelimitedFrom(client.inputStream)
+                if (request == null) {
+                    Log.i(TAG, "Client closed the stream")
+                    break
+                }
                 val params = request.params.ifEmpty { "{}" }
                 handleRequest(request.id, request.method, params)
+            } catch (e: java.io.InterruptedIOException) {
+                Log.i(TAG, "Client idle timeout, closing connection")
+                break
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to handle request", e)
                 break
@@ -96,7 +122,7 @@ class Connection(private val client: LocalSocket) : Thread() {
     }
 
     private fun handleRequest(id: String, method: String, params: String) {
-        Log.i(TAG, "Request method: $method, params: $params")
+        Log.i(TAG, "Request method: $method, params: ${brief(params)}")
 
         val result = JSONObject()
 
@@ -207,7 +233,7 @@ class Connection(private val client: LocalSocket) : Thread() {
             }
         }
 
-        Log.i(TAG, "Response: $result")
+        Log.i(TAG, "Response: ${brief(result.toString())}")
         Wire.Response.newBuilder().setId(id).setResult(result.toString()).build()
             .writeDelimitedTo(client.outputStream)
     }
@@ -227,11 +253,10 @@ class Connection(private val client: LocalSocket) : Thread() {
         // 单个包要反射解析整份 APK 资源表并编码图标，
         // 串行处理 50 个包在设备刚启动时很容易超过主机超时，这里改成小并发。
         val infos = arrayOfNulls<JSONObject>(size)
-        val executor = Executors.newFixedThreadPool(Math.min(MAX_PARALLEL, size))
         val latch = CountDownLatch(size)
         for (i in 0 until size) {
             val index = i
-            executor.execute {
+            workerPool.execute {
                 try {
                     infos[index] = getPackageInfo(packageNames[index])
                 } catch (e: Exception) {
@@ -247,7 +272,6 @@ class Connection(private val client: LocalSocket) : Thread() {
         } catch (e: InterruptedException) {
             Log.e(TAG, "Interrupted while loading package infos", e)
         }
-        executor.shutdown()
 
         // 整批处理完统一落盘一次，避免每包都写文件
         saveCacheIndex()

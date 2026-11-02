@@ -45,6 +45,10 @@ import isUndef from 'licia/isUndef'
 
 const logger = log('ScrcpyClient')
 
+// 超过这个时间没有任何新帧，认为流已经卡死（socket 还活着但不出画面）
+const FRAME_STALL_TIMEOUT = 15 * 1000
+const FRAME_WATCHDOG_INTERVAL = 5 * 1000
+
 export default class ScrcpyClient extends Emitter {
   private deviceId: string
   private server?: net.Server
@@ -60,6 +64,8 @@ export default class ScrcpyClient extends Emitter {
   private sockets: Set<any> = new Set()
   private player: any
   private destroyed = false
+  private lastFrameAt = 0
+  private watchdogTimer: NodeJS.Timeout | null = null
   constructor(deviceId: string, options: ScrcpyOptions3_1) {
     super()
 
@@ -111,6 +117,7 @@ export default class ScrcpyClient extends Emitter {
     } catch {
       // ignore
     }
+    this.stopFrameWatchdog()
 
     // 通知主进程关闭设备端 scrcpy 进程与它的 adb shell 通道
     main.stopScrcpy(this.deviceId).catch(noop)
@@ -289,6 +296,8 @@ export default class ScrcpyClient extends Emitter {
             this.recorder.addVideoPacket(packet)
             if (packet.type === 'configuration') {
               logger.info('video configuration', packet.data)
+            } else {
+              this.lastFrameAt = Date.now()
             }
           })
         ),
@@ -300,6 +309,33 @@ export default class ScrcpyClient extends Emitter {
 
     logger.info('video ready')
     this.readiness.signal('video')
+    this.startFrameWatchdog()
+  }
+  /**
+   * socket 还活着但设备端不再出帧时，前端只会看到静止画面且没有任何提示。
+   * 定期检查最后一帧时间，超时就抛给上层展示重试入口。
+   */
+  private startFrameWatchdog() {
+    this.stopFrameWatchdog()
+    this.lastFrameAt = Date.now()
+    this.watchdogTimer = setInterval(() => {
+      if (this.destroyed) {
+        this.stopFrameWatchdog()
+        return
+      }
+      const idle = Date.now() - this.lastFrameAt
+      if (idle > FRAME_STALL_TIMEOUT) {
+        logger.warn('video stalled', idle)
+        this.stopFrameWatchdog()
+        this.emit('stalled')
+      }
+    }, FRAME_WATCHDOG_INTERVAL)
+  }
+  private stopFrameWatchdog() {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer)
+      this.watchdogTimer = null
+    }
   }
   private bindVideoEvent(el: HTMLVideoElement) {
     logger.info('bind video event')

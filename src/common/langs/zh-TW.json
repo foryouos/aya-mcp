@@ -88,6 +88,7 @@
   "autoRetrying": "自動重試中（{{count}}/{{total}}）",
   "loadPackagesFailed": "載入應用程式列表失敗：{{message}}",
   "screencastFailed": "投屏連線失敗：{{message}}",
+  "screencastStalled": "畫面已停止更新，請重試",
   "packageInstalling": "安裝應用中：{{path}}",
   "installPackageErr": "安裝應用失敗",
   "uninstall": "解除安裝",

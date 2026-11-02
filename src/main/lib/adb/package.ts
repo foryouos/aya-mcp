@@ -20,11 +20,25 @@ import {
 
 let client: Client
 
+// 当前用户几乎不会变，但 singleton 只在 pending 期间去重，
+// 每次刷新都要多跑一条 shell，这里加一个短 TTL
+const currentUserCache: { [deviceId: string]: { value: number; at: number } } =
+  {}
+const CURRENT_USER_TTL = 60 * 1000
+
 const getCurrentUser = singleton(async (deviceId: string) => {
+  const cached = currentUserCache[deviceId]
+  if (cached && Date.now() - cached.at < CURRENT_USER_TTL) {
+    return cached.value
+  }
+
   // 设备重启期间这条命令最容易卡住，单独给一个较短的上限，
   // 避免它把整个 getPackages 的耗时拖长
   const result = await shell(deviceId, 'am get-current-user', 10 * 1000)
-  return parseInt(result, 10)
+  const parsed = parseInt(result, 10)
+  const value = Number.isNaN(parsed) ? 0 : parsed
+  currentUserCache[deviceId] = { value, at: Date.now() }
+  return value
 })
 
 export const getPackages = singleton(<IpcGetPackages>(async (

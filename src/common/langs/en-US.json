@@ -98,6 +98,7 @@
   "autoRetrying": "Retrying automatically ({{count}}/{{total}})",
   "loadPackagesFailed": "Failed to load packages: {{message}}",
   "screencastFailed": "Screencast connection failed: {{message}}",
+  "screencastStalled": "Video stream stopped updating, please retry",
   "packageInstalling": "Installing package {{path}}",
   "installPackageErr": "Failed to install package",
   "uninstall": "Uninstall",

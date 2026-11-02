@@ -32,6 +32,16 @@ export default observer(function Screencast() {
       setIsLoading(false)
     }
 
+    // socket 还活着但设备端不再出帧时，给用户明确的提示而不是一直静止
+    const onStalled = () => {
+      if (canceled) {
+        return
+      }
+      setIsLoading(false)
+      setError(t('screencastStalled'))
+    }
+    scrcpyClient.on('stalled', onStalled)
+
     async function start() {
       try {
         const video = await Promise.race([
@@ -60,6 +70,7 @@ export default observer(function Screencast() {
       if (timer) {
         clearTimeout(timer)
       }
+      scrcpyClient.off('stalled', onStalled)
       scrcpyClient.destroy()
     }
   }, [])

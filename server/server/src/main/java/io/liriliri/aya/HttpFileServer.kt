@@ -11,6 +11,7 @@ import java.net.URLDecoder
 class HttpFileServer(port: Int) : NanoHTTPD(port) {
     private companion object {
         private const val TAG = "Aya.HttpFileServer"
+        private const val ICON_DIR = "/data/local/tmp/aya/icons"
     }
 
     override fun serve(session: IHTTPSession): Response {
@@ -30,6 +31,23 @@ class HttpFileServer(port: Int) : NanoHTTPD(port) {
             else -> getMimeTypeForFile(target.name)
         }
 
+        // 图标文件名带 apkSize，APK 更新后文件名会变，可以安全地长缓存；
+        // 其它文件（日志、截图等）内容会变，必须每次校验
+        val isIcon = decoded.startsWith("$ICON_DIR/")
+        val cacheControl = if (isIcon) "public, max-age=86400" else "no-cache"
+        val lastModified = target.lastModified()
+        val etag = "\"$total-$lastModified\""
+
+        if (isIcon) {
+            val ifNoneMatch = session.headers["if-none-match"]
+            if (ifNoneMatch != null && ifNoneMatch.trim() == etag) {
+                val resp = newFixedLengthResponse(Status.NOT_MODIFIED, mime, "")
+                resp.addHeader("ETag", etag)
+                resp.addHeader("Cache-Control", cacheControl)
+                return resp
+            }
+        }
+
         val rangeHeader = session.headers["range"]
         if (rangeHeader != null) {
             val m = Regex("""bytes=(\d*)-(\d*)""").find(rangeHeader)
@@ -46,6 +64,8 @@ class HttpFileServer(port: Int) : NanoHTTPD(port) {
                     resp.addHeader("Accept-Ranges", "bytes")
                     resp.addHeader("Content-Range", "bytes $start-$end/$total")
                     resp.addHeader("Connection", "close")
+                    resp.addHeader("ETag", etag)
+                    resp.addHeader("Cache-Control", cacheControl)
                     return resp
                 }
             }
@@ -55,6 +75,8 @@ class HttpFileServer(port: Int) : NanoHTTPD(port) {
             val resp = newFixedLengthResponse(Status.OK, mime, "")
             resp.addHeader("Accept-Ranges", "bytes")
             resp.addHeader("Content-Length", total.toString())
+            resp.addHeader("ETag", etag)
+            resp.addHeader("Cache-Control", cacheControl)
             return resp
         }
 
@@ -62,6 +84,8 @@ class HttpFileServer(port: Int) : NanoHTTPD(port) {
         val resp = newFixedLengthResponse(Status.OK, mime, fis, total)
         resp.addHeader("Accept-Ranges", "bytes")
         resp.addHeader("Connection", "close")
+        resp.addHeader("ETag", etag)
+        resp.addHeader("Cache-Control", cacheControl)
         return resp
     }
 }
