@@ -1140,6 +1140,24 @@ tbody tr:hover td {
   background: #f8fcf9;
 }
 
+/* 更新日志：版本号下方显示发布日期，改动列用列表分条，便于扫读 */
+.toolbox td .ver-meta {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.toolbox td ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.toolbox td li + li {
+  margin-top: 5px;
+}
+
 code {
   font-family: var(--mono);
   font-size: 13px;
@@ -3054,6 +3072,16 @@ details p {
         </div>
       </section>
 
+      <!--
+        维护约定（AI 与本项目维护者都必须遵守，请勿删除本注释）：
+        1. 下方「更新日志」表格只保留最新 3 个版本，不要补全历史版本。
+           完整历史见仓库根目录 CHANGELOG.md 与 GitHub Releases 页面。
+        2. 发布新版本时：在 <tbody> 顶部插入新行，并删除最旧的一行，始终保持 3 行。
+        3. 版本单元格格式固定为：
+           <td><code>vX.Y.Z</code><span class="ver-meta">YYYY-MM-DD</span></td>
+        4. 改动列使用 <ul><li>…</li></ul> 分条，每条一句话，只写用户能感知到的变化，
+           不要罗列内部重构细节（那些写进 CHANGELOG.md）。
+      -->
       <!-- ======================= 最近更新 ======================= -->
       <section id="changelog">
         <div class="wrap">
@@ -3069,57 +3097,52 @@ details p {
                 <path d="M12 8v4l3 2" /><circle cx="12" cy="12" r="9" />
               </svg>
               更新日志
-              <span class="count">2026-11</span>
+              <span class="count">最近 3 个版本</span>
             </div>
             <table>
               <thead>
                 <tr><th>版本</th><th>改动</th></tr>
               </thead>
+              <!-- 仅保留最新 3 个版本：新增版本请插到最前面并删除最后一行，历史见 CHANGELOG.md -->
               <tbody>
                 <tr>
-                  <td><code>v2.1.6</code></td>
                   <td>
-                    长跑稳定性与性能优化：设备重启后应用列表不再卡在加载（adb 请求 / 建连 / shell 全部加超时，半开连接主动断开，
-                    设备变化时重置全部连接）；设备端应用信息缓存落盘，重启后不再重新解析 APK 资源表（60s+ 降到 1~2 秒）；
-                    图标 HTTP 服务支持 ETag / 304 缓存，主进程补齐用户 / 磁盘 / 端口缓存；投屏新增 15 秒无帧看门狗，
-                    关闭时完整释放 socket、解码器与设备端进程；设备端截图补 Bitmap / HardwareBuffer 回收；终端新增
-                    <code>adb shell</code> 输出语法高亮（可在设置中开关）与按 系统 / 显示 / 音频 / GPIO / 性能 / 存储 / 调试
-                    分组的快捷命令，含控制序列的输出原样透传，不影响 top / vi 等全屏程序。
+                    <code>v2.1.6</code>
+                    <span class="ver-meta">2026-11-03</span>
+                  </td>
+                  <td>
+                    <ul>
+                      <li>设备重启后应用列表不再卡在加载：adb 请求 / 建连 / shell 全部加超时，半开连接主动断开，设备变化时重置连接，重启完成后自动恢复（实测约 19 秒）。</li>
+                      <li>设备端应用信息缓存落盘并改为并发解析，重启后首次加载从 60 秒以上降到 1~2 秒；图标 HTTP 服务支持 ETag / 304 缓存。</li>
+                      <li>投屏新增 15 秒无帧看门狗，关闭时完整释放 socket、解码器与设备端进程；设备端截图补齐 Bitmap / HardwareBuffer 回收。</li>
+                      <li>终端新增 <code>adb shell</code> 输出语法高亮（可在设置中开关）与按 系统 / 显示 / 音频 / GPIO / 性能 / 存储 / 调试 分组的快捷命令，含控制序列的输出原样透传。</li>
+                    </ul>
                   </td>
                 </tr>
                 <tr>
-                  <td><code>v2.1.5</code></td>
                   <td>
-                    支持带 adb 的 Linux 工控主板（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto）：平台自动识别，
-                    概览 / 进程 / 性能按 Linux 适配，新增 journalctl / dmesg 日志后端；Android 专有面板与工具按平台隐藏或返回
-                    <code>NOT_SUPPORTED</code>，并去掉 Linux 设备上每次 10 秒的空等。
+                    <code>v2.1.5</code>
+                    <span class="ver-meta">2026-10-28</span>
+                  </td>
+                  <td>
+                    <ul>
+                      <li>支持带 adb 的 Linux 工控主板（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto），自动识别平台并按平台调整面板与工具。</li>
+                      <li>概览 / 进程 / 性能面板适配 Linux，新增 journalctl / dmesg 日志后端。</li>
+                      <li>Android 专有面板与工具按平台隐藏或返回 <code>NOT_SUPPORTED</code>，去掉 Linux 设备上每次 10 秒的空等。</li>
+                    </ul>
                   </td>
                 </tr>
                 <tr>
-                  <td><code>v2.1.4</code></td>
                   <td>
-                    新增独立的软件更新页面：启动后后台自动检查新版本，主窗口可见时右下角提醒，收进托盘时推送系统通知；支持应用内下载安装包，
-                    实时显示进度并可取消，下载完成后一键安装。
+                    <code>v2.1.4</code>
+                    <span class="ver-meta">2026-10-27</span>
                   </td>
-                </tr>
-                <tr>
-                  <td><code>v2.1.3</code></td>
                   <td>
-                    注入通道提速：tap / swipe / key / text / screencap 改走常驻 UiAutomation，单次动作从 200–400ms 降到几十毫秒；文本改用
-                    ACTION_SET_TEXT，中文与 emoji 原样写入；截图在设备端压缩透传；新增 <code>aya_ui_watch</code> 无障碍事件订阅，
-                    <code>aya_wait_for</code> 改为事件驱动；官网改版。
+                    <ul>
+                      <li>新增独立的软件更新页面：启动后后台自动检查新版本，主窗口可见时右下角提醒，收进托盘时推送系统通知。</li>
+                      <li>支持应用内下载安装包，实时显示进度并可取消，下载完成后一键安装。</li>
+                    </ul>
                   </td>
-                </tr>
-                <tr>
-                  <td><code>v2.1.2</code></td>
-                  <td>
-                    新增 <code>aya_long_press</code> 与手势注入，<code>aya_batch</code> 支持 gesture 步骤；定位失败返回 nearMatches 与可见性诊断；
-                    短 resource-id 可直接匹配；多窗口节点合并与 <code>visibleOnly</code> 过滤；工具总数 72。
-                  </td>
-                </tr>
-                <tr>
-                  <td><code>v2.1.0</code></td>
-                  <td>新增串口调试面板（bootloader / kernel / android 分段识别、过滤、暂停、波特率探测）与 8 个 <code>aya_serial_*</code> 工具，工具总数 50。</td>
                 </tr>
               </tbody>
             </table>
