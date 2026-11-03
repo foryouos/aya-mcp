@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import store from '../../store'
 import LunaPerformanceMonitor from 'luna-performance-monitor/react'
 import {
+  cyan6,
+  cyan6Dark,
   green4,
   green4Dark,
   green6,
@@ -43,6 +45,8 @@ export default observer(function Performance() {
     cpus: [],
     cpuTemperature: 0,
     fps: 0,
+    // 只有带 NPU 的设备才有值，null 表示不显示图表
+    npu: null as { cores: number[]; freqMhz: number } | null,
   })
 
   const memData = useCallback(() => {
@@ -59,6 +63,15 @@ export default observer(function Performance() {
   }, [])
 
   const fpsData = useCallback(() => dataRef.current.fps, [])
+
+  const npuData = useCallback(() => {
+    const npu = dataRef.current.npu
+    if (!npu || isEmpty(npu.cores)) {
+      return 0
+    }
+
+    return Math.floor(sum(...npu.cores) / npu.cores.length)
+  }, [])
 
   const { device } = store
 
@@ -169,6 +182,18 @@ export default observer(function Performance() {
           height={80}
           color={isDark ? orange6Dark : orange6}
         />
+        {data.npu && (
+          <LunaPerformanceMonitor
+            title={`NPU${data.npu.freqMhz ? ` ${data.npu.freqMhz}MHz` : ''}`}
+            data={npuData}
+            theme={store.theme}
+            max={100}
+            smooth={false}
+            color={isDark ? cyan6Dark : cyan6}
+            height={80}
+            unit="%"
+          />
+        )}
       </div>
     </div>
   )

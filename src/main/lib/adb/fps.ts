@@ -48,6 +48,13 @@ async function getFpsByLatency(deviceId: string, pkg: string) {
     return fps
   }
 
+  // SurfaceFlinger 的帧时间戳是 CLOCK_MONOTONIC，与 /proc/uptime 同基准。
+  // 用它判断缓冲区里的最后一帧是不是「刚刚」渲染的
+  const uptimeOut = await shell(deviceId, 'cat /proc/uptime', 5000).catch(
+    () => ''
+  )
+  const deviceUptime = toNum(uptimeOut.split(' ')[0] || '0')
+
   const list = await shell(deviceId, 'dumpsys SurfaceFlinger --list')
   let layers = filter(list.split('\n'), (line) => contain(line, pkg))
   if (isEmpty(layers)) {
@@ -103,28 +110,59 @@ async function getFpsByLatency(deviceId: string, pkg: string) {
       return `dumpsys SurfaceFlinger --latency "${layer}"`
     })
   )
-  const allFps = map(latencies, (latency) => {
-    latency = trim(latency)
-    let fps = 0
-    const timestamps: number[] = []
-    each(latency.split('\n'), (line) => {
-      const match = line.match(/(\d+)\s+(\d+)\s+(\d+)/)
-      if (match) {
-        timestamps.push(toNum(match[2]) / 1e9)
-      }
-    })
-    timestamps.pop()
-
-    if (timestamps.length > 1) {
-      const seconds = last(timestamps) - timestamps[0]
-      if (seconds > 0) {
-        fps = Math.round((timestamps.length - 1) / seconds)
-      }
-    }
-    return fps
-  })
+  const allFps = map(latencies, (latency) =>
+    calcLatencyFps(latency, deviceUptime)
+  )
 
   return max(...allFps)
+}
+
+/**
+ * --latency 返回的是环形缓冲区（约 128 帧），里面混着几秒甚至几十分钟前的旧帧。
+ * 直接拿首尾两个时间戳算平均，会被这些旧帧稀释成接近 0。
+ * 这里只取末尾连续的一段（相邻间隔 < 200ms、跨度 ≤ 2s），
+ * 并校验最后一帧确实是最近渲染的，桌面静止时如实返回 0。
+ */
+function calcLatencyFps(latency: string, deviceUptime: number): number {
+  const timestamps: number[] = []
+  each(trim(latency).split('\n'), (line) => {
+    const match = line.match(/(\d+)\s+(\d+)\s+(\d+)/)
+    if (!match) {
+      return
+    }
+    // 第 2 列是实际呈现时间，0 表示该帧被丢弃
+    const actual = toNum(match[2])
+    if (actual > 0) {
+      timestamps.push(actual / 1e9)
+    }
+  })
+
+  if (timestamps.length < 2) {
+    return 0
+  }
+
+  const end = last(timestamps) as number
+  // 最后一帧不是最近渲染的，说明画面已经静止
+  if (deviceUptime > 0 && deviceUptime - end > 3) {
+    return 0
+  }
+
+  let start = timestamps.length - 1
+  while (start > 0) {
+    const gap = timestamps[start] - timestamps[start - 1]
+    const span = end - timestamps[start - 1]
+    if (gap > 0.2 || span > 2) {
+      break
+    }
+    start--
+  }
+
+  const seconds = end - timestamps[start]
+  if (seconds <= 0) {
+    return 0
+  }
+
+  return Math.round((timestamps.length - 1 - start) / seconds)
 }
 
 export async function init() {

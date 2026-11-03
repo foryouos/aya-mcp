@@ -364,9 +364,51 @@ export async function getPerformance(deviceId: string) {
     cpus,
     cpuLoads: await getCpuLoads(deviceId, cpus),
     cpuTemperature: await getCpuTemperature(deviceId),
+    // 没有 NPU 的设备返回 null，前端据此决定是否显示图表
+    npu: await getNpu(deviceId),
     ...(await getMemory(deviceId)),
     // Linux 主板没有 dumpsys battery，留空而不是返回 0，避免误报电量 0%
     ...(platform.platform === 'android' ? await getBattery(deviceId) : {}),
+  }
+}
+
+/**
+ * NPU 负载。RK 平台在 /sys/kernel/debug/rknpu/load 暴露每个核心的占用，
+ * 频率从 devfreq 节点读（单位 Hz）。节点不存在时返回 null。
+ */
+async function getNpu(deviceId: string): Promise<{
+  cores: number[]
+  freqMhz: number
+} | null> {
+  try {
+    const result = await shell(
+      deviceId,
+      'cat /sys/kernel/debug/rknpu/load 2>/dev/null; echo "@@freq"; cat /sys/class/devfreq/*npu*/cur_freq 2>/dev/null | head -1',
+      5000
+    )
+    const index = result.indexOf('@@freq')
+    const loadPart = index >= 0 ? result.slice(0, index) : result
+    const freqPart = index >= 0 ? result.slice(index + '@@freq'.length) : ''
+
+    // 输出形如 "NPU load:  Core0:  0%, Core1:  0%,"
+    // 注意不能用 toNum："55%" 会被 Number() 转成 NaN 再变成 0
+    const cores = map(
+      loadPart.match(/(\d+)\s*%/g) || [],
+      (item) => parseInt(item, 10) || 0
+    )
+    if (isEmpty(cores)) {
+      return null
+    }
+
+    const freq = toNum(freqPart.trim())
+
+    return {
+      cores,
+      freqMhz: freq > 0 ? Math.round(freq / 1e6) : 0,
+    }
+  } catch {
+    // 读节点失败等同于没有 NPU
+    return null
   }
 }
 
