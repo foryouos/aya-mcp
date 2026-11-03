@@ -8,6 +8,8 @@
 * feat: app list retries automatically with exponential backoff while a device reboots, showing "waiting for device" instead of a red error
 * feat: after a device change AYA waits for `sys.boot_completed` before telling panels to refresh, so the first load succeeds
 * feat: screencast shows a retry prompt when the video stream stops producing frames for 15s
+* feat: adb shell output gets syntax highlighting (paths, hex values, resolutions, status keywords, numbers); output containing escape sequences, backspaces or carriage returns is passed through unchanged, so `top`, `vi` and other full-screen programs keep working; toggle in settings
+* feat: terminal quick commands are grouped into system / display / audio / GPIO / performance / storage / debug
 * fix: screencast fully releases sockets / decoders / the device-side scrcpy process on close, and window teardown stops the device process from the main process
 * fix: device-side screenshots recycle Bitmaps and close HardwareBuffers, so `aya_screencap` no longer slows down during long sessions
 * fix: device-side service uses a bounded connection pool, a 5 minute idle timeout and a shared worker pool, keeping the thread count flat
