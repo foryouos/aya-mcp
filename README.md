@@ -4,13 +4,13 @@
 
 ## 项目简介
 
-AYA 是一款跨平台（Windows / macOS / Linux）的 Android `adb` 桌面工具，提供投屏、文件管理、日志、性能监控、Shell、应用管理等能力。
+AYA 是个跨平台的 Android `adb` 桌面工具（Windows / macOS / Linux），能投屏、管文件、看日志和性能、开 Shell、装卸应用。
 
-**本分支（aya-mcp）** 在完整保留上游全部桌面能力的基础上，新增三块能力：
+**本分支（aya-mcp）** 保留上游全部桌面能力，另外加了三样东西：
 
-- **MCP 服务**：把 Android 设备能力封装为 73 个 `aya_*` 工具（29 只读 / 44 写），让 CodeBuddy、WorkBuddy、Claude 等 AI 客户端直接用自然语言操控已连接的设备。工具清单与接入方式由 [`page/index.html`](page/index.html) 详细介绍。
-- **串口调试面板**：直接接收主板启动日志，自动划分 bootloader / kernel / android 阶段，支持阶段与关键字过滤、暂停、保存会话、波特率自动探测。
-- **Linux 工控主板支持**：带 adb 服务的 Debian / Ubuntu / Buildroot / Yocto 主板（RK3568、RK3576 等）可直接接入，自动识别平台并按平台隐藏 Android 专有功能，见下文「[Linux 工控主板支持](#linux-工控主板支持adb-直连)」。
+- **MCP 服务**：把 Android 设备能力做成 73 个 `aya_*` 工具（29 只读 / 44 写），CodeBuddy、WorkBuddy、Claude 等客户端用自然语言就能操作已连接的设备。工具清单和接入步骤在 [`page/index.html`](page/index.html)。
+- **串口调试面板**：直接收主板启动日志，按 bootloader / kernel / android 自动分段，可以按阶段和关键字过滤、暂停、存会话，波特率自动探测。
+- **Linux 工控主板支持**：带 adb 服务的 Debian / Ubuntu / Buildroot / Yocto 主板（RK3568、RK3576 等）能直接接入，平台自动识别，Android 专有功能按平台隐藏，详见下文「[Linux 工控主板支持](#linux-工控主板支持adb-直连)」。
 
 当前版本 **v2.1.6**（版本号独立于上游 AYA）。
 
@@ -18,7 +18,7 @@ AYA 是一款跨平台（Windows / macOS / Linux）的 Android `adb` 桌面工�
 
 ## Linux 工控主板支持（adb 直连）
 
-除 Android 手机 / 平板 / 模拟器外，桌面端也可以直接连**带 adb 服务的 Linux 工控主板**（实测 RK3568、RK3576；Debian / Ubuntu / Buildroot / Yocto 均可）。接上后自动识别平台，按平台决定面板与工具是否可用，不会出现「点了就报错」或「白等 10 秒再失败」。
+除 Android 手机 / 平板 / 模拟器外，桌面端也可以直接连**带 adb 服务的 Linux 工控主板**（实测 RK3568、RK3576；Debian / Ubuntu / Buildroot / Yocto 均可）。接上后自动识别平台，面板和工具能不能用按平台决定，不会出现「点了就报错」或者白等 10 秒才失败。
 
 **可直接使用**
 
@@ -190,4 +190,4 @@ npm run release
 
 ## 许可证
 
-遵循上游 **AGPL-3.0**。本分支在保留上游许可证的前提下新增代码。
+遵循上游 **AGPL-3.0**，本分支新增的代码按同一许可证发布。
