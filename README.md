@@ -8,7 +8,7 @@ AYA 是个跨平台的 Android `adb` 桌面工具（Windows / macOS / Linux）�
 
 **本分支（aya-mcp）** 保留上游全部桌面能力，另外加了三样东西：
 
-- **MCP 服务**：把 Android 设备能力做成 73 个 `aya_*` 工具（29 只读 / 44 写），CodeBuddy、WorkBuddy、Claude 等客户端用自然语言就能操作已连接的设备。工具清单和接入步骤在 [`page/index.html`](page/index.html)。
+- **MCP 服务**：把 Android 设备能力做成 75 个 `aya_*` 工具（31 只读 / 44 写），CodeBuddy、WorkBuddy、Claude 等客户端用自然语言就能操作已连接的设备。工具清单和接入步骤在 [`page/index.html`](page/index.html)。
 - **串口调试面板**：直接收主板启动日志，按 bootloader / kernel / android 自动分段，可以按阶段和关键字过滤、暂停、存会话，波特率自动探测。
 - **Linux 工控主板支持**：带 adb 服务的 Debian / Ubuntu / Buildroot / Yocto 主板（RK3568、RK3576 等）能直接接入，平台自动识别，Android 专有功能按平台隐藏，详见下文「[Linux 工控主板支持](#linux-工控主板支持adb-直连)」。
 
@@ -91,7 +91,7 @@ node script/bench/bench_aya.mjs --out tmp-bench-aya.json
 
 - `src/`：Electron 源码
   - `src/main/lib/mcp/*`：MCP Server（JSON-RPC 2.0 + SSE）、工具实现、鉴权
-  - `src/main/lib/mcp/tools/*`：73 个 `aya_*` 工具（29 只读 / 44 写）
+  - `src/main/lib/mcp/tools/*`：75 个 `aya_*` 工具（31 只读 / 44 写）
   - `src/main/lib/adb/platform.ts`：Android / Linux 平台探测与能力缓存（`getprop`、`/etc/os-release`、`app_process`、`journalctl`…）
   - `src/main/lib/log/linux.ts`：Linux 日志后端（journalctl / dmesg 轮询、统一条目结构）
   - `src/main/lib/serial/*`：串口读取、阶段识别、日志缓冲区与会话文件

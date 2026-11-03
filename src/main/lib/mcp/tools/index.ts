@@ -7,6 +7,7 @@ import gestureTools from './gesture'
 import appTools from './app'
 import shellTools from './shell'
 import packageTools from './package'
+import serviceTools from './services'
 import performanceTools from './performance'
 import fileTools from './file'
 import logcatTools from './logcat'
@@ -34,6 +35,7 @@ const toolGroups: McpTool[][] = [
   appTools,
   shellTools,
   packageTools,
+  serviceTools,
   performanceTools,
   fileTools,
   logcatTools,

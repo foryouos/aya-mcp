@@ -44,6 +44,88 @@ export interface IPackageInfo {
   signatures: string[]
 }
 
+// 服务来源：系统服务（servicemanager / hwservicemanager）或应用 Service 组件
+export type ServiceOrigin = 'system' | 'app'
+// AIDL HAL / HIDL HAL / Native Binder / Java 系统服务 / 应用 Service
+export type ServiceKind =
+  | 'aidl-hal'
+  | 'hidl-hal'
+  | 'native-binder'
+  | 'java-system'
+  | 'app-service'
+export type ServiceStatus = 'running' | 'dead' | 'lazy' | 'unknown'
+
+export interface IServiceInfo {
+  // 唯一键：system:<name> / app:<pkg>/<class>
+  id: string
+  origin: ServiceOrigin
+  name: string
+  // binder 接口描述符（系统服务），应用服务为空
+  descriptor: string
+  packageName: string
+  className: string
+  // 0 表示无法获取（如无 root 的 AIDL HAL）
+  pid: number
+  processName: string
+  kind: ServiceKind
+  // 形如 u:r:hal_graphics_composer_default:s0
+  selinux: string
+  status: ServiceStatus
+  uid: number
+  gid: number
+  rssKb: number
+  // HIDL HAL 的 binder 线程（来自 lshal）
+  threadCurrent: number
+  threadMax: number
+  // vendor 专有（vendor.* / 非 system 分区进程）
+  vendor: boolean
+  // 应用 Service 的运行信息
+  runningMs: number
+  startRequested: boolean
+  foreground: boolean
+  bindings: number
+}
+
+export interface IServiceFilter {
+  query: string
+  group: 'all' | 'hal' | 'java' | 'vendor'
+}
+
+export interface IServiceProcessInfo {
+  pid: number
+  comm: string
+  cmdline: string
+  selinux: string
+  uid: number
+  gid: number
+  rssKb: number
+  // 匹配到的 init rc 文件
+  initRc: string[]
+  // /dev 与 /sys 节点
+  fds: string[]
+  // 无权限读取 /proc/<pid>/fd 时为 true
+  fdDenied: boolean
+}
+
+export interface IServiceBinderInfo {
+  pid: number
+  available: boolean
+  error: string
+  context: string
+  // 当前 binder 线程数
+  threads: number
+  // 最大线程数（来自 lshal，拿不到为 0）
+  maxThreads: number
+  // 入向引用进程 PID
+  refs: number[]
+  nodes: number
+}
+
+export interface IAtraceResult {
+  path: string
+  bytes: number
+}
+
 export interface IFileStat {
   size?: number
   mtime: Date
@@ -117,6 +199,30 @@ export type IpcGetPackageInfos = (
   deviceId: string,
   packageNames: string[]
 ) => Promise<IPackageInfo[]>
+export type IpcGetServices = (deviceId: string) => Promise<IServiceInfo[]>
+export type IpcGetServiceDetail = (
+  deviceId: string,
+  kind: 'system' | 'app',
+  target: string,
+  args?: string
+) => Promise<{ kind: 'system' | 'app'; target: string; output: string }>
+export type IpcGetServiceProcess = (
+  deviceId: string,
+  pid: number,
+  processName: string
+) => Promise<IServiceProcessInfo>
+export type IpcGetServiceBinder = (
+  deviceId: string,
+  pid: number
+) => Promise<IServiceBinderInfo>
+export type IpcCaptureServiceStack = (
+  deviceId: string,
+  pid: number
+) => Promise<{ ok: boolean; output: string; error: string }>
+export type IpcCaptureAtrace = (
+  deviceId: string,
+  seconds: number
+) => Promise<IAtraceResult>
 export type IpcGetAvds = (forceRefresh?: boolean) => Promise<IAvd[]>
 export type IpcStartAvd = (avdId: string) => Promise<void>
 export type IpcStopAvd = IpcStartAvd

@@ -31,6 +31,7 @@ import * as shellAdb from './adb/shell'
 import * as server from './adb/server'
 import * as scrcpy from './adb/scrcpy'
 import * as packageAdb from './adb/package'
+import * as servicesAdb from './adb/services'
 import * as file from './adb/file'
 import * as fps from './adb/fps'
 import * as webview from './adb/webview'
@@ -684,6 +685,7 @@ export async function init() {
   server.init(client)
   scrcpy.init(client)
   packageAdb.init(client)
+  servicesAdb.init(client)
   file.init(client)
   fps.init()
   webview.init()

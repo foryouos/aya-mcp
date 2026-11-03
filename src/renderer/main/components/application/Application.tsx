@@ -1,4 +1,5 @@
 import LunaToolbar, {
+  LunaToolbarButton,
   LunaToolbarCheckbox,
   LunaToolbarInput,
   LunaToolbarSeparator,
@@ -28,7 +29,9 @@ import clone from 'licia/clone'
 import LunaModal from 'luna-modal'
 import findIdx from 'licia/findIdx'
 import PackageInfoModal from './PackageInfoModal'
-import { IPackageInfo } from 'common/types'
+import ServiceInfoModal from './ServiceInfoModal'
+import ServicePanel from './ServicePanel'
+import { IPackageInfo, IServiceInfo } from 'common/types'
 import defaultIcon from '../../../assets/default-icon.png'
 import contextMenu from 'share/renderer/lib/contextMenu'
 import dateFormat from 'licia/dateFormat'
@@ -50,6 +53,8 @@ const GET_PACKAGE_INFOS_TIMEOUT = 120 * 1000
 // 失败后按指数退避自动重试，累计约 3+6+12+24+48 = 93s，覆盖一次完整重启。
 const MAX_AUTO_RETRY = 5
 const AUTO_RETRY_BASE_DELAY = 3 * 1000
+
+
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -97,10 +102,17 @@ export default observer(function Application() {
   const autoRetryRef = useRef(0)
   const autoRetryTimerRef = useRef<NodeJS.Timeout | null>(null)
 
+  // 服务视图
+  const [serviceDetail, setServiceDetail] = useState<IServiceInfo | null>(null)
+  const [serviceDetailVisible, setServiceDetailVisible] = useState(false)
+  const [serviceReloadKey, setServiceReloadKey] = useState(0)
+
   const { device } = store
 
   useEffect(() => {
-    refresh()
+    if (store.application.view !== 'service') {
+      refresh()
+    }
   }, [])
   useWindowResize(() => dataGridRef.current?.fit())
 
@@ -262,6 +274,30 @@ export default observer(function Application() {
     }
   }
 
+  function switchView(view: 'package' | 'service') {
+    if (store.application.view === view) {
+      return
+    }
+    store.application.set('view', view)
+    setFilter('')
+    if (view === 'package') {
+      refresh()
+    }
+  }
+
+  function switchServiceGroup(group: 'system' | 'app') {
+    if (store.application.serviceGroup === group) {
+      return
+    }
+    store.application.set('serviceGroup', group)
+    setFilter('')
+  }
+
+  function showServiceDetail(service: IServiceInfo) {
+    setServiceDetail(service)
+    setServiceDetailVisible(true)
+  }
+
   async function onDrop(e: React.DragEvent) {
     e.preventDefault()
     setDropHighlight(false)
@@ -412,6 +448,19 @@ export default observer(function Application() {
     contextMenu(e, template)
   }
 
+  const isServiceView = store.application.view === 'service'
+  const serviceGroup = store.application.serviceGroup
+
+  const serviceView = device ? (
+    <ServicePanel
+      deviceId={device.id}
+      origin={serviceGroup}
+      filter={filter}
+      reloadKey={serviceReloadKey}
+      onDetail={showServiceDetail}
+    />
+  ) : null
+
   const applications = (
     <div
       className={Style.applications}
@@ -532,95 +581,137 @@ export default observer(function Application() {
   return (
     <div className="panel-with-toolbar">
       <LunaToolbar className="panel-toolbar">
+        <ToolbarIcon
+          icon="android"
+          title={t('application')}
+          state={isServiceView ? '' : 'active'}
+          onClick={() => switchView('package')}
+        />
+        <ToolbarIcon
+          icon="processor"
+          title={t('service')}
+          state={isServiceView ? 'active' : ''}
+          onClick={() => switchView('service')}
+        />
+        <LunaToolbarSeparator />
         <LunaToolbarInput
           keyName="filter"
           value={filter}
           placeholder={t('filter')}
           onChange={(val) => setFilter(val)}
         />
-        <LunaToolbarCheckbox
-          keyName="sysPackage"
-          value={store.application.sysPackage}
-          label={t('sysPackage')}
-          onChange={(val) => {
-            store.application.set('sysPackage', val)
-            refresh()
-          }}
-          disabled={isLoading}
-        />
-        <LunaToolbarSeparator />
-        <LunaToolbarText
-          text={t('totalPackage', { total: packageInfos.length })}
-        />
-        <LunaToolbarSpace />
-        <ToolbarIcon
-          icon="add"
-          title={t('install')}
-          onClick={() => install()}
-          disabled={!device}
-        />
-        <LunaToolbarSeparator />
-        <ToolbarIcon
-          icon="zoom-in"
-          title={t('zoomIn')}
-          disabled={
-            store.application.listView ||
-            store.application.itemSize > 256 ||
-            isEmpty(packageInfos)
-          }
-          onClick={() => {
-            const itemSize = Math.round(store.application.itemSize * 1.2)
-            store.application.set('itemSize', itemSize)
-          }}
-        />
-        <ToolbarIcon
-          icon="zoom-out"
-          title={t('zoomOut')}
-          disabled={
-            store.application.listView ||
-            store.application.itemSize < 32 ||
-            isEmpty(packageInfos)
-          }
-          onClick={() => {
-            const itemSize = Math.round(store.application.itemSize * 0.8)
-            store.application.set('itemSize', itemSize)
-          }}
-        />
-        <LunaToolbarSeparator />
-        <ToolbarIcon
-          icon="grid"
-          title={t('iconView')}
-          state={store.application.listView ? '' : 'hover'}
-          onClick={() => {
-            if (store.application.listView) {
-              store.application.set('listView', false)
-            }
-          }}
-        />
-        <ToolbarIcon
-          icon="list"
-          title={t('listView')}
-          state={store.application.listView ? 'hover' : ''}
-          onClick={() => {
-            if (!store.application.listView) {
-              store.application.set('listView', true)
-            }
-          }}
-        />
-        <LunaToolbarSeparator />
-        <ToolbarIcon
-          icon="refresh"
-          title={t('refresh')}
-          disabled={isLoading || !device}
-          onClick={() => refresh()}
-        />
+        {isServiceView ? (
+          <>
+            <LunaToolbarSeparator />
+            <LunaToolbarButton
+              state={serviceGroup === 'system' ? 'active' : ''}
+              onClick={() => switchServiceGroup('system')}
+            >
+              {t('systemService')}
+            </LunaToolbarButton>
+            <LunaToolbarButton
+              state={serviceGroup === 'app' ? 'active' : ''}
+              onClick={() => switchServiceGroup('app')}
+            >
+              {t('appService')}
+            </LunaToolbarButton>
+            <LunaToolbarSpace />
+            <ToolbarIcon
+              icon="refresh"
+              title={t('refresh')}
+              disabled={!device}
+              onClick={() => setServiceReloadKey((key) => key + 1)}
+            />
+          </>
+        ) : (
+          <>
+            <LunaToolbarCheckbox
+              keyName="sysPackage"
+              value={store.application.sysPackage}
+              label={t('sysPackage')}
+              onChange={(val) => {
+                store.application.set('sysPackage', val)
+                refresh()
+              }}
+              disabled={isLoading}
+            />
+            <LunaToolbarSeparator />
+            <LunaToolbarText
+              text={t('totalPackage', { total: packageInfos.length })}
+            />
+            <LunaToolbarSpace />
+            <ToolbarIcon
+              icon="add"
+              title={t('install')}
+              onClick={() => install()}
+              disabled={!device}
+            />
+            <LunaToolbarSeparator />
+            <ToolbarIcon
+              icon="zoom-in"
+              title={t('zoomIn')}
+              disabled={
+                store.application.listView ||
+                store.application.itemSize > 256 ||
+                isEmpty(packageInfos)
+              }
+              onClick={() => {
+                const itemSize = Math.round(store.application.itemSize * 1.2)
+                store.application.set('itemSize', itemSize)
+              }}
+            />
+            <ToolbarIcon
+              icon="zoom-out"
+              title={t('zoomOut')}
+              disabled={
+                store.application.listView ||
+                store.application.itemSize < 32 ||
+                isEmpty(packageInfos)
+              }
+              onClick={() => {
+                const itemSize = Math.round(store.application.itemSize * 0.8)
+                store.application.set('itemSize', itemSize)
+              }}
+            />
+            <LunaToolbarSeparator />
+            <ToolbarIcon
+              icon="grid"
+              title={t('iconView')}
+              state={store.application.listView ? '' : 'hover'}
+              onClick={() => {
+                if (store.application.listView) {
+                  store.application.set('listView', false)
+                }
+              }}
+            />
+            <ToolbarIcon
+              icon="list"
+              title={t('listView')}
+              state={store.application.listView ? 'hover' : ''}
+              onClick={() => {
+                if (!store.application.listView) {
+                  store.application.set('listView', true)
+                }
+              }}
+            />
+            <LunaToolbarSeparator />
+            <ToolbarIcon
+              icon="refresh"
+              title={t('refresh')}
+              disabled={isLoading || !device}
+              onClick={() => refresh()}
+            />
+          </>
+        )}
       </LunaToolbar>
       <div
         className={className('panel-body', {
           [Style.highlight]: dropHighlight,
         })}
       >
-        {isLoading && isEmpty(packageInfos) ? (
+        {isServiceView ? (
+          serviceView
+        ) : isLoading && isEmpty(packageInfos) ? (
           <PannelLoading />
         ) : retryCount > 0 && isEmpty(packageInfos) ? (
           <div className={Style.loadError}>
@@ -644,6 +735,14 @@ export default observer(function Application() {
           applications
         )}
       </div>
+      {serviceDetail && device && (
+        <ServiceInfoModal
+          deviceId={device.id}
+          service={serviceDetail}
+          visible={serviceDetailVisible}
+          onClose={() => setServiceDetailVisible(false)}
+        />
+      )}
       {!isNull(packageInfo) && (
         <PackageInfoModal
           packageInfo={packageInfo}

@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>AYA MCP 工具清单 · 73 个 aya_* 接口完整参考</title>
+    <title>AYA MCP 工具清单 · 75 个 aya_* 接口完整参考</title>
     <meta
       name="description"
-      content="AYA MCP 全部 73 个 aya_* 工具完整清单：29 个只读工具默认开放，44 个写工具需授权。覆盖设备与屏幕、交互手势、应用管理、文件、日志与 adb shell、串口调试、性能统计、端口映射、WebView 调试、屏幕适配、录屏投屏。"
+      content="AYA MCP 全部 75 个 aya_* 工具完整清单：31 个只读工具默认开放，44 个写工具需授权。覆盖设备与屏幕、交互手势、应用管理、文件、日志与 adb shell、串口调试、性能统计、端口映射、WebView 调试、屏幕适配、录屏投屏。"
     />
     <meta
       name="keywords"
@@ -1421,10 +1421,10 @@ td:first-child {
       <section class="hero">
         <div class="wrap tools-hero">
           <div class="tools-hero-copy">
-            <span class="badge"><span class="dot"></span>73 个 <code>aya_*</code> 工具 · 11 个分类</span>
+            <span class="badge"><span class="dot"></span>75 个 <code>aya_*</code> 工具 · 11 个分类</span>
             <h1>完整工具清单</h1>
             <p class="sub">
-              工具名统一以 <code>aya_</code> 开头。<strong>29 个只读工具</strong>默认开放；<strong>44 个写工具</strong>需在
+              工具名统一以 <code>aya_</code> 开头。<strong>31 个只读工具</strong>默认开放；<strong>44 个写工具</strong>需在
               设置 → MCP 中勾选「允许写操作」后才会出现在客户端。下面可按名称搜索，或只看只读 / 写工具。
               <br />
               连接 <strong>Linux 工控主板</strong>（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto）时，依赖 Android
@@ -1444,8 +1444,8 @@ td:first-child {
           </div>
 
           <div class="hero-stats">
-            <div class="stat"><b>73</b><span>工具总数</span></div>
-            <div class="stat"><b>29</b><span>只读 · 默认开放</span></div>
+            <div class="stat"><b>75</b><span>工具总数</span></div>
+            <div class="stat"><b>31</b><span>只读 · 默认开放</span></div>
             <div class="stat"><b>44</b><span>写 · 需显式授权</span></div>
             <div class="stat"><b>11</b><span>功能分类</span></div>
           </div>
@@ -1468,7 +1468,7 @@ td:first-child {
               <button type="button" data-perm="r">只读</button>
               <button type="button" data-perm="w">写</button>
             </div>
-            <span class="hit" id="hit">显示 73 / 73 个工具</span>
+            <span class="hit" id="hit">显示 75 / 75 个工具</span>
           </div>
 
           <div class="chips">
@@ -1526,7 +1526,7 @@ td:first-child {
 
           <!-- 应用管理 -->
           <div class="toolbox" id="group-app">
-            <div class="tool-head"><span class="gdot"></span>应用管理<span class="count">8 个 · 2 只读 / 6 写</span></div>
+            <div class="tool-head"><span class="gdot"></span>应用管理<span class="count">10 个 · 4 只读 / 6 写</span></div>
             <table>
               <thead>
                 <tr><th>工具</th><th>权限</th><th>说明</th></tr>
@@ -1534,6 +1534,8 @@ td:first-child {
               <tbody>
                 <tr data-perm="r"><td><code>aya_list_packages</code></td><td><span class="tag r">只读</span></td><td>包名列表（apk 路径、是否系统应用），支持关键字过滤与仅看第三方应用。</td></tr>
                 <tr data-perm="r"><td><code>aya_app_info</code></td><td><span class="tag r">只读</span></td><td>版本号、sdk、安装/更新时间、启用状态、运行状态与 pid。</td></tr>
+                <tr data-perm="r"><td><code>aya_list_services</code></td><td><span class="tag r">只读</span></td><td>系统 Binder 服务（activity / window / power / wifi 等）与运行中的应用 Service 组件：包名、类名、进程、PID、运行时长、启动与前台状态、绑定数。</td></tr>
+                <tr data-perm="r"><td><code>aya_service_info</code></td><td><span class="tag r">只读</span></td><td>单个服务的 dumpsys 原文，用于排查服务状态；原文过长时截断并标记 truncated。</td></tr>
                 <tr data-perm="w"><td><code>aya_start_app</code></td><td><span class="tag w">写</span></td><td>启动 Launcher Activity，默认等前台切换，也可等指定控件出现；未安装返回 NOT_FOUND。</td></tr>
                 <tr data-perm="w"><td><code>aya_stop_app</code></td><td><span class="tag w">写</span></td><td>am force-stop 强制停止应用，进程立即被杀死。</td></tr>
                 <tr data-perm="w"><td><code>aya_clear_app_data</code></td><td><span class="tag w">写</span></td><td>pm clear 清空应用数据与缓存，等价系统「清除数据」，不可撤销。</td></tr>
@@ -1714,7 +1716,7 @@ td:first-child {
 
     <script>
       ;(function () {
-        var TOTAL = 73
+        var TOTAL = 75
         var q = document.getElementById('q')
         var hit = document.getElementById('hit')
         var empty = document.getElementById('empty')
