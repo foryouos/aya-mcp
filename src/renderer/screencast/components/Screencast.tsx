@@ -16,6 +16,9 @@ export default observer(function Screencast() {
   const screenContainerRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  // 画面停滞和连接失败要分开：设备画面静止时本来就不出帧，
+  // 用全屏错误层会误报并挡住视频
+  const [stalled, setStalled] = useState(false)
 
   useEffect(() => {
     let canceled = false
@@ -32,15 +35,23 @@ export default observer(function Screencast() {
       setIsLoading(false)
     }
 
-    // socket 还活着但设备端不再出帧时，给用户明确的提示而不是一直静止
+    // socket 还活着但设备端不再出帧时，给用户一个不打断观看的提示
     const onStalled = () => {
       if (canceled) {
         return
       }
       setIsLoading(false)
-      setError(t('screencastStalled'))
+      setStalled(true)
+    }
+    // 画面恢复后提示必须自动消失，否则会一直挂在窗口上
+    const onRecovered = () => {
+      if (canceled) {
+        return
+      }
+      setStalled(false)
     }
     scrcpyClient.on('stalled', onStalled)
+    scrcpyClient.on('recovered', onRecovered)
 
     async function start() {
       try {
@@ -71,6 +82,7 @@ export default observer(function Screencast() {
         clearTimeout(timer)
       }
       scrcpyClient.off('stalled', onStalled)
+      scrcpyClient.off('recovered', onRecovered)
       scrcpyClient.destroy()
     }
   }, [])
@@ -97,10 +109,16 @@ export default observer(function Screencast() {
       onDrop={onDrop}
       onDragOver={(e) => e.preventDefault()}
     >
-      {isLoading && <LoadingBar />}
+      {isLoading && <LoadingBar className={Style.loading} />}
       {!isLoading && !!error && (
         <div className={Style.error}>
           <div className={Style.errorMessage}>{error}</div>
+          <button onClick={() => main.restartScreencast()}>{t('retry')}</button>
+        </div>
+      )}
+      {!error && stalled && (
+        <div className={Style.stalled}>
+          <span>{t('screencastStalled')}</span>
           <button onClick={() => main.restartScreencast()}>{t('retry')}</button>
         </div>
       )}

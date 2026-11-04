@@ -15,18 +15,50 @@
   }
 }
 
+/* 覆盖在视频之上：video 是 appendChild 进去的裸 DOM，
+   如果参与 flex 布局会和错误块左右各占一半 */
 .error {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: center;
   gap: 12px;
-  max-width: 520px;
   padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
   color: #ddd;
   text-align: center;
   line-height: 1.5;
 }
 
 .error-message {
+  max-width: 520px;
   word-break: break-all;
+}
+
+.loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+/* 画面停滞只在角落提示，不遮挡正在显示的画面 */
+.stalled {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #ddd;
+  font-size: 12px;
+  line-height: 1.4;
 }

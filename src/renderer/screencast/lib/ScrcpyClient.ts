@@ -66,6 +66,9 @@ export default class ScrcpyClient extends Emitter {
   private destroyed = false
   private lastFrameAt = 0
   private watchdogTimer: NodeJS.Timeout | null = null
+  private stalledNotified = false
+  // 浏览器支持 video.requestVideoFrameCallback 时，帧时间由它提供
+  private useFrameCallback = false
   constructor(deviceId: string, options: ScrcpyOptions3_1) {
     super()
 
@@ -296,7 +299,8 @@ export default class ScrcpyClient extends Emitter {
             this.recorder.addVideoPacket(packet)
             if (packet.type === 'configuration') {
               logger.info('video configuration', packet.data)
-            } else {
+            } else if (!this.useFrameCallback) {
+              // 没有 requestVideoFrameCallback 时退回按 packet 计时
               this.lastFrameAt = Date.now()
             }
           })
@@ -313,11 +317,14 @@ export default class ScrcpyClient extends Emitter {
   }
   /**
    * socket 还活着但设备端不再出帧时，前端只会看到静止画面且没有任何提示。
-   * 定期检查最后一帧时间，超时就抛给上层展示重试入口。
+   * 定期检查最后一帧时间，超时抛给上层提示；画面恢复时再通知上层清掉提示。
+   * 这里不能超时就 stopFrameWatchdog，否则一旦误报（解码器短暂背压）
+   * 错误提示会永远留在界面上，只能重开窗口才能消掉。
    */
   private startFrameWatchdog() {
     this.stopFrameWatchdog()
     this.lastFrameAt = Date.now()
+    this.stalledNotified = false
     this.watchdogTimer = setInterval(() => {
       if (this.destroyed) {
         this.stopFrameWatchdog()
@@ -325,9 +332,15 @@ export default class ScrcpyClient extends Emitter {
       }
       const idle = Date.now() - this.lastFrameAt
       if (idle > FRAME_STALL_TIMEOUT) {
-        logger.warn('video stalled', idle)
-        this.stopFrameWatchdog()
-        this.emit('stalled')
+        if (!this.stalledNotified) {
+          this.stalledNotified = true
+          logger.warn('video stalled', idle)
+          this.emit('stalled')
+        }
+      } else if (this.stalledNotified) {
+        this.stalledNotified = false
+        logger.info('video recovered')
+        this.emit('recovered')
       }
     }, FRAME_WATCHDOG_INTERVAL)
   }
@@ -339,6 +352,21 @@ export default class ScrcpyClient extends Emitter {
   }
   private bindVideoEvent(el: HTMLVideoElement) {
     logger.info('bind video event')
+
+    // 以「真正渲染出一帧」为基准，而不是 packet 到达。
+    // 解码器背压时上游会暂停读取，但视频元素仍在播放已解码的帧，
+    // 只按 packet 计时会把正常播放误判成画面卡死。
+    const anyEl = el as any
+    if (typeof anyEl.requestVideoFrameCallback === 'function') {
+      this.useFrameCallback = true
+      const onFrame = () => {
+        this.lastFrameAt = Date.now()
+        if (!this.destroyed) {
+          anyEl.requestVideoFrameCallback(onFrame)
+        }
+      }
+      anyEl.requestVideoFrameCallback(onFrame)
+    }
 
     el.addEventListener('pointerdown', (e) => {
       el.focus()
