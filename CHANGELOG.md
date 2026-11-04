@@ -1,3 +1,13 @@
+## v2.1.7 (4 Nov 2026)
+
+* feat: new Service view in the apps panel: lists every service registered with servicemanager and hwservicemanager, filterable by HAL / Java / Vendor, plus a process view that groups services by host PID and shows process-level SELinux / RSS / service count
+* feat: service detail shows `dumpsys` output, `/proc` info (cmdline, fds, init rc) and binder topology, with one click `debuggerd` stack and `atrace` capture
+* fix: service list now resolves PIDs for HIDL HALs (process names come from `ps`, since `/proc/<pid>/comm` is denied for other SELinux domains), understands both HIDL and AIDL `lshal` formats, and no longer reports `android.frameworks.*` AIDL services as plain native binders
+* fix: performance FPS no longer sticks at 0: SurfaceFlinger latency is a ring buffer that mixes in frames from minutes ago, so only the trailing continuous run is used and `/proc/uptime` decides whether the last frame is fresh
+* feat: the performance panel shows NPU load (RK `rknpu` debugfs: per-core load and current frequency) on boards that have one
+* fix: screencast no longer reports "video stalled" while frames are still being rendered (frame timing now comes from `requestVideoFrameCallback`), clears the warning once frames resume, and shows it as a corner badge instead of a full-screen overlay that pushed the video aside
+* chore: verified on RK3576 / Android 14
+
 ## v2.1.6 (3 Nov 2026)
 
 * fix: app list no longer stays stuck on loading after a device reboot: adb shell / RPC / connect all have timeouts, half-open sockets are torn down, and a device change resets every cached connection
