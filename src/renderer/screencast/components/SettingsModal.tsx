@@ -54,7 +54,7 @@ export default observer(function SettingsModal(props: IModalProps) {
         />
         <LunaSettingButton
           description={t('restart')}
-          onClick={() => main.restartScreencast()}
+          onClick={() => store.reloadAll()}
         />
       </LunaSetting>
     </LunaModal>,

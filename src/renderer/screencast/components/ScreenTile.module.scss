@@ -1,0 +1,144 @@
+.tile {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #000;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.tile.active {
+  border-color: #4a9eff;
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: black;
+
+  /* video 是 appendChild 进去的裸 DOM。
+     这里不能用 max-width/max-height —— 那只限制上限，不会把分辨率小的
+     画面放大，横竖屏或不同分辨率放在一起时就会大小不一、填不满格子。
+     改成撑满容器 + object-fit: contain，由浏览器按视频真实分辨率等比缩放，
+     ScrcpyClient.getPointer 的 letterbox 换算正是按"元素撑满、画面居中"
+     这个前提写的，两者保持一致 */
+  video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    outline: none !important;
+  }
+}
+
+/* 设备名条默认隐藏，不占用画面；hover 或作为活动目标时常显 */
+.bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 24px;
+  padding: 0 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ccc;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  user-select: none;
+  /* 名条只占上沿 24px，如果整体吃事件会挡住状态栏的触摸，
+     所以只有名字和按钮可点，其余区域让事件穿透到画面 */
+  pointer-events: none;
+}
+
+.tile:hover .bar,
+.tile.active .bar {
+  opacity: 1;
+}
+
+.name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  pointer-events: auto;
+
+  span {
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  span:hover {
+    color: #fff;
+  }
+}
+
+.error {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ddd;
+  text-align: center;
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.error-message {
+  max-width: 100%;
+  word-break: break-all;
+}
+
+.loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+/* 画面停滞只是个弱提示，做成角落小图标，不遮挡画面也不影响操作 */
+.stalled {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ddd;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.stalled:hover {
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+}

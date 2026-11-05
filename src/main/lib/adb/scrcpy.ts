@@ -7,8 +7,9 @@ import { IpcStartScrcpy, IpcStopScrcpy } from 'common/types'
 const logger = log('scrcpy')
 
 let client: Client
-// 当前正在投屏的设备，用于窗口被强制销毁时兜底清理设备端进程
-let activeDeviceId = ''
+// 当前正在投屏的设备集合。多设备同屏投屏时会有多路会话并存，
+// 窗口被强制销毁时要把这些设备端进程全部清理掉，否则会残留 N-1 个
+const activeDeviceIds = new Set<string>()
 
 class ScrcpyClient {
   private deviceId = ''
@@ -31,14 +32,12 @@ class ScrcpyClient {
       )}`
     )
     this.socket = socket
-    activeDeviceId = this.deviceId
+    activeDeviceIds.add(this.deviceId)
     const release = () => {
       // 旧 socket 的迟到事件不能把新启动的会话状态清掉
       if (this.socket === socket) {
         this.socket = null
-        if (activeDeviceId === this.deviceId) {
-          activeDeviceId = ''
-        }
+        activeDeviceIds.delete(this.deviceId)
       }
     }
     socket.on('readable', () => {
@@ -54,9 +53,7 @@ class ScrcpyClient {
   async stop() {
     const socket = this.socket
     this.socket = null
-    if (activeDeviceId === this.deviceId) {
-      activeDeviceId = ''
-    }
+    activeDeviceIds.delete(this.deviceId)
     if (!socket) {
       return
     }
@@ -77,11 +74,25 @@ class ScrcpyClient {
   async push() {
     logger.info('push')
 
+    // 设备掉线时 push 会在 adb sync 协议里抛 write after end，
+    // 提前判断一下，给上层一个明确的「设备不在线」而不是协议层报错
+    const devices = await client.listDevices()
+    const target = devices.find((item) => item.id === this.deviceId)
+    if (!target || target.type !== 'device') {
+      throw new Error(`设备 ${this.deviceId} 不在线`)
+    }
+
     const device = client.getDevice(this.deviceId)
-    await device.push(
-      resolveResources('scrcpy.jar'),
-      '/data/local/tmp/aya/scrcpy.jar'
-    )
+    try {
+      await device.push(
+        resolveResources('scrcpy.jar'),
+        '/data/local/tmp/aya/scrcpy.jar'
+      )
+    } catch (err) {
+      throw new Error(
+        `推送 scrcpy 组件失败：${err instanceof Error ? err.message : String(err)}`
+      )
+    }
   }
 }
 
@@ -108,16 +119,17 @@ const stopScrcpy: IpcStopScrcpy = async function (deviceId) {
 
 /**
  * 投屏窗口被强制销毁时（renderer 来不及发 IPC），由主进程兜底关闭设备端进程。
+ * 不传 deviceId 时清理全部活跃会话，多设备投屏关窗必须走这条路径。
  */
-export function stopActiveScrcpy() {
-  if (!activeDeviceId) {
-    return
-  }
-  const deviceId = activeDeviceId
-  activeDeviceId = ''
-  const scrcpyClient = getDeviceStore(deviceId, 'scrcpyClient')
-  if (scrcpyClient) {
-    scrcpyClient.stop().catch(() => {})
+export function stopActiveScrcpy(deviceId?: string) {
+  const ids = deviceId ? [deviceId] : Array.from(activeDeviceIds)
+  for (let i = 0, len = ids.length; i < len; i++) {
+    const id = ids[i]
+    activeDeviceIds.delete(id)
+    const scrcpyClient = getDeviceStore(id, 'scrcpyClient')
+    if (scrcpyClient) {
+      scrcpyClient.stop().catch(() => {})
+    }
   }
 }
 

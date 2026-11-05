@@ -67,6 +67,8 @@ import {
   IpcSerialWait,
   IpcSerialWrite,
   IpcSetScreencastAlwaysOnTop,
+  IpcSetScreencastDevices,
+  IpcSetScreencastLayout,
   IpcStartAvd,
   IpcStartPackage,
   IpcStartScrcpy,
@@ -92,6 +94,10 @@ export default Object.assign(mainObj, {
   setDevicesStore: invoke<IpcSetStore>('setDevicesStore'),
   setScreencastAlwaysOnTop: invoke<IpcSetScreencastAlwaysOnTop>(
     'setScreencastAlwaysOnTop'
+  ),
+  setScreencastLayout: invoke<IpcSetScreencastLayout>('setScreencastLayout'),
+  setScreencastDevices: invoke<IpcSetScreencastDevices>(
+    'setScreencastDevices'
   ),
   getSettingsStore: invoke<IpcGetStore>('getSettingsStore'),
   setSettingsStore: invoke<IpcSetStore>('setSettingsStore'),

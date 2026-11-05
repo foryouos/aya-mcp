@@ -180,6 +180,11 @@ export enum TransferType {
 export type IpcGetFps = (deviceId: string, pkg: string) => Promise<number>
 export type IpcGetDevices = () => Promise<IDevice[]>
 export type IpcSetScreencastAlwaysOnTop = (alwaysOnTop: boolean) => void
+// 投屏窗口的多画面布局：等分网格 / 聚焦放大
+export type ScreencastLayout = 'grid' | 'spotlight'
+export type IpcSetScreencastLayout = (layout: ScreencastLayout) => void
+// 投屏窗口把当前的设备列表同步给主进程，供 MCP 增删与状态查询
+export type IpcSetScreencastDevices = (deviceIds: string[]) => void
 export type IpcListForwards = (
   deviceId: string
 ) => Promise<Array<{ local: string; remote: string }>>
