@@ -280,6 +280,43 @@ export const reverseTcp: IpcReverseTcp = async function (deviceId, remote) {
   return port
 }
 
+export const DEVICE_DIR = '/data/local/tmp/aya'
+
+/**
+ * 设备端产物目录（scrcpy.jar / aya.dex / 录屏文件）的权限自愈。
+ *
+ * 用 adb root 或 su 跑过 AYA 之后，/data/local/tmp/aya 会变成 root:root，
+ * 之后普通 shell 用户再也写不进去，push 直接报
+ * "couldn't create file: Permission denied"，投屏和其它 RPC 全部起不来。
+ * /data/local/tmp 属主是 shell 且没有 sticky 位，所以可以把 root 留下的
+ * 残留整个删掉重建。
+ *
+ * 返回 false 表示连重建都不行（例如 /data/local/tmp 被改成只读），
+ * 此时只能提示用户用 root 模式运行。
+ */
+export async function ensureDeviceDir(deviceId: string) {
+  try {
+    const state = await shell(
+      deviceId,
+      `if [ -d ${DEVICE_DIR} ] && [ -w ${DEVICE_DIR} ]; then echo ok; else echo fix; fi`
+    )
+    if (trim(state) === 'ok') {
+      return true
+    }
+
+    logger.warn('device dir not writable, recreating', deviceId)
+    const result = await shell(
+      deviceId,
+      `rm -rf ${DEVICE_DIR} 2>/dev/null; mkdir -p ${DEVICE_DIR} 2>/dev/null; if [ -w ${DEVICE_DIR} ]; then echo ok; else echo fail; fi`
+    )
+
+    return trim(result) === 'ok'
+  } catch (err) {
+    logger.warn('ensure device dir failed', err)
+    return false
+  }
+}
+
 const deviceStore: types.PlainObj<any> = {}
 
 export function getDeviceStore(deviceId: string, key: string) {

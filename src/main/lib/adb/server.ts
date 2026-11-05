@@ -6,6 +6,7 @@ import singleton from 'licia/singleton'
 import wire from '../wire'
 import waitUntil from 'licia/waitUntil'
 import {
+  ensureDeviceDir,
   forwardTcp,
   getDeviceStore,
   setDeviceStore,
@@ -280,6 +281,14 @@ class AyaClient {
   }
   private async push() {
     logger.info('push')
+
+    // 同 scrcpy：目录可能是 root 模式创建的，shell 写不进去
+    if (!(await ensureDeviceDir(this.deviceId))) {
+      throw new Error(
+        '设备端目录 /data/local/tmp/aya 不可写：请执行 adb root 后重试，或手动删除该目录'
+      )
+    }
+
     const device = client.getDevice(this.deviceId)
     await device.push(
       resolveResources('aya.dex'),

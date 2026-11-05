@@ -1,6 +1,6 @@
 import { Client } from '@devicefarmer/adbkit'
 import { handleEvent, resolveResources } from 'share/main/lib/util'
-import { getDeviceStore, setDeviceStore } from './base'
+import { ensureDeviceDir, getDeviceStore, setDeviceStore } from './base'
 import log from 'share/common/log'
 import { IpcStartScrcpy, IpcStopScrcpy } from 'common/types'
 
@@ -21,6 +21,22 @@ class ScrcpyClient {
   }
   async start(args: string[]) {
     await this.stop()
+
+    // 设备离线时后面的 shell / push 都会变成协议层报错，先给出明确提示
+    const devices = await client.listDevices()
+    const target = devices.find((item) => item.id === this.deviceId)
+    if (!target || target.type !== 'device') {
+      throw new Error(`设备 ${this.deviceId} 不在线`)
+    }
+
+    // 目录可能是在 root 模式下创建的，普通 shell 写不进去，
+    // 不修复的话 push 会直接报 Permission denied
+    if (!(await ensureDeviceDir(this.deviceId))) {
+      throw new Error(
+        '设备端目录 /data/local/tmp/aya 不可写：请执行 adb root 后重试，或手动删除该目录'
+      )
+    }
+
     await this.push()
 
     logger.info('start', args)
@@ -73,14 +89,6 @@ class ScrcpyClient {
   }
   async push() {
     logger.info('push')
-
-    // 设备掉线时 push 会在 adb sync 协议里抛 write after end，
-    // 提前判断一下，给上层一个明确的「设备不在线」而不是协议层报错
-    const devices = await client.listDevices()
-    const target = devices.find((item) => item.id === this.deviceId)
-    if (!target || target.type !== 'device') {
-      throw new Error(`设备 ${this.deviceId} 不在线`)
-    }
 
     const device = client.getDevice(this.deviceId)
     try {
