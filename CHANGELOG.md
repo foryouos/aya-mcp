@@ -1,3 +1,19 @@
+## v2.1.8 (5 Nov 2026)
+
+* feat: screencast mirrors up to 6 devices side by side in one window, with an equal grid layout and a spotlight layout that enlarges one device while the others keep streaming in a sidebar; switching focus only touches CSS, so playback is never interrupted
+* feat: the screencast toolbar gains "add device" (double-click a device to cast it directly) and a layout toggle; power / volume / back / screenshot / recording now apply to the active tile
+* feat: only the focused device plays audio; the rest keep decoding but drop their samples, so switching focus takes effect immediately without restarting the session
+* feat: a device that goes offline is removed from the grid after a 3 second confirmation, and the window closes when the last one is gone
+* feat: 3 or more devices automatically drop to `max_size=1024` / `max_fps=30` to keep hardware decoders within budget
+* feat: `aya_cast_window` accepts `deviceIds` and gains `add` / `remove` / `focus` / `layout` actions
+* fix: the preload socket wrapper was missing `off` / `destroy` / `isDestroyed`, so sockets were never actually destroyed on teardown and repeated cast cycles leaked them
+* fix: control messages (touch / key) written to a dead socket produced a flood of unhandled `ECONNABORTED` rejections
+* fix: "video stalled" no longer fires for a screen that is simply static or turned off (threshold raised to 60s and downgraded to a small corner icon); the client asks the encoder for a key frame first
+* fix: video fills the tile with `object-fit: contain` instead of being capped by `max-width`, so low resolution devices are no longer rendered small
+* fix: screencast start failures (reverse tunnel, listen, jar push) are surfaced immediately instead of leaving the window waiting for the 20s first-frame timeout
+* fix: writing to a closed control socket no longer throws, and the device is reported offline right away instead of after a timeout
+* chore: verified on RK3576 / RK3562 with 3 devices casting simultaneously
+
 ## v2.1.7 (4 Nov 2026)
 
 * feat: new Service view in the apps panel: lists every service registered with servicemanager and hwservicemanager, filterable by HAL / Java / Vendor, plus a process view that groups services by host PID and shows process-level SELinux / RSS / service count

@@ -55,7 +55,7 @@
             "applicationSubCategory": "Android / Linux 设备控制 · MCP 服务",
             "operatingSystem": "Windows, macOS, Linux",
             "url": "https://aya-mcp.foryouos.cn/",
-            "softwareVersion": "2.1.7",
+            "softwareVersion": "2.1.8",
             "description": "AYA MCP 在 AYA 桌面端内置一个只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力做成 75 个 aya_* 工具：截图、界面层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏。同一台 RK3576 实测比 Python uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。也支持带 adb 的 Linux 工控主板（Debian / Ubuntu / Buildroot / Yocto），日志走 journalctl / dmesg。",
             "featureList": [
               "75 个 MCP 工具（31 只读 / 44 写）",
@@ -2250,7 +2250,7 @@ details p {
             />
             <path d="M25 36h14" stroke="#fff" stroke-width="5" stroke-linecap="round" />
           </svg>
-          AYA&nbsp;MCP <small>v2.1.7</small>
+          AYA&nbsp;MCP <small>v2.1.8</small>
         </a>
         <nav class="links" aria-label="主导航">
           <a href="#what">什么是 MCP</a>
@@ -3107,6 +3107,21 @@ details p {
               <tbody>
                 <tr>
                   <td>
+                    <code>v2.1.8</code>
+                    <span class="ver-meta">2026-11-05</span>
+                  </td>
+                  <td>
+                    <ul>
+                      <li>投屏支持多设备同屏：一个窗口最多并排显示 6 台设备，提供等分网格与聚焦放大两种布局，放大只改样式不重启会话，切换零中断。</li>
+                      <li>投屏工具栏新增「添加设备」（可双击直接投屏）与布局切换；电源 / 音量 / 返回 / 截图 / 录屏改为作用于当前活动设备；双击留白区域即可放大该路。</li>
+                      <li>多设备时只有聚焦的那一路出声，切换即时生效；3 路及以上自动降档到 1024 / 30fps 保证实时性。</li>
+                      <li>设备掉线 3 秒确认后自动从投屏中下线，全部掉线则关闭窗口；MCP 的 <code>aya_cast_window</code> 新增 <code>deviceIds</code> 与 <code>add</code> / <code>remove</code> / <code>focus</code> / <code>layout</code>。</li>
+                      <li>修复若干稳定性问题：socket 关闭时未真正释放、设备断开后控制指令写入刷屏、暂停画面被误判为卡死、低分辨率画面填不满格子、启动失败要干等 20 秒超时。</li>
+                    </ul>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
                     <code>v2.1.7</code>
                     <span class="ver-meta">2026-11-04</span>
                   </td>
@@ -3130,19 +3145,6 @@ details p {
                       <li>设备端应用信息缓存落盘并改为并发解析，重启后首次加载从 60 秒以上降到 1~2 秒；图标 HTTP 服务支持 ETag / 304 缓存。</li>
                       <li>投屏新增 15 秒无帧看门狗，关闭时完整释放 socket、解码器与设备端进程；设备端截图补齐 Bitmap / HardwareBuffer 回收。</li>
                       <li>终端新增 <code>adb shell</code> 输出语法高亮（可在设置中开关）与按 系统 / 显示 / 音频 / GPIO / 性能 / 存储 / 调试 分组的快捷命令，含控制序列的输出原样透传。</li>
-                    </ul>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <code>v2.1.5</code>
-                    <span class="ver-meta">2026-10-28</span>
-                  </td>
-                  <td>
-                    <ul>
-                      <li>支持带 adb 的 Linux 工控主板（RK3568 / RK3576 · Debian / Ubuntu / Buildroot / Yocto），自动识别平台并按平台调整面板与工具。</li>
-                      <li>概览 / 进程 / 性能面板适配 Linux，新增 journalctl / dmesg 日志后端。</li>
-                      <li>Android 专有面板与工具按平台隐藏或返回 <code>NOT_SUPPORTED</code>，去掉 Linux 设备上每次 10 秒的空等。</li>
                     </ul>
                   </td>
                 </tr>
@@ -3205,7 +3207,7 @@ details p {
           <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（
           <a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">github.com/liriliri/aya</a>，作者
           <b>surunzi / liriliri</b>）二次开发，遵循原项目 <b>AGPL-3.0</b> 许可证；桌面端基础能力（投屏、文件管理、日志、性能、Shell
-          等）均来自上游。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.7</b>。
+          等）均来自上游。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.8</b>。
         </div>
 
         <div class="copy-bar">
