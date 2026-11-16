@@ -137,10 +137,34 @@ function trimBuffer() {
   }
 }
 
+// loader/刷机模式下设备会在同一行用 \r 重绘转圈动画（- \ | /，每秒上百帧），
+// 若逐帧成行会把日志刷满。这里把连续的动画帧合并成一行原地更新：
+// 序号不变、时间取最后一帧，UI 呈现为单行转圈；原始字节仍完整落盘
+const SPINNER_FRAME_RE = /^[-\\|/]$/
+
 function pushLine(text: string, tx = false) {
+  const now = Date.now()
+  const last = lines.length > head ? lines[lines.length - 1] : null
+  if (
+    !tx &&
+    last &&
+    !last.tx &&
+    SPINNER_FRAME_RE.test(text) &&
+    SPINNER_FRAME_RE.test(last.text) &&
+    now - last.time < 2000
+  ) {
+    // 动画帧覆盖最后一行，序号不变；渲染端按 seq 覆盖而不是追加
+    last.text = text
+    last.time = now
+    // 已经在待推送队列里就不用重复入队，emit 本身有 120ms 节流
+    if (!paused && pendingEmit[pendingEmit.length - 1] !== last) {
+      pendingEmit.push(last)
+    }
+    return
+  }
   const line: ISerialLine = {
     seq: ++seq,
-    time: Date.now(),
+    time: now,
     // 发送的数据不参与阶段判定，否则用户敲的命令会把内核阶段误判成别的阶段
     source: tx ? stage : classify(text),
     text,

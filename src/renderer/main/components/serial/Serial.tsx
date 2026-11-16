@@ -161,6 +161,17 @@ export default observer(function Serial() {
     return !re || re.test(line.text)
   }
 
+  // 动画帧覆盖的是缓冲区末尾的行，从尾部往前找几条足够；找不到就按新行处理
+  function findLineBySeq(seq: number) {
+    const lines = linesRef.current
+    for (let i = lines.length - 1, n = Math.max(0, lines.length - 8); i >= n; i--) {
+      if (lines[i].seq === seq) {
+        return lines[i]
+      }
+    }
+    return null
+  }
+
   function setLines(list: ISerialLine[]) {
     linesRef.current = list
     lastSeqRef.current = list.length ? list[list.length - 1].seq : 0
@@ -247,6 +258,19 @@ export default observer(function Serial() {
     let max = maxLengthRef.current
 
     for (const line of incoming) {
+      // 主进程会把 loader 模式的转圈动画合并为同一行原地更新（seq 重复推送），
+      // 命中已有行时按 seq 覆盖内容，而不是追加成新行刷屏
+      const existing =
+        lines.length && lines[lines.length - 1].seq === line.seq
+          ? lines[lines.length - 1]
+          : line.seq < lastSeqRef.current
+          ? findLineBySeq(line.seq)
+          : null
+      if (existing) {
+        existing.text = line.text
+        existing.time = line.time
+        continue
+      }
       lines.push(line)
       if (line.text.length > max) {
         max = line.text.length
