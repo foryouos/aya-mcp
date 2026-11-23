@@ -180,6 +180,27 @@ export default observer(function Logcat() {
     return () => document.removeEventListener('dblclick', onEntryDblClick, true)
   }, [])
 
+  // 按下鼠标就退出自动跟随：虚拟列表只在 isAtBottom 时强制滚到底部，
+  // 拖选期间关掉它可以避免行在指针下跳动（不暂停数据源，避免丢日志）
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      const logcat = logcatRef.current
+      const target = e.target as HTMLElement | null
+      if (!logcat || !target || !target.closest) {
+        return
+      }
+      if (!logcat.container.contains(target)) {
+        return
+      }
+      const virtualList = (logcat as any).virtualList
+      if (virtualList) {
+        virtualList.isAtBottom = false
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown, true)
+    return () => document.removeEventListener('mousedown', onMouseDown, true)
+  }, [])
+
   // 切换过滤条件或视图时 luna-logcat 会重绘条目，重绘后补回全名 tooltip
   useEffect(() => {
     const logcat = logcatRef.current
@@ -210,17 +231,7 @@ export default observer(function Logcat() {
   }
 
   function save() {
-    const data = map(entriesRef.current, (entry) => {
-      return trim(
-        `${dateFormat(entry.date, 'mm-dd HH:MM:ss.l')} ${rpad(
-          entry.pid,
-          5,
-          ' '
-        )} ${rpad(entry.tid, 5, ' ')} ${toLetter(entry.priority)} ${
-          entry.tag
-        }: ${entry.message}`
-      )
-    }).join('\n')
+    const data = map(entriesRef.current, formatEntry).join('\n')
     const name = `${store.device ? store.device.name : 'logcat'}.${dateFormat(
       'yyyymmddHH'
     )}.txt`
@@ -241,11 +252,39 @@ export default observer(function Logcat() {
     const template: any[] = [
       {
         label: t('copy'),
+        enabled: !!entry || logcat.hasSelection(),
         click: () => {
           if (logcat.hasSelection()) {
             copy(logcat.getSelection())
           } else if (entry) {
             copy(entry.message)
+          }
+        },
+      },
+      {
+        label: t('logcatCopyFull'),
+        enabled: !!entry,
+        click: () => {
+          if (entry) {
+            copy(formatEntry(entry))
+          }
+        },
+      },
+      {
+        label: t('logcatCopyTag'),
+        enabled: !!entry,
+        click: () => {
+          if (entry) {
+            copy(entry.tag)
+          }
+        },
+      },
+      {
+        label: t('logcatCopyPackage'),
+        enabled: !!entry,
+        click: () => {
+          if (entry) {
+            copy(entry.package)
           }
         },
       },
@@ -395,6 +434,18 @@ const PRIORITY_LETTERS = ['?', '?', 'V', 'D', 'I', 'W', 'E']
 
 function toLetter(priority: number) {
   return PRIORITY_LETTERS[priority]
+}
+
+function formatEntry(entry: any) {
+  return trim(
+    `${dateFormat(entry.date, 'mm-dd HH:MM:ss.l')} ${rpad(
+      entry.pid,
+      5,
+      ' '
+    )} ${rpad(entry.tid, 5, ' ')} ${toLetter(entry.priority)} ${
+      entry.tag
+    }: ${entry.message}`
+  )
 }
 
 function escapeHtml(str: string) {

@@ -15,6 +15,22 @@
   font-family: Consolas, 'Courier New', monospace;
   font-size: 12px;
   user-select: text;
+  cursor: text;
+
+  &::selection,
+  *::selection {
+    background-color: rgba(82, 196, 26, 0.35);
+  }
+}
+
+// 拖选时隐藏浮层，避免按钮区域吃掉鼠标事件
+.selectingHidden {
+  opacity: 0;
+  pointer-events: none;
+
+  button {
+    pointer-events: none;
+  }
 }
 
 .sendBar {
@@ -104,8 +120,10 @@
   font-size: 12px;
   white-space: nowrap;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
 
   button {
+    pointer-events: auto;
     height: 20px;
     padding: 0 8px;
     border: none;
@@ -224,19 +242,21 @@
   border-top: 1px dashed var(--color-border);
 }
 
-// 行号让搜索命中的位置一目了然
+// 行号让搜索命中的位置一目了然；这几列不参与拖选，复制结果只含正文
 .lineNo {
   flex: none;
   width: 52px;
   text-align: right;
   color: var(--color-text-secondary);
   opacity: 0.55;
+  user-select: none;
 }
 
 .time {
   flex: none;
   color: var(--color-text-secondary);
   opacity: 0.75;
+  user-select: none;
 }
 
 .badge {
@@ -247,6 +267,7 @@
   font-size: 10px;
   line-height: 14px;
   color: #fff;
+  user-select: none;
 }
 
 .bootloader {

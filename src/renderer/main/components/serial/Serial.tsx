@@ -141,6 +141,8 @@ export default observer(function Serial() {
     centerSeq: number
     lines: ISerialLine[]
   } | null>(null)
+  // 拖选时暂停自动跟随并隐藏浮层，避免行在指针下跳动
+  const [selecting, setSelecting] = useState(false)
 
   const linesRef = useRef<ISerialLine[]>([])
   const filteredRef = useRef<ISerialLine[]>([])
@@ -828,18 +830,53 @@ export default observer(function Serial() {
     }
   }
 
+  // 只认日志区域内的选区，避免把界面其他地方的选中文本复制进来
+  function getLogSelection() {
+    const selection = window.getSelection()
+    const viewport = viewportRef.current
+    if (!selection || selection.isCollapsed || !viewport) {
+      return ''
+    }
+    const { anchorNode, focusNode } = selection
+    if (
+      !anchorNode ||
+      !focusNode ||
+      !viewport.contains(anchorNode) ||
+      !viewport.contains(focusNode)
+    ) {
+      return ''
+    }
+    return selection.toString()
+  }
+
   function onContextMenu(e: React.MouseEvent, line?: ISerialLine) {
     e.preventDefault()
     const template: any[] = [
       {
         label: t('copy'),
+        enabled: !!line || !!getLogSelection(),
         click: () => {
-          const selection = window.getSelection()?.toString()
+          const selection = getLogSelection()
           if (selection) {
             copy(selection)
           } else if (line) {
             copy(line.text)
           }
+        },
+      },
+      {
+        label: t('serialCopyCurrentLine'),
+        enabled: !!line,
+        click: () => {
+          if (line) {
+            copy(line.text)
+          }
+        },
+      },
+      {
+        label: t('serialCopyVisible'),
+        click: () => {
+          copy(visible.map((item) => item.text).join('\n'))
         },
       },
       {
@@ -1058,6 +1095,17 @@ export default observer(function Serial() {
               setAutoScroll(atBottom)
             }
           }}
+          onMouseDown={() => {
+            // 拖选期间停止自动跟随，否则新日志会把行从指针下滚走
+            setSelecting(true)
+            if (autoScrollRef.current) {
+              autoScrollRef.current = false
+              atBottomRef.current = false
+              setAutoScroll(false)
+            }
+          }}
+          onMouseUp={() => setSelecting(false)}
+          onMouseLeave={() => setSelecting(false)}
           onContextMenu={(e) => onContextMenu(e)}
         >
           {total > 0 && (
@@ -1096,6 +1144,10 @@ export default observer(function Serial() {
                       .filter(Boolean)
                       .join(' ')}
                     style={{ top: (start + index) * ROW_HEIGHT }}
+                    onContextMenu={(e) => {
+                      e.stopPropagation()
+                      onContextMenu(e, line)
+                    }}
                   >
                     <span className={Style.lineNo}>{line.seq}</span>
                     <span className={Style.time}>
@@ -1120,7 +1172,11 @@ export default observer(function Serial() {
             <div className={Style.searchTip}>{t('serialNoMatch')}</div>
           )}
           {contextWindow && (
-            <div className={Style.contextBanner}>
+            <div
+              className={`${Style.contextBanner} ${
+                selecting ? Style.selectingHidden : ''
+              }`}
+            >
               <span>
                 {t('serialSearchLocated', {
                   seq: String(activeSeq || contextWindow.centerSeq),
@@ -1137,7 +1193,12 @@ export default observer(function Serial() {
         </div>
         {/* 用户翻上去看历史时不再自动滚动，这里提示下面还有多少新日志 */}
         {pendingNew > 0 && !autoScroll && (
-          <button className={Style.newLines} onClick={scrollToEnd}>
+          <button
+            className={`${Style.newLines} ${
+              selecting ? Style.selectingHidden : ''
+            }`}
+            onClick={scrollToEnd}
+          >
             ↓ {t('serialNewLines', { n: String(pendingNew) })}
           </button>
         )}

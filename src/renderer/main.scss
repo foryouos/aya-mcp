@@ -58,6 +58,16 @@
     }
   }
 
+  /* 消息列才是拖选复制的目标 */
+  .luna-logcat-message {
+    cursor: text;
+  }
+
+  &::selection,
+  *::selection {
+    background-color: rgba(82, 196, 26, 0.35);
+  }
+
   /* 搜索命中高亮 */
   .logcat-highlight,
   mark.logcat-highlight {
