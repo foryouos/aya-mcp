@@ -70,6 +70,57 @@
   }
 }
 
+// 搜索结果提示：只提示，不遮挡日志
+.searchTip {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  z-index: 3;
+  padding: 3px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background-color: var(--color-bg-container);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+// 命中行不在本地缓冲时展示历史上下文，可一键回到实时日志
+.contextBanner {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 3px 6px 3px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--color-primary);
+  border-radius: 12px;
+  background-color: var(--color-bg-container);
+  color: var(--color-text);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+
+  button {
+    height: 20px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 10px;
+    background-color: var(--color-primary);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--color-primary-hover);
+    }
+  }
+}
+
 .newlineLabel {
   flex: none;
   color: var(--color-text-secondary);
@@ -173,6 +224,15 @@
   border-top: 1px dashed var(--color-border);
 }
 
+// 行号让搜索命中的位置一目了然
+.lineNo {
+  flex: none;
+  width: 52px;
+  text-align: right;
+  color: var(--color-text-secondary);
+  opacity: 0.55;
+}
+
 .time {
   flex: none;
   color: var(--color-text-secondary);
@@ -209,9 +269,27 @@
   white-space: pre;
 }
 
+// 相邻行弱高亮，保留崩溃前后的上下文
+.rowContext {
+  background-color: rgba(255, 224, 138, 0.06);
+}
+
+// 当前命中的行：整行突出，滚动后立刻能看到位置
+.rowActive {
+  background-color: rgba(255, 224, 138, 0.16);
+  border-left-color: #e6a700;
+  box-shadow: inset 0 0 0 1px rgba(230, 167, 0, 0.35);
+}
+
 .highlight {
   background-color: #ffe08a;
   color: #333;
+}
+
+.highlightActive {
+  background-color: #ff9f43;
+  color: #1a1a1a;
+  font-weight: 600;
 }
 
 .empty {

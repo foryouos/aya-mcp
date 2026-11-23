@@ -31,6 +31,12 @@ const MAX_LOCAL_LINES = 30000
 const TRIM_STEP = 2000
 const ROW_HEIGHT = 18
 const OVERSCAN = 12
+// 搜索只用于定位，不过滤日志；匹配行最多保留最近的 5000 条用于逐个跳转
+const SEARCH_MATCH_LIMIT = 5000
+// 命中行不在本地缓冲时，向主进程取这一段上下文展示
+const CONTEXT_BEFORE = 24
+const CONTEXT_AFTER = 80
+const CONTEXT_VISUAL_RADIUS = 3
 
 // 主板调试口常用波特率，只保留最常见的三个
 const BAUD_RATES = ['115200', '921600', '1500000']
@@ -68,7 +74,7 @@ function buildMatcher(keyword: string, regex: boolean): RegExp | null {
   }
 }
 
-function renderHighlight(text: string, matcher: RegExp | null) {
+function renderHighlight(text: string, matcher: RegExp | null, active = false) {
   if (!matcher) {
     return text
   }
@@ -82,7 +88,10 @@ function renderHighlight(text: string, matcher: RegExp | null) {
       nodes.push(text.slice(last, match.index))
     }
     nodes.push(
-      <mark key={key++} className={Style.highlight}>
+      <mark
+        key={key++}
+        className={active ? Style.highlightActive : Style.highlight}
+      >
         {match[0]}
       </mark>
     )
@@ -124,10 +133,30 @@ export default observer(function Serial() {
   const [maxLength, setMaxLength] = useState(0)
   // 用户上滑后不再自动跟随，用这个数字提示“下面还有新日志”
   const [pendingNew, setPendingNew] = useState(0)
+  // 搜索只定位不筛选：这里记录命中的行和当前定位到第几条
+  const [matchIndex, setMatchIndex] = useState(-1)
+  const [matchCount, setMatchCount] = useState(0)
+  const [activeSeq, setActiveSeq] = useState(0)
+  const [contextWindow, setContextWindow] = useState<{
+    centerSeq: number
+    lines: ISerialLine[]
+  } | null>(null)
 
   const linesRef = useRef<ISerialLine[]>([])
   const filteredRef = useRef<ISerialLine[]>([])
-  const filterRef = useRef({ search: '', useRegex: false, source: 'all' as string })
+  const matchesRef = useRef<ISerialLine[]>([])
+  const activeMatchRef = useRef(-1)
+  const activeSeqRef = useRef(0)
+  const contextWindowRef = useRef<{
+    centerSeq: number
+    lines: ISerialLine[]
+  } | null>(null)
+  const pendingScrollSeqRef = useRef<number | null>(null)
+  const filterRef = useRef({
+    search: '',
+    useRegex: false,
+    source: 'all' as string,
+  })
   const atBottomRef = useRef(true)
   const autoScrollRef = useRef(true)
   const manualPauseRef = useRef(false)
@@ -150,21 +179,21 @@ export default observer(function Serial() {
   )
 
   function isFilterActive() {
-    const f = filterRef.current
-    return !!f.search.trim() || f.source !== 'all'
+    return filterRef.current.source !== 'all'
   }
 
-  function lineMatch(line: ISerialLine, re: RegExp | null, src: string) {
-    if (src !== 'all' && line.source !== src) {
-      return false
-    }
-    return !re || re.test(line.text)
+  function lineSourceMatch(line: ISerialLine, src: string) {
+    return src === 'all' || line.source === src
   }
 
   // 动画帧覆盖的是缓冲区末尾的行，从尾部往前找几条足够；找不到就按新行处理
   function findLineBySeq(seq: number) {
     const lines = linesRef.current
-    for (let i = lines.length - 1, n = Math.max(0, lines.length - 8); i >= n; i--) {
+    for (
+      let i = lines.length - 1, n = Math.max(0, lines.length - 8);
+      i >= n;
+      i--
+    ) {
       if (lines[i].seq === seq) {
         return lines[i]
       }
@@ -191,6 +220,7 @@ export default observer(function Serial() {
   function resetLocal() {
     linesRef.current = []
     filteredRef.current = []
+    clearSearchState()
     lastSeqRef.current = 0
     pendingNewRef.current = 0
     maxLengthRef.current = 0
@@ -201,47 +231,192 @@ export default observer(function Serial() {
 
   function rebuildFiltered() {
     const f = filterRef.current
-    if (!f.search.trim() && f.source === 'all') {
-      filteredRef.current = linesRef.current
-      return
-    }
-    const re = buildMatcher(f.search, f.useRegex)
-    filteredRef.current = linesRef.current.filter((line) =>
-      lineMatch(line, re, f.source)
-    )
+    filteredRef.current =
+      f.source === 'all'
+        ? linesRef.current
+        : linesRef.current.filter((line) => line.source === f.source)
   }
 
-  // 过滤在本地做即时响应；有过滤条件时再向主进程查询完整缓冲区（200k 行），
-  // 这样搜索能覆盖比本地保留量更早的日志
+  function updateContextWindow(
+    next: {
+      centerSeq: number
+      lines: ISerialLine[]
+    } | null
+  ) {
+    contextWindowRef.current = next
+    setContextWindow(next)
+    setVersion((v) => v + 1)
+  }
+
+  function clearSearchState() {
+    const hadContext = !!contextWindowRef.current
+    pendingScrollSeqRef.current = null
+    matchesRef.current = []
+    activeMatchRef.current = -1
+    activeSeqRef.current = 0
+    setMatchIndex(-1)
+    setMatchCount(0)
+    setActiveSeq(0)
+    if (hadContext) {
+      updateContextWindow(null)
+    }
+  }
+
+  // 滚到指定行并尽量居中；返回 false 表示该行不在当前列表里
+  function scrollToLine(seq: number) {
+    const lines = contextWindowRef.current
+      ? contextWindowRef.current.lines
+      : filteredRef.current
+    const index = lines.findIndex((line) => line.seq === seq)
+    const viewport = viewportRef.current
+    if (index < 0 || !viewport) {
+      return false
+    }
+    const top = Math.max(
+      0,
+      index * ROW_HEIGHT - (viewport.clientHeight - ROW_HEIGHT) / 2
+    )
+    viewport.scrollTop = top
+    setScrollTop(top)
+    atBottomRef.current = false
+    autoScrollRef.current = false
+    setAutoScroll(false)
+    return true
+  }
+
+  // 命中行不在本地缓冲时，从主进程取前后一段作为上下文
+  async function loadContext(seq: number) {
+    const token = ++searchTokenRef.current
+    try {
+      const res = await main.serialQuery({
+        fromSeq: Math.max(1, seq - CONTEXT_BEFORE),
+        toSeq: seq + CONTEXT_AFTER,
+        lines: 0,
+        source: filterRef.current.source as any,
+      })
+      if (token !== searchTokenRef.current) {
+        return
+      }
+      updateContextWindow({ centerSeq: seq, lines: res.lines })
+      pendingScrollSeqRef.current = seq
+    } catch {
+      if (token === searchTokenRef.current) {
+        backToLive()
+      }
+    }
+  }
+
+  function goToMatch(delta: number) {
+    const matches = matchesRef.current
+    if (!matches.length) {
+      return
+    }
+    // 丢弃上一次定位尚未执行的滚动，避免跳到已经失效的目标
+    pendingScrollSeqRef.current = null
+    const current = activeMatchRef.current
+    const index =
+      current < 0 || current >= matches.length
+        ? delta > 0
+          ? 0
+          : matches.length - 1
+        : (current + delta + matches.length) % matches.length
+    activeMatchRef.current = index
+    const seq = matches[index].seq
+    activeSeqRef.current = seq
+    setMatchIndex(index)
+    setActiveSeq(seq)
+
+    // 优先在完整日志里定位；本地缓冲没有时再看历史上下文视图
+    if (filteredRef.current.some((line) => line.seq === seq)) {
+      if (contextWindowRef.current) {
+        updateContextWindow(null)
+        pendingScrollSeqRef.current = seq
+      } else {
+        scrollToLine(seq)
+      }
+      return
+    }
+    if (contextWindowRef.current?.lines.some((line) => line.seq === seq)) {
+      scrollToLine(seq)
+      return
+    }
+    loadContext(seq)
+  }
+
+  function backToLive() {
+    pendingScrollSeqRef.current = null
+    if (contextWindowRef.current) {
+      updateContextWindow(null)
+    }
+    setAutoScroll(true)
+  }
+
+  // 搜索只定位不筛选：向主进程取命中行用于逐个跳转，完整日志始终留在列表里
   async function applyFilter() {
     const f = filterRef.current
     const token = ++searchTokenRef.current
-    if (!f.search.trim() && f.source === 'all') {
-      filteredRef.current = linesRef.current
+    pendingScrollSeqRef.current = null
+    rebuildFiltered()
+    if (!f.search.trim()) {
+      clearSearchState()
       setVersion((v) => v + 1)
       return
     }
 
+    const prevSeq = activeSeqRef.current
     try {
       const res = await main.serialQuery({
         keyword: f.search,
         regex: f.useRegex,
         source: f.source as any,
-        lines: 5000,
-        // 要看的是“现在匹配到什么”，取最近的匹配行而不是会话开头
+        lines: SEARCH_MATCH_LIMIT,
+        // 取最近的命中行，跳转时默认停在最靠近当前时间的一条
         latest: true,
       })
       if (token !== searchTokenRef.current) {
         return
       }
-      filteredRef.current = res.lines
+      matchesRef.current = res.lines
+      setMatchCount(res.lines.length)
+      if (!res.lines.length) {
+        activeMatchRef.current = -1
+        activeSeqRef.current = 0
+        setMatchIndex(-1)
+        setActiveSeq(0)
+        if (contextWindowRef.current) {
+          updateContextWindow(null)
+        }
+        setVersion((v) => v + 1)
+        return
+      }
+      // 同步新日志后尽量保留用户当前看的那条命中，避免又跳回最后一条
+      const keep = prevSeq
+        ? res.lines.findIndex((line) => line.seq === prevSeq)
+        : -1
+      const index = keep >= 0 ? keep : res.lines.length - 1
+      activeMatchRef.current = index
+      const seq = res.lines[index].seq
+      activeSeqRef.current = seq
+      setMatchIndex(index)
+      setActiveSeq(seq)
+      if (contextWindowRef.current?.centerSeq === seq) {
+        setVersion((v) => v + 1)
+        return
+      }
+      if (contextWindowRef.current) {
+        updateContextWindow(null)
+      }
+      if (filteredRef.current.some((line) => line.seq === seq)) {
+        scrollToLine(seq)
+      } else {
+        loadContext(seq)
+      }
     } catch {
       if (token !== searchTokenRef.current) {
         return
       }
-      rebuildFiltered()
+      clearSearchState()
     }
-
     setVersion((v) => v + 1)
   }
 
@@ -252,7 +427,6 @@ export default observer(function Serial() {
     const lines = linesRef.current
     const f = filterRef.current
     const active = isFilterActive()
-    const re = active ? buildMatcher(f.search, f.useRegex) : null
     // 无过滤时 filtered 与 lines 是同一个数组，再 push 一次会凭空多出一行
     const separate = filteredRef.current !== lines
     let max = maxLengthRef.current
@@ -264,8 +438,8 @@ export default observer(function Serial() {
         lines.length && lines[lines.length - 1].seq === line.seq
           ? lines[lines.length - 1]
           : line.seq < lastSeqRef.current
-          ? findLineBySeq(line.seq)
-          : null
+            ? findLineBySeq(line.seq)
+            : null
       if (existing) {
         existing.text = line.text
         existing.time = line.time
@@ -275,7 +449,7 @@ export default observer(function Serial() {
       if (line.text.length > max) {
         max = line.text.length
       }
-      if (active && separate && lineMatch(line, re, f.source)) {
+      if (active && separate && lineSourceMatch(line, f.source)) {
         filteredRef.current.push(line)
       }
     }
@@ -318,9 +492,10 @@ export default observer(function Serial() {
         if (exist) {
           return current
         }
-        const next = saved && list.some((port) => port.path === saved)
-          ? saved
-          : list[0]?.path || ''
+        const next =
+          saved && list.some((port) => port.path === saved)
+            ? saved
+            : list[0]?.path || ''
         return next
       })
     })
@@ -330,7 +505,10 @@ export default observer(function Serial() {
     const token = ++syncTokenRef.current
     try {
       // latest：拿缓冲里最新的 N 行，否则缓冲区涨到 20 万行后会一直显示会话开头
-      const res = await main.serialQuery({ lines: MAX_LOCAL_LINES, latest: true })
+      const res = await main.serialQuery({
+        lines: MAX_LOCAL_LINES,
+        latest: true,
+      })
       if (token !== syncTokenRef.current) {
         return
       }
@@ -341,8 +519,8 @@ export default observer(function Serial() {
         : 0
       const tail = linesRef.current.filter((line) => line.seq > snapLast)
       setLines(tail.length ? res.lines.concat(tail) : res.lines)
-      if (isFilterActive()) {
-        // 保持搜索条件时重新从主进程完整缓冲取匹配结果
+      if (isFilterActive() || filterRef.current.search.trim()) {
+        // 保持搜索条件时重新从主进程完整缓冲刷新匹配结果
         applyFilter()
         return
       }
@@ -380,14 +558,22 @@ export default observer(function Serial() {
         return
       }
       const current = statusRef.current
-      if (current && payload.sessionId && current.sessionId !== payload.sessionId) {
+      if (
+        current &&
+        payload.sessionId &&
+        current.sessionId !== payload.sessionId
+      ) {
         return
       }
       const incoming = payload.lines
       const first = incoming.length ? incoming[0].seq : 0
       // 两次推送之间的行号不连续，说明中间丢了批次（渲染进程忙、暂停恢复、
       // 主进程重启等），补一次快照，否则日志框会一直缺那一段
-      if (first > 0 && lastSeqRef.current > 0 && first > lastSeqRef.current + 1) {
+      if (
+        first > 0 &&
+        lastSeqRef.current > 0 &&
+        first > lastSeqRef.current + 1
+      ) {
         scheduleResync()
       }
       if (first > 0) {
@@ -413,7 +599,8 @@ export default observer(function Serial() {
       const prev = statusRef.current
       // 会话被重建或清空（MCP 重新打开串口、清空缓冲等）时本地数据已失效
       const reset =
-        !!prev && (prev.sessionId !== next.sessionId || next.seq < lastSeqRef.current)
+        !!prev &&
+        (prev.sessionId !== next.sessionId || next.seq < lastSeqRef.current)
       setStatus(next)
       if (reset) {
         resetLocal()
@@ -502,15 +689,26 @@ export default observer(function Serial() {
     }
   }, [version, autoScroll])
 
+  // 历史上下文切换后列表内容变了，等渲染完再滚到目标行
+  useEffect(() => {
+    const seq = pendingScrollSeqRef.current
+    if (seq == null) {
+      return
+    }
+    pendingScrollSeqRef.current = null
+    scrollToLine(seq)
+  }, [version])
+
   const filtered = filteredRef.current
+  const displayLines = contextWindow ? contextWindow.lines : filtered
   const total = linesRef.current.length
   const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
   const visibleCount = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN * 2
-  const end = Math.min(filtered.length, start + visibleCount)
-  const visible = filtered.slice(start, end)
+  const end = Math.min(displayLines.length, start + visibleCount)
+  const visible = displayLines.slice(start, end)
   const contentWidth = Math.max(
     viewportWidth,
-    Math.min(maxLength, 8192) * charWidthRef.current + 140
+    Math.min(maxLength, 8192) * charWidthRef.current + 200
   )
 
   async function connect() {
@@ -551,7 +749,8 @@ export default observer(function Serial() {
     try {
       const filePath = await main.serialSave(
         mode,
-        mode === 'view' ? { keyword: search, regex: useRegex, source } : {}
+        // 搜索现在只用于定位，导出仍按“当前视图”保存：来源筛选生效，关键词不裁剪
+        mode === 'view' ? { source } : {}
       )
       if (filePath) {
         notify(t('serialSaved', { path: filePath }))
@@ -571,6 +770,10 @@ export default observer(function Serial() {
   }
 
   function scrollToEnd() {
+    pendingScrollSeqRef.current = null
+    if (contextWindowRef.current) {
+      updateContextWindow(null)
+    }
     const viewport = viewportRef.current
     if (viewport) {
       viewport.scrollTop = viewport.scrollHeight
@@ -672,8 +875,8 @@ export default observer(function Serial() {
     const label = port.friendlyName
       ? `${port.path} (${port.friendlyName})`
       : port.manufacturer
-      ? `${port.path} (${port.manufacturer})`
-      : port.path
+        ? `${port.path} (${port.manufacturer})`
+        : port.path
     portOptions[label] = port.path
   })
 
@@ -685,7 +888,11 @@ export default observer(function Serial() {
     baudOptions[toStr(baudRate)] = toStr(baudRate)
   }
 
-  const filterActive = !!search.trim() || source !== 'all'
+  const filterActive = source !== 'all'
+  const searching = !!search.trim()
+  const counter = searching
+    ? `${matchIndex >= 0 ? matchIndex + 1 : 0}/${matchCount}`
+    : `${filtered.length}/${total}`
   let emptyTip = ''
   if (status?.open) {
     if (!total) {
@@ -780,6 +987,7 @@ export default observer(function Serial() {
           value={search}
           historyKey="serial-search"
           onChange={setSearch}
+          onEnter={() => goToMatch(1)}
         />
         <ToolbarIcon
           icon="text"
@@ -787,10 +995,20 @@ export default observer(function Serial() {
           title={t('serialRegex')}
           onClick={() => setUseRegex(!useRegex)}
         />
+        <ToolbarIcon
+          icon="arrow-left"
+          title={t('serialPrevMatch')}
+          onClick={() => goToMatch(-1)}
+          disabled={!matchCount}
+        />
+        <ToolbarIcon
+          icon="arrow-right"
+          title={t('serialNextMatch')}
+          onClick={() => goToMatch(1)}
+          disabled={!matchCount}
+        />
         <LunaToolbarText
-          text={`${filtered.length}/${total}${
-            status?.paused ? ` ${t('serialPaused')}` : ''
-          }`}
+          text={`${counter}${status?.paused ? ` ${t('serialPaused')}` : ''}`}
         />
         <LunaToolbarSpace />
         <ToolbarIcon
@@ -829,66 +1047,88 @@ export default observer(function Serial() {
         <div
           ref={viewportRef}
           className={Style.viewport}
-        onScroll={(e) => {
-          const el = e.currentTarget
-          setScrollTop(el.scrollTop)
-          const atBottom =
-            el.scrollHeight - el.scrollTop - el.clientHeight < ROW_HEIGHT * 2
-          atBottomRef.current = atBottom
-          autoScrollRef.current = atBottom
-          if (atBottom !== autoScroll) {
-            setAutoScroll(atBottom)
-          }
-        }}
-        onContextMenu={(e) => onContextMenu(e)}
-      >
-        {total > 0 && (
-          <div
-            className={Style.content}
-            style={{
-              height: filtered.length * ROW_HEIGHT,
-              width: contentWidth,
-            }}
-          >
-            {visible.map((line, index) => {
-              const absIndex = start + index
-              const prevLine = absIndex > 0 ? filtered[absIndex - 1] : null
-              // 阶段切换处画一条分隔线，让 loader 到 kernel 的衔接一目了然
-              const stageStart =
-                !!prevLine &&
-                !line.tx &&
-                !prevLine.tx &&
-                prevLine.source !== line.source
-              return (
-                <div
-                  key={line.seq}
-                  className={[
-                    Style.row,
-                    line.tx ? Style.rowTx : ROW_CLASSES[line.source],
-                    stageStart ? Style.stageStart : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  style={{ top: (start + index) * ROW_HEIGHT }}
-                >
-                  <span className={Style.time}>
-                    {dateFormat(new Date(line.time), 'HH:MM:ss.l')}
-                  </span>
-                  <span
-                    className={`${Style.badge} ${
-                      line.tx ? Style.tx : Style[line.source]
-                    }`}
+          onScroll={(e) => {
+            const el = e.currentTarget
+            setScrollTop(el.scrollTop)
+            const atBottom =
+              el.scrollHeight - el.scrollTop - el.clientHeight < ROW_HEIGHT * 2
+            atBottomRef.current = atBottom
+            autoScrollRef.current = atBottom
+            if (atBottom !== autoScroll) {
+              setAutoScroll(atBottom)
+            }
+          }}
+          onContextMenu={(e) => onContextMenu(e)}
+        >
+          {total > 0 && (
+            <div
+              className={Style.content}
+              style={{
+                height: displayLines.length * ROW_HEIGHT,
+                width: contentWidth,
+              }}
+            >
+              {visible.map((line, index) => {
+                const absIndex = start + index
+                const prevLine =
+                  absIndex > 0 ? displayLines[absIndex - 1] : null
+                // 阶段切换处画一条分隔线，让 loader 到 kernel 的衔接一目了然
+                const stageStart =
+                  !!prevLine &&
+                  !line.tx &&
+                  !prevLine.tx &&
+                  prevLine.source !== line.source
+                const isActive = !!activeSeq && line.seq === activeSeq
+                const isContext =
+                  !!activeSeq &&
+                  !isActive &&
+                  Math.abs(line.seq - activeSeq) <= CONTEXT_VISUAL_RADIUS
+                return (
+                  <div
+                    key={line.seq}
+                    className={[
+                      Style.row,
+                      line.tx ? Style.rowTx : ROW_CLASSES[line.source],
+                      stageStart ? Style.stageStart : '',
+                      isActive ? Style.rowActive : '',
+                      isContext ? Style.rowContext : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    style={{ top: (start + index) * ROW_HEIGHT }}
                   >
-                    {t(line.tx ? 'serialSend' : SOURCE_LABELS[line.source])}
-                  </span>
-                  <span className={Style.text}>
-                    {renderHighlight(line.text, matcher)}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                    <span className={Style.lineNo}>{line.seq}</span>
+                    <span className={Style.time}>
+                      {dateFormat(new Date(line.time), 'HH:MM:ss.l')}
+                    </span>
+                    <span
+                      className={`${Style.badge} ${
+                        line.tx ? Style.tx : Style[line.source]
+                      }`}
+                    >
+                      {t(line.tx ? 'serialSend' : SOURCE_LABELS[line.source])}
+                    </span>
+                    <span className={Style.text}>
+                      {renderHighlight(line.text, matcher, isActive)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {searching && !matchCount && (
+            <div className={Style.searchTip}>{t('serialNoMatch')}</div>
+          )}
+          {contextWindow && (
+            <div className={Style.contextBanner}>
+              <span>
+                {t('serialSearchLocated', {
+                  seq: String(activeSeq || contextWindow.centerSeq),
+                })}
+              </span>
+              <button onClick={backToLive}>{t('serialBackToLive')}</button>
+            </div>
+          )}
           {emptyTip && (
             <div className={Style.empty}>
               {status?.error ? `${emptyTip}\n${status.error}` : emptyTip}
