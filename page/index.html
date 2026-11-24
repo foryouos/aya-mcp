@@ -55,7 +55,7 @@
             "applicationSubCategory": "Android / Linux 设备控制 · MCP 服务",
             "operatingSystem": "Windows, macOS, Linux",
             "url": "https://aya-mcp.foryouos.cn/",
-            "softwareVersion": "2.1.8",
+            "softwareVersion": "2.1.9",
             "description": "AYA MCP 在 AYA 桌面端内置一个只监听 127.0.0.1 的 MCP 服务，把 Android 设备能力做成 75 个 aya_* 工具：截图、界面层级、点击滑动、应用管理、文件传输、logcat、串口日志、WebView 调试、屏幕适配、端口映射、录屏投屏。同一台 RK3576 实测比 Python uiautomator2 快 1.7–5 倍，层级回传体积小 24 倍。也支持带 adb 的 Linux 工控主板（Debian / Ubuntu / Buildroot / Yocto），日志走 journalctl / dmesg。",
             "featureList": [
               "75 个 MCP 工具（31 只读 / 44 写）",
@@ -2250,7 +2250,7 @@ details p {
             />
             <path d="M25 36h14" stroke="#fff" stroke-width="5" stroke-linecap="round" />
           </svg>
-          AYA&nbsp;MCP <small>v2.1.8</small>
+          AYA&nbsp;MCP <small>v2.1.9</small>
         </a>
         <nav class="links" aria-label="主导航">
           <a href="#what">什么是 MCP</a>
@@ -3107,6 +3107,20 @@ details p {
               <tbody>
                 <tr>
                   <td>
+                    <code>v2.1.9</code>
+                    <span class="ver-meta">2026-11-24</span>
+                  </td>
+                  <td>
+                    <ul>
+                      <li>串口搜索改为定位而非过滤：输入关键词后完整日志保持可见，自动跳到最近的命中行，可用上一条 / 下一条或回车逐条查看，命中行与前后上下文高亮并显示行号。</li>
+                      <li>更早的历史命中会从完整缓冲取回前后上下文，顶部提示定位行号并可一键返回实时日志；工具栏计数改为「当前命中 / 命中总数」。</li>
+                      <li>串口复制更精准：拖选只含正文，不再混入行号 / 时间 / 来源；按下鼠标即暂停自动跟随并隐藏浮层，右键新增复制当前行、可见日志与全部日志。</li>
+                      <li>日志页新增右键复制本条完整日志、完整标签与完整包名，长字段不受列宽截断影响；消息列拖选时自动滚动不再打断选择。</li>
+                    </ul>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
                     <code>v2.1.8</code>
                     <span class="ver-meta">2026-11-05</span>
                   </td>
@@ -3131,20 +3145,6 @@ details p {
                       <li>服务详情支持 dumpsys、/proc 进程信息、Binder 拓扑，并可一键抓取 debuggerd 栈与 atrace。</li>
                       <li>性能页修复 FPS 长期为 0：SurfaceFlinger 帧延迟是环形缓冲区，改为只取末尾连续帧并由 uptime 判断是否仍在刷新；带 NPU 的主板新增负载图表。</li>
                       <li>投屏修复画面停滞误报与提示遮挡：帧计时改用 requestVideoFrameCallback，画面恢复后自动清除提示，停滞提示缩小到右上角不再挤占画面。</li>
-                    </ul>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <code>v2.1.6</code>
-                    <span class="ver-meta">2026-11-03</span>
-                  </td>
-                  <td>
-                    <ul>
-                      <li>设备重启后应用列表不再卡在加载：adb 请求 / 建连 / shell 全部加超时，半开连接主动断开，设备变化时重置连接，重启完成后自动恢复（实测约 19 秒）。</li>
-                      <li>设备端应用信息缓存落盘并改为并发解析，重启后首次加载从 60 秒以上降到 1~2 秒；图标 HTTP 服务支持 ETag / 304 缓存。</li>
-                      <li>投屏新增 15 秒无帧看门狗，关闭时完整释放 socket、解码器与设备端进程；设备端截图补齐 Bitmap / HardwareBuffer 回收。</li>
-                      <li>终端新增 <code>adb shell</code> 输出语法高亮（可在设置中开关）与按 系统 / 显示 / 音频 / GPIO / 性能 / 存储 / 调试 分组的快捷命令，含控制序列的输出原样透传。</li>
                     </ul>
                   </td>
                 </tr>
@@ -3207,7 +3207,7 @@ details p {
           <a href="https://aya.liriliri.io/" target="_blank" rel="noopener">AYA</a>（
           <a href="https://github.com/liriliri/aya" target="_blank" rel="noopener">github.com/liriliri/aya</a>，作者
           <b>surunzi / liriliri</b>）二次开发，遵循原项目 <b>AGPL-3.0</b> 许可证；桌面端基础能力（投屏、文件管理、日志、性能、Shell
-          等）均来自上游。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.8</b>。
+          等）均来自上游。文档中的工具清单与行为描述对应 AYA MCP <b>v2.1.9</b>。
         </div>
 
         <div class="copy-bar">

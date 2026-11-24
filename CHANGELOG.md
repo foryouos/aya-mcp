@@ -1,3 +1,11 @@
+## v2.1.9 (24 Nov 2026)
+
+* feat: serial search now locates matches instead of filtering the log: the full log stays visible, the nearest match is focused automatically, and previous/next (or Enter) navigation walks through hits with the active line, nearby context and line numbers highlighted
+* feat: matches older than the local buffer load surrounding lines from the full main-process buffer, with a banner showing the located line and a shortcut back to live logs
+* fix: serial text selection is limited to the message column (line number, time and source badge are excluded); mouse down stops auto-follow and hides overlays so dragging is no longer interrupted
+* feat: serial context menu adds copy current line, copy visible lines and copy all, with selection validated against the log container
+* feat: logcat context menu adds copy full entry, full tag and full package, bypassing ellipsis truncation; pressing the mouse disables virtual-list auto-scroll while selecting
+
 ## v2.1.8 (5 Nov 2026)
 
 * feat: screencast mirrors up to 6 devices side by side in one window, with an equal grid layout and a spotlight layout that enlarges one device while the others keep streaming in a sidebar; switching focus only touches CSS, so playback is never interrupted
